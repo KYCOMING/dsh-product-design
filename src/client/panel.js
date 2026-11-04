@@ -261,6 +261,7 @@ function ProductDesignPanel() {
     const w = Number(loadUi().rightWidth);
     return w >= 200 && w <= 520 ? w : 242;
   });
+  const [rightCollapsed, setRightCollapsed] = useState(() => loadUi().rightCollapsed === true);
   const [section, setSection] = useState(() => {
     const s = loadUi().section;
     return s === null || s === 'pages' || s === 'components' || s === 'layers' ? s : 'pages';
@@ -382,10 +383,11 @@ function ProductDesignPanel() {
     saveUi({
       leftWidth: leftWidth,
       rightWidth: rightWidth,
+      rightCollapsed: rightCollapsed,
       section: section,
       snapEnabled: snapEnabled,
     });
-  }, [leftWidth, rightWidth, section, snapEnabled]);
+  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled]);
 
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -1299,6 +1301,7 @@ function ProductDesignPanel() {
   function startResizeRight(ev) {
     ev.preventDefault();
     ev.stopPropagation();
+    if (rightCollapsed) return;
     const sx = ev.clientX;
     const sw = rightWidth;
     const move = (e2) => {
@@ -1454,6 +1457,8 @@ function ProductDesignPanel() {
             groupSelection,
             ungroupSelection,
             rightWidth,
+            rightCollapsed,
+            toggleRight: () => setRightCollapsed((v) => !v),
             startResizeRight,
           }),
     ),

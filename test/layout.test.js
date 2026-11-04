@@ -62,6 +62,23 @@ describe('侧栏宽度与预览布局', () => {
     );
   });
 
+  it('右侧属性栏可以收起为窄条，再展开', async () => {
+    expect(one('.dpd-right.collapsed')).toBeNull();
+    const collapse = one('.dpd-right .dpd-mini');
+    expect(collapse.title).toBe('收起属性栏');
+    await click(collapse);
+    expect(one('.dpd-right.collapsed')).toBeTruthy();
+    expect(one('.dpd-right.collapsed .dpd-rightToggle')).toBeTruthy();
+    expect(one('.dpd-right.collapsed .dpd-empty')).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem('dsh-product-design:ui:v1')).rightCollapsed).toBe(
+      true,
+    );
+
+    await click(one('.dpd-right.collapsed .dpd-rightToggle'));
+    expect(one('.dpd-right.collapsed')).toBeNull();
+    expect(one('.dpd-right .dpd-empty')).toBeTruthy();
+  });
+
   it('预览时只保留产品画板，退出后恢复编辑器', async () => {
     await click(btnText('预览'));
     expect(q('.dpd-toolbar').length).toBe(0);

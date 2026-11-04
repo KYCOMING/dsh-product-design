@@ -184,6 +184,8 @@ var DICT = {
     "library.title": "\u7EC4\u4EF6\u5E93",
     "library.hint": "\u70B9\u51FB\u6DFB\u52A0\u5230\u5F53\u524D\u9875\u9762",
     "inspector.title": "\u5C5E\u6027",
+    "inspector.collapse": "\u6536\u8D77\u5C5E\u6027\u680F",
+    "inspector.expand": "\u5C55\u5F00\u5C5E\u6027\u680F",
     "inspector.frame": "\u753B\u5E03\u8BBE\u7F6E",
     "inspector.page": "\u9875\u9762",
     "inspector.pageName": "\u9875\u9762\u540D\u79F0",
@@ -299,6 +301,8 @@ var DICT = {
     "library.title": "Components",
     "library.hint": "Click to add to the current page",
     "inspector.title": "Properties",
+    "inspector.collapse": "Collapse properties",
+    "inspector.expand": "Expand properties",
     "inspector.frame": "Frame settings",
     "inspector.page": "Page",
     "inspector.pageName": "Page name",
@@ -1013,7 +1017,10 @@ var CSS = [
   ".dpd-resizer{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;z-index:6}",
   ".dpd-resizer.left{left:0;right:auto}",
   ".dpd-resizer:hover{background:var(--dsw-alias-border-l2,#d6d9e2)}",
-  ".dpd-right{position:relative;width:242px;flex-shrink:0;border-left:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);display:flex;flex-direction:column;min-height:0;overflow:auto}",
+  ".dpd-right{position:relative;width:242px;max-width:36%;flex-shrink:0;border-left:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);display:flex;flex-direction:column;min-height:0;overflow:auto}",
+  ".dpd-right.collapsed{width:38px;min-width:38px;max-width:none;align-items:center;padding-top:8px;overflow:hidden}",
+  ".dpd-rightToggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:8px;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;font:inherit;font-size:15px}",
+  ".dpd-rightToggle:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);color:var(--dsw-alias-label-primary,#111)}",
   ".dpd-panelTitle{padding:10px 12px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,#6b7280);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:6px}",
   ".dpd-hint{padding:0 12px 8px;font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280)}",
   ".dpd-pages{display:flex;flex-direction:column;gap:1px;padding:0 8px 8px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}",
@@ -1977,8 +1984,27 @@ function InspectorView(props) {
     groupSelection,
     ungroupSelection,
     rightWidth,
+    rightCollapsed,
+    toggleRight,
     startResizeRight
   } = props;
+  if (rightCollapsed) {
+    return h(
+      "div",
+      { className: "dpd-right collapsed" },
+      h(
+        "button",
+        {
+          className: "dpd-rightToggle",
+          type: "button",
+          title: t("inspector.expand"),
+          "aria-label": t("inspector.expand"),
+          onClick: toggleRight
+        },
+        "\xAB"
+      )
+    );
+  }
   function numInput(value, onChange) {
     return h("input", {
       className: "dpd-input",
@@ -2307,7 +2333,22 @@ function InspectorView(props) {
     "div",
     { className: "dpd-right", style: { width: rightWidth || 242 } },
     h("div", { className: "dpd-resizer left", onMouseDown: startResizeRight }),
-    h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.title"))),
+    h(
+      "div",
+      { className: "dpd-panelTitle" },
+      h("span", null, t("inspector.title")),
+      h(
+        "button",
+        {
+          className: "dpd-mini",
+          type: "button",
+          title: t("inspector.collapse"),
+          "aria-label": t("inspector.collapse"),
+          onClick: toggleRight
+        },
+        "\xBB"
+      )
+    ),
     inspectorBody
   );
   return right;
@@ -2913,6 +2954,7 @@ function ProductDesignPanel() {
     const w = Number(loadUi().rightWidth);
     return w >= 200 && w <= 520 ? w : 242;
   });
+  const [rightCollapsed, setRightCollapsed] = useState2(() => loadUi().rightCollapsed === true);
   const [section, setSection] = useState2(() => {
     const s = loadUi().section;
     return s === null || s === "pages" || s === "components" || s === "layers" ? s : "pages";
@@ -3019,10 +3061,11 @@ function ProductDesignPanel() {
     saveUi({
       leftWidth,
       rightWidth,
+      rightCollapsed,
       section,
       snapEnabled
     });
-  }, [leftWidth, rightWidth, section, snapEnabled]);
+  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled]);
   const canvasRef = useRef(null);
   useEffect2(() => {
     const el = canvasRef.current;
@@ -3879,6 +3922,7 @@ function ProductDesignPanel() {
   function startResizeRight(ev) {
     ev.preventDefault();
     ev.stopPropagation();
+    if (rightCollapsed) return;
     const sx = ev.clientX;
     const sw = rightWidth;
     const move = (e2) => {
@@ -4025,6 +4069,8 @@ function ProductDesignPanel() {
         groupSelection,
         ungroupSelection,
         rightWidth,
+        rightCollapsed,
+        toggleRight: () => setRightCollapsed((v) => !v),
         startResizeRight
       })
     ),

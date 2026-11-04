@@ -22,8 +22,28 @@ export function InspectorView(props) {
     groupSelection,
     ungroupSelection,
     rightWidth,
+    rightCollapsed,
+    toggleRight,
     startResizeRight,
   } = props;
+
+  if (rightCollapsed) {
+    return h(
+      'div',
+      { className: 'dpd-right collapsed' },
+      h(
+        'button',
+        {
+          className: 'dpd-rightToggle',
+          type: 'button',
+          title: t('inspector.expand'),
+          'aria-label': t('inspector.expand'),
+          onClick: toggleRight,
+        },
+        '«',
+      ),
+    );
+  }
 
   // -------------------------------------------------- right: inspector + layers
   function numInput(value, onChange) {
@@ -373,7 +393,22 @@ export function InspectorView(props) {
     'div',
     { className: 'dpd-right', style: { width: rightWidth || 242 } },
     h('div', { className: 'dpd-resizer left', onMouseDown: startResizeRight }),
-    h('div', { className: 'dpd-panelTitle' }, h('span', null, t('inspector.title'))),
+    h(
+      'div',
+      { className: 'dpd-panelTitle' },
+      h('span', null, t('inspector.title')),
+      h(
+        'button',
+        {
+          className: 'dpd-mini',
+          type: 'button',
+          title: t('inspector.collapse'),
+          'aria-label': t('inspector.collapse'),
+          onClick: toggleRight,
+        },
+        '»',
+      ),
+    ),
     inspectorBody,
   );
 
