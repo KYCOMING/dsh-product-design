@@ -22,6 +22,7 @@
   },
   "files": [
     "index.js",
+    "host-model.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
@@ -39,7 +40,7 @@
     "react": "^18.2.0"
   },
   "scripts": {
-    "syntax": "node --check client.js && node --check index.js",
+    "syntax": "node --check client.js && node --check index.js && node --check host-model.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check test vitest.config.mjs",

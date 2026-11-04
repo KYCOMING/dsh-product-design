@@ -1,8 +1,10 @@
 # dsh-product-design bundle patch: inserts a dual-face plugin row.
-# The Host half (exports ".") registers nothing; the browser half
-# (exports "./client", served from the dsh.client declaration) contributes the
-# sidebar panel entry ("sidebar.panellist") and its center-column page
-# ("main") so the canvas renders through the shell's own panel container.
+# The Host half (exports ".") is the authoritative document service: it
+# persists the design, serves /dsh-product-design/api routes, and registers the
+# product_design_* agent tools. The browser half (exports "./client", served via
+# the dsh.client declaration) contributes the sidebar panel entry
+# ("sidebar.panellist"), its center-column page ("main"), and the /canvas
+# command, and syncs the document from the Host.
 - insert:
     - id: dsh-product-design
       name: 'dsh-product-design'

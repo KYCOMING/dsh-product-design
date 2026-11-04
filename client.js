@@ -41,6 +41,8 @@ window.__ModuleLoader__.load({
     const STORAGE_KEY = 'dsh-product-design:doc:v2';
     const LEGACY_KEY = 'dsh-product-design:doc:v1';
     const UI_KEY = 'dsh-product-design:ui:v1';
+    /** Host half's same-origin API (see index.js). The browser is a view over it. */
+    const API_PREFIX = '/dsh-product-design/api';
 
     /** Set from apply(); components read the locale service through it. */
     let APP_CTX = null;
@@ -609,6 +611,32 @@ window.__ModuleLoader__.load({
       } catch (e) { /* ignore */ }
     }
 
+    /**
+     * Call the Host document API. Returns `{ status, body }`, or `null` when the
+     * Host half is not reachable (standalone/localStorage-only mode).
+     */
+    function apiFetch(path, init) {
+      if (typeof fetch !== 'function') return Promise.resolve(null);
+      let url;
+      try {
+        url = new URL(API_PREFIX + path, window.location && window.location.href ? window.location.href : 'http://localhost/').toString();
+      } catch (e) {
+        return Promise.resolve(null);
+      }
+      const opts = Object.assign({}, init);
+      if (!opts.signal && typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        try { opts.signal = AbortSignal.timeout(4000); } catch (e) { /* ignore */ }
+      }
+      return fetch(url, opts).then(
+        (res) => res.text().then((text) => {
+          let body = null;
+          if (text) { try { body = JSON.parse(text); } catch (e) { body = null; } }
+          return { status: res.status, body };
+        }),
+        () => null,
+      );
+    }
+
     // ------------------------------------------------------------------
     // styles
     // ------------------------------------------------------------------
@@ -837,7 +865,101 @@ window.__ModuleLoader__.load({
         return s === null || s === 'pages' || s === 'components' || s === 'layers' ? s : 'pages';
       });
 
-      useEffect(() => { saveDoc(doc); }, [doc]);
+      // Host sync: when the Host half is reachable the document is authoritative
+      // there (persisted + shared with agent tools). When it is not, this panel
+      // degrades to localStorage-only editing, exactly like before.
+      const hostRef = useRef({ on: false, revision: 0, suppressSave: false });
+
+      useEffect(() => {
+        saveDoc(doc);
+        if (hostRef.current.suppressSave) {
+          hostRef.current.suppressSave = false;
+          return undefined;
+        }
+        if (!hostRef.current.on) return undefined;
+        const timer = setTimeout(() => {
+          apiFetch('/doc', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ baseRevision: hostRef.current.revision, doc: doc }),
+          }).then((res) => {
+            if (!res) return;
+            if (res.status === 200 && res.body) {
+              hostRef.current.revision = res.body.revision;
+            } else if (res.status === 409 && res.body && res.body.doc) {
+              const nd = normalizeDoc(res.body.doc);
+              if (nd) {
+                hostRef.current.revision = res.body.revision;
+                hostRef.current.suppressSave = true;
+                docRef.current = nd;
+                setDocState(nd);
+              }
+            }
+          });
+        }, 400);
+        return () => clearTimeout(timer);
+      }, [doc]);
+
+      // Load the Host document on mount and follow its change stream. The panel
+      // seeds the Host from the current (localStorage) doc when it is empty.
+      useEffect(() => {
+        let cancelled = false;
+        let source = null;
+        (async () => {
+          // The host API should be up by the time the browser loads, but a
+          // slower boot should not permanently disable sync: retry a few times
+          // when this looks like a real browser (EventSource present).
+          const canStream = typeof EventSource === 'function';
+          const attempts = canStream ? 6 : 1;
+          let got = null;
+          for (let i = 0; i < attempts && !cancelled; i += 1) {
+            got = await apiFetch('/doc');
+            if (got && got.status === 200 && got.body) break;
+            if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500));
+          }
+          if (cancelled || !got || got.status !== 200 || !got.body) return;
+          hostRef.current.on = true;
+          hostRef.current.revision = got.body.revision || 0;
+          if (got.body.doc) {
+            const nd = normalizeDoc(got.body.doc);
+            if (nd) {
+              hostRef.current.suppressSave = true;
+              docRef.current = nd;
+              setDocState(nd);
+            }
+          } else {
+            const seeded = await apiFetch('/doc', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ baseRevision: hostRef.current.revision, doc: docRef.current }),
+            });
+            if (seeded && seeded.status === 200 && seeded.body) hostRef.current.revision = seeded.body.revision;
+          }
+          if (cancelled || typeof EventSource !== 'function') return;
+          try {
+            source = new EventSource(new URL(API_PREFIX + '/events', window.location.href).toString());
+            source.onmessage = (evt) => {
+              let data = null;
+              try { data = JSON.parse(evt.data); } catch (e) { data = null; }
+              if (!data || typeof data.revision !== 'number' || data.revision === hostRef.current.revision) return;
+              apiFetch('/doc').then((snap) => {
+                if (!snap || snap.status !== 200 || !snap.body || !snap.body.doc) return;
+                const nd = normalizeDoc(snap.body.doc);
+                if (!nd) return;
+                hostRef.current.revision = snap.body.revision;
+                hostRef.current.suppressSave = true;
+                docRef.current = nd;
+                setDocState(nd);
+              });
+            };
+          } catch (e) { /* EventSource unavailable */ }
+        })();
+        return () => {
+          cancelled = true;
+          if (source) { try { source.close(); } catch (e) { /* ignore */ } }
+        };
+      }, []);
+
       useEffect(() => { saveUi({ leftWidth: leftWidth, section: section }); }, [leftWidth, section]);
 
       const canvasRef = useRef(null);
