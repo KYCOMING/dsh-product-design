@@ -61,6 +61,8 @@ window.__ModuleLoader__.load({
         'toolbar.undo': '撤销 (⌘Z)',
         'toolbar.redo': '重做 (⇧⌘Z)',
         'toolbar.panHint': '空格 / 中键拖拽平移画布',
+        'command.canvas.label': '产品设计画布',
+        'command.canvas.desc': '打开产品设计画布，开始搭原型',
         'frame.title': '画布尺寸',
         'frame.mobile': '手机 390×844',
         'frame.tablet': '平板 768×1024',
@@ -155,6 +157,8 @@ window.__ModuleLoader__.load({
         'toolbar.undo': 'Undo (⌘Z)',
         'toolbar.redo': 'Redo (⇧⌘Z)',
         'toolbar.panHint': 'Hold Space / middle-drag to pan the canvas',
+        'command.canvas.label': 'Product Design Canvas',
+        'command.canvas.desc': 'Open the product design canvas to build a prototype',
         'frame.title': 'Frame size',
         'frame.mobile': 'Phone 390×844',
         'frame.tablet': 'Tablet 768×1024',
@@ -1549,9 +1553,36 @@ window.__ModuleLoader__.load({
         key: PANEL_ID,
       }, ProductDesignPanel)));
 
+      // `/canvas` — open this plugin's panel from the composer. Registering a
+      // client action command through commandUi is the supported "invoke from
+      // the conversation" path: picking it runs ui.run(session) and never
+      // becomes a model message. Selecting the panel flips the shell's shared
+      // central-panel selection onto our `main` key.
+      if (typeof ctx.inject === 'function') {
+        try {
+          ctx.inject(['commandUi'], (scope) => {
+            scope.effect(() => scope.commandUi.register({
+              name: 'canvas',
+              label: () => pickDict(activeLocale(), 'command.canvas.label'),
+              description: () => pickDict(activeLocale(), 'command.canvas.desc'),
+              available: () => true,
+              ui: {
+                kind: 'action',
+                run: () => {
+                  try {
+                    const layout = ctx.get('layout');
+                    if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID);
+                  } catch (e) { /* layout service unavailable */ }
+                },
+              },
+            }), 'dsh-product-design: /canvas command');
+          });
+        } catch (e) { /* commandUi service unavailable */ }
+      }
+
       return () => { for (const d of disposers.splice(0)) { try { d(); } catch (e) { /* ignore */ } } };
     }
 
-    return { inject: ['slots'], apply };
+    return { inject: ['slots', 'layout'], apply };
   },
 });

@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- 新增 `/canvas` 客户端命令：在 composer 通过 `/` 菜单或直接输入 `/canvas` 打开画布（`ctx.commandUi` 动作命令 + `ctx.layout.selectPanel`）。
 - 工程化骨架：git 仓库、`.gitignore` / `.editorconfig` / `.nvmrc`、README / CHANGELOG / CONTRIBUTING / LICENSE。
 - `package.json` 补充 `engines`、`peerDependencies`、`scripts`、`devDependencies`。
 - 行为回归测试入库（vitest + jsdom）：插件注册、整树渲染、撤销/重做、快捷键、拖拽、平移。
