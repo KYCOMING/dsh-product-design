@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+.pnpm-store/
+.pnpm-cache/
+.pnpm-state/
+.pnpm-home/
+.npm-cache/
+.cache/
+.data/
+.state/
+
+# build output (reserved for a future bundler step)
+lib/
+dist/
+
+# test / tooling caches
+coverage/
+.vitest/
+
+# os / editor
+.DS_Store
+*.log
+*.local
