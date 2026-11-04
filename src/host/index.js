@@ -19,7 +19,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { applyOps, emptyDoc, summarizeDoc } from './model.js';
+import { applyOps, emptyDoc, repairDoc, summarizeDoc } from './model.js';
 
 const API_PREFIX = '/dsh-product-design/api';
 const MAX_BODY = 4 * 1024 * 1024;
@@ -66,6 +66,20 @@ function createStore(file) {
     }
   } catch {
     /* no file yet — start empty */
+  }
+
+  // Heal documents left inconsistent by older versions (frame changed without
+  // scaling the elements). Persist immediately so reads and the canvas agree.
+  const repaired = repairDoc(doc);
+  if (repaired.changed) {
+    doc = repaired.doc;
+    revision += 1;
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, JSON.stringify({ revision, doc }), 'utf8');
+    } catch {
+      /* best-effort */
+    }
   }
 
   const subscribers = new Set();

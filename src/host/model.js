@@ -64,6 +64,22 @@ const num = (v, d) => {
 };
 const str = (v, d) => (typeof v === 'string' ? v : d);
 
+/** Bounding box of a page's elements (empty page → null). */
+function elementsBounds(elements) {
+  if (!Array.isArray(elements) || elements.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const e of elements) {
+    minX = Math.min(minX, e.x);
+    minY = Math.min(minY, e.y);
+    maxX = Math.max(maxX, e.x + e.w);
+    maxY = Math.max(maxY, e.y + e.h);
+  }
+  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+}
+
 /** Scale a component's font size / radius with the frame change factor. */
 function scaleProps(props, s) {
   const out = isObj(props) ? { ...props } : {};
@@ -209,13 +225,18 @@ function applyOne(doc, op, index) {
     const ow = page.frame.w;
     const oh = page.frame.h;
     if (op.scaleElements !== false && ow > 0 && oh > 0 && (ow !== nw || oh !== nh)) {
-      const sx = nw / ow;
-      const sy = nh / oh;
+      const b = elementsBounds(page.elements);
+      const hasContent = b && b.w > 0 && b.h > 0;
+      const inconsistent = hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
+      const sx = inconsistent ? nw / b.w : nw / ow;
+      const sy = inconsistent ? nh / b.h : nh / oh;
+      const ox = inconsistent ? b.minX : 0;
+      const oy = inconsistent ? b.minY : 0;
       const sf = Math.min(sx, sy);
       page.elements = page.elements.map((e) => ({
         ...e,
-        x: Math.round(e.x * sx),
-        y: Math.round(e.y * sy),
+        x: Math.round((e.x - ox) * sx),
+        y: Math.round((e.y - oy) * sy),
         w: Math.max(12, Math.round(e.w * sx)),
         h: Math.max(8, Math.round(e.h * sy)),
         props: scaleProps(e.props, sf),
@@ -296,6 +317,40 @@ export function applyOps(rawDoc, ops) {
   const results = ops.map((op, i) => applyOne(doc, op, i));
   if (!doc.activePageId && doc.pages.length) doc.activePageId = doc.pages[0].id;
   return { doc, results };
+}
+
+/**
+ * Repair pages whose elements are much narrower than their frame (an
+ * inconsistent state left by older versions that changed the frame without
+ * scaling). Fits such content to the frame once. Idempotent: repaired pages
+ * are consistent, so a second call changes nothing.
+ * @returns {{ doc: object, changed: boolean }}
+ */
+export function repairDoc(rawDoc) {
+  if (!isObj(rawDoc) || !Array.isArray(rawDoc.pages)) return { doc: rawDoc, changed: false };
+  let changed = false;
+  for (const page of rawDoc.pages) {
+    if (!isObj(page) || !Array.isArray(page.elements) || page.elements.length === 0) continue;
+    const frame = isObj(page.frame) ? page.frame : {};
+    const ow = num(frame.w, 390);
+    const oh = num(frame.h, 844);
+    const b = elementsBounds(page.elements);
+    if (!b || b.w <= 0 || b.h <= 0) continue;
+    if (b.w >= ow * 0.4 && b.w < ow * 0.8) {
+      const sx = ow / b.w;
+      const sy = oh / b.h;
+      page.elements = page.elements.map((e) => ({
+        ...e,
+        x: Math.round((e.x - b.minX) * sx),
+        y: Math.round((e.y - b.minY) * sy),
+        w: Math.max(12, Math.round(e.w * sx)),
+        h: Math.max(8, Math.round(e.h * sy)),
+        props: scaleProps(e.props, Math.min(sx, sy)),
+      }));
+      changed = true;
+    }
+  }
+  return { doc: rawDoc, changed };
 }
 
 /** A short human/model-readable summary of a document (for tool output). */

@@ -49,6 +49,20 @@ var num = (v, d) => {
   return Number.isFinite(n) ? n : d;
 };
 var str = (v, d) => typeof v === "string" ? v : d;
+function elementsBounds(elements) {
+  if (!Array.isArray(elements) || elements.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const e of elements) {
+    minX = Math.min(minX, e.x);
+    minY = Math.min(minY, e.y);
+    maxX = Math.max(maxX, e.x + e.w);
+    maxY = Math.max(maxY, e.y + e.h);
+  }
+  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+}
 function scaleProps(props, s) {
   const out = isObj(props) ? { ...props } : {};
   if (typeof out.fontSize === "number") out.fontSize = Math.max(8, Math.round(out.fontSize * s));
@@ -179,13 +193,18 @@ function applyOne(doc, op, index) {
     const ow = page.frame.w;
     const oh = page.frame.h;
     if (op.scaleElements !== false && ow > 0 && oh > 0 && (ow !== nw || oh !== nh)) {
-      const sx = nw / ow;
-      const sy = nh / oh;
+      const b = elementsBounds(page.elements);
+      const hasContent = b && b.w > 0 && b.h > 0;
+      const inconsistent = hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
+      const sx = inconsistent ? nw / b.w : nw / ow;
+      const sy = inconsistent ? nh / b.h : nh / oh;
+      const ox = inconsistent ? b.minX : 0;
+      const oy = inconsistent ? b.minY : 0;
       const sf = Math.min(sx, sy);
       page.elements = page.elements.map((e) => ({
         ...e,
-        x: Math.round(e.x * sx),
-        y: Math.round(e.y * sy),
+        x: Math.round((e.x - ox) * sx),
+        y: Math.round((e.y - oy) * sy),
         w: Math.max(12, Math.round(e.w * sx)),
         h: Math.max(8, Math.round(e.h * sy)),
         props: scaleProps(e.props, sf)
@@ -256,6 +275,32 @@ function applyOps(rawDoc, ops) {
   if (!doc.activePageId && doc.pages.length) doc.activePageId = doc.pages[0].id;
   return { doc, results };
 }
+function repairDoc(rawDoc) {
+  if (!isObj(rawDoc) || !Array.isArray(rawDoc.pages)) return { doc: rawDoc, changed: false };
+  let changed = false;
+  for (const page of rawDoc.pages) {
+    if (!isObj(page) || !Array.isArray(page.elements) || page.elements.length === 0) continue;
+    const frame = isObj(page.frame) ? page.frame : {};
+    const ow = num(frame.w, 390);
+    const oh = num(frame.h, 844);
+    const b = elementsBounds(page.elements);
+    if (!b || b.w <= 0 || b.h <= 0) continue;
+    if (b.w >= ow * 0.4 && b.w < ow * 0.8) {
+      const sx = ow / b.w;
+      const sy = oh / b.h;
+      page.elements = page.elements.map((e) => ({
+        ...e,
+        x: Math.round((e.x - b.minX) * sx),
+        y: Math.round((e.y - b.minY) * sy),
+        w: Math.max(12, Math.round(e.w * sx)),
+        h: Math.max(8, Math.round(e.h * sy)),
+        props: scaleProps(e.props, Math.min(sx, sy))
+      }));
+      changed = true;
+    }
+  }
+  return { doc: rawDoc, changed };
+}
 function summarizeDoc(rawDoc) {
   const doc = ensureDoc(rawDoc ?? emptyDoc());
   return {
@@ -309,6 +354,16 @@ function createStore(file) {
       doc = parsed.doc ?? null;
     }
   } catch {
+  }
+  const repaired = repairDoc(doc);
+  if (repaired.changed) {
+    doc = repaired.doc;
+    revision += 1;
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, JSON.stringify({ revision, doc }), "utf8");
+    } catch {
+    }
   }
   const subscribers = /* @__PURE__ */ new Set();
   function notify() {

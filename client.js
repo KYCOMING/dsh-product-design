@@ -2519,6 +2519,20 @@ function ProductDesignPanel() {
       setPreview(false);
     }
   }
+  function elementsBounds(elements) {
+    if (!Array.isArray(elements) || elements.length === 0) return null;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const e of elements) {
+      minX = Math.min(minX, e.x);
+      minY = Math.min(minY, e.y);
+      maxX = Math.max(maxX, e.x + e.w);
+      maxY = Math.max(maxY, e.y + e.h);
+    }
+    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+  }
   function setPreset(key) {
     const map = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
     const sz = map[key];
@@ -2533,8 +2547,13 @@ function ProductDesignPanel() {
         const ow = p.frame.w || nw;
         const oh = p.frame.h || nh;
         if (ow === nw && oh === nh) return { ...p, frame };
-        const sx = nw / ow;
-        const sy = nh / oh;
+        const b = elementsBounds(p.elements);
+        const hasContent = b && b.w > 0 && b.h > 0;
+        const inconsistent = hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
+        const sx = inconsistent ? nw / b.w : nw / ow;
+        const sy = inconsistent ? nh / b.h : nh / oh;
+        const ox = inconsistent ? b.minX : 0;
+        const oy = inconsistent ? b.minY : 0;
         const sf = Math.min(sx, sy);
         const scaleEl = (e) => {
           const props = { ...e.props };
@@ -2544,8 +2563,8 @@ function ProductDesignPanel() {
             props.radius = Math.max(0, Math.round(props.radius * sf));
           return {
             ...e,
-            x: Math.round(e.x * sx),
-            y: Math.round(e.y * sy),
+            x: Math.round((e.x - ox) * sx),
+            y: Math.round((e.y - oy) * sy),
             w: Math.max(12, Math.round(e.w * sx)),
             h: Math.max(8, Math.round(e.h * sy)),
             props

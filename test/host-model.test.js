@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, emptyDoc, ensureDoc, summarizeDoc } from '../src/host/model.js';
+import { applyOps, emptyDoc, ensureDoc, repairDoc, summarizeDoc } from '../src/host/model.js';
 
 describe('host 文档 reducer', () => {
   it('add_page + add_element 生成 id 并保持结构', () => {
@@ -124,5 +124,31 @@ describe('host 文档 reducer', () => {
       { kind: 'set_page_frame', pageId, preset: 'mobile', scaleElements: false },
     ]).doc;
     expect(kept.pages[0].elements[0].w).toBe(before.w);
+  });
+
+  it('repairDoc 修复半宽错位文档（幂等）', () => {
+    const doc = {
+      name: '',
+      activePageId: 'p',
+      pages: [
+        {
+          id: 'p',
+          name: 'P',
+          frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
+          elements: [
+            { id: 'n', type: 'navbar', x: 0, y: 0, w: 198, h: 46, state: 'default', props: {} },
+            { id: 't', type: 'tabs', x: 0, y: 387, w: 198, h: 40, state: 'default', props: {} },
+          ],
+        },
+      ],
+    };
+    const first = repairDoc(doc);
+    expect(first.changed).toBe(true);
+    const els = first.doc.pages[0].elements;
+    const maxX = Math.max(...els.map((e) => e.x + e.w));
+    const maxY = Math.max(...els.map((e) => e.y + e.h));
+    expect(Math.abs(maxX - 390)).toBeLessThanOrEqual(1);
+    expect(Math.abs(maxY - 844)).toBeLessThanOrEqual(1);
+    expect(repairDoc(first.doc).changed).toBe(false);
   });
 });

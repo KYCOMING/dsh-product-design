@@ -521,14 +521,31 @@ function ProductDesignPanel() {
       setPreview(false);
     }
   }
+  /** Bounding box of a page's elements (empty page → null). */
+  function elementsBounds(elements) {
+    if (!Array.isArray(elements) || elements.length === 0) return null;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const e of elements) {
+      minX = Math.min(minX, e.x);
+      minY = Math.min(minY, e.y);
+      maxX = Math.max(maxX, e.x + e.w);
+      maxY = Math.max(maxY, e.y + e.h);
+    }
+    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+  }
+
   function setPreset(key) {
     const map = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
     const sz = map[key];
     if (!sz) return;
-    // Scale the page's components with the frame: x/width follow the width
-    // ratio, y/height follow the height ratio, so the layout fills the new
-    // frame and is exactly reversible when switching back. Font size / radius
-    // use the smaller ratio so text stays readable rather than stretched.
+    // Fit the page's existing content to the new frame: scale x/width by the
+    // content width ratio and y/height by the content height ratio so the
+    // components fill the new artboard (and switching back restores it). Using
+    // the content box (not the old frame) also repairs documents left
+    // inconsistent by older versions that changed the frame without scaling.
     setDoc((d) => ({
       ...d,
       pages: d.pages.map((p) => {
@@ -539,8 +556,17 @@ function ProductDesignPanel() {
         const ow = p.frame.w || nw;
         const oh = p.frame.h || nh;
         if (ow === nw && oh === nh) return { ...p, frame };
-        const sx = nw / ow;
-        const sy = nh / oh;
+        const b = elementsBounds(p.elements);
+        const hasContent = b && b.w > 0 && b.h > 0;
+        // Detects a page left inconsistent by older versions (content much
+        // narrower than its frame) and repairs it by fitting the content box to
+        // the new frame. Consistent pages use the frame ratio, which is exactly
+        // reversible across presets.
+        const inconsistent = hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
+        const sx = inconsistent ? nw / b.w : nw / ow;
+        const sy = inconsistent ? nh / b.h : nh / oh;
+        const ox = inconsistent ? b.minX : 0;
+        const oy = inconsistent ? b.minY : 0;
         const sf = Math.min(sx, sy);
         const scaleEl = (e) => {
           const props = { ...e.props };
@@ -550,8 +576,8 @@ function ProductDesignPanel() {
             props.radius = Math.max(0, Math.round(props.radius * sf));
           return {
             ...e,
-            x: Math.round(e.x * sx),
-            y: Math.round(e.y * sy),
+            x: Math.round((e.x - ox) * sx),
+            y: Math.round((e.y - oy) * sy),
             w: Math.max(12, Math.round(e.w * sx)),
             h: Math.max(8, Math.round(e.h * sy)),
             props,
