@@ -816,6 +816,46 @@ function applyTool(store) {
     }
   };
 }
+function newUserMessage(text) {
+  const id = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `u${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    id,
+    role: "user",
+    content: [{ type: "text", text }],
+    source: { kind: "user" }
+  };
+}
+function registerDesignCommand(ctx) {
+  const install = (scope) => {
+    const commands = scope && scope.commands || ctx.get("commands");
+    if (!commands || typeof commands.register !== "function") return;
+    const register = () => commands.register({
+      name: "design",
+      description: "\u63D0\u4EA4\u4EA7\u54C1\u8BBE\u8BA1\u9700\u6C42\uFF0C\u8BA9 AI \u5728\u753B\u5E03\u4E0A\u751F\u6210\u6216\u4FEE\u6539\u8BBE\u8BA1",
+      input: { hint: "<\u9700\u6C42>" },
+      recordInput: false,
+      handler: ({ agent, rawInput }) => {
+        const text = String(rawInput || "").trim();
+        if (!text) return { kind: "error", text: "\u7528\u6CD5\uFF1A/design <\u4F60\u7684\u4EA7\u54C1\u8BBE\u8BA1\u9700\u6C42>" };
+        if (!agent || typeof agent.followup !== "function") {
+          return { kind: "error", text: "\u5F53\u524D\u4F1A\u8BDD\u4E0D\u652F\u6301\u76F4\u63A5\u63D0\u4EA4\u9700\u6C42\u3002" };
+        }
+        agent.followup(newUserMessage(text));
+        return {
+          kind: "success",
+          text: "\u5DF2\u63D0\u4EA4\u8BBE\u8BA1\u9700\u6C42\uFF0CAI \u4F1A\u5728\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\u4E0A\u5F00\u59CB\u7ED8\u5236\u3002"
+        };
+      }
+    });
+    if (typeof scope.effect === "function") {
+      scope.effect(register, "dsh-product-design: /design command");
+    } else {
+      register();
+    }
+  };
+  if (typeof ctx.inject === "function") ctx.inject(["commands"], install);
+  else install(ctx);
+}
 function registerTools(ctx, store) {
   const install = (scope) => {
     const tools = scope && scope.tools || ctx.get("tools");
@@ -860,6 +900,7 @@ function apply(ctx) {
     "dsh-product-design: host api"
   );
   registerTools(ctx, store);
+  registerDesignCommand(ctx);
   registerPrompt(ctx);
 }
 export {

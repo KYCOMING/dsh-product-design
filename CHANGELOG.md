@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **`/design <需求>` 命令**：Host 命令接收产品设计需求并通过 `agent.followup()` 提交为普通用户消息，由 AI 调用 `product_design_apply` 绘制；`/canvas` 保持打开画布查看的职责。
 - **对话内产品预览（Codex Visualize 风格）**：`product_design_apply` / `product_design_get_document` 的结果附带 `presentationMeta`，客户端在聊天回合末尾渲染当前页面的产品缩略卡片，支持「打开画布」。AI 收到需求并修改文档后，用户无需先输入 `/canvas` 就能看到结果。
 - **右侧属性栏可拖拽调宽 + 收起**：宽度会记忆到 `dsh-product-design:ui:v1`，并限制最大占可用宽度的 36%；标题栏「»」可收起为窄条、「«」展开，避免遮挡画布。
 - **纯净预览**：进入预览时隐藏工具栏与左右侧栏，只保留当前产品画板（无网格/页面标签），支持右上角「退出预览」或 `Esc` 返回。

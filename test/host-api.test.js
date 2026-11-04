@@ -10,6 +10,7 @@ let home;
 const routes = [];
 const tools = [];
 const sections = [];
+const commands = [];
 let ctx;
 let apply;
 
@@ -67,12 +68,20 @@ beforeAll(async () => {
       return () => {};
     },
   };
+  const commandService = {
+    register(command) {
+      commands.push(command);
+      return () => {};
+    },
+  };
   const scopeOf = () => ({
     tools: scopeTools,
     systemPrompt,
+    commands: commandService,
     get: (name) => {
       if (name === 'tools') return scopeTools;
       if (name === 'systemPrompt') return systemPrompt;
+      if (name === 'commands') return commandService;
       return undefined;
     },
     effect: (fn) => {
@@ -94,6 +103,7 @@ beforeAll(async () => {
     get(name) {
       if (name === 'tools') return scopeTools;
       if (name === 'systemPrompt') return systemPrompt;
+      if (name === 'commands') return commandService;
       return undefined;
     },
     inject(_deps, cb) {
@@ -162,6 +172,26 @@ describe('host API + tools', () => {
       expect(tool.parameters.type).toBe('object');
       expect(typeof tool.execute).toBe('function');
     }
+  });
+
+  it('/design 命令把需求作为普通用户消息提交给 Agent', async () => {
+    const command = commands.find((item) => item.name === 'design');
+    expect(command).toBeTruthy();
+    expect(command.input).toEqual({ hint: '<需求>' });
+    let followed = null;
+    const result = command.handler({
+      agent: {
+        followup(message) {
+          followed = message;
+        },
+      },
+      rawInput: '画一个登录页',
+      attachments: [],
+    });
+    expect(result.kind).toBe('success');
+    expect(followed.role).toBe('user');
+    expect(followed.content[0].text).toBe('画一个登录页');
+    expect(command.handler({ agent: { followup() {} }, rawInput: '  ' }).kind).toBe('error');
   });
 
   it('GET /doc 初始为空 → POST 播种 → GET 读到', async () => {

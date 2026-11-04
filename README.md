@@ -42,8 +42,11 @@
 | 命令      | 作用                                                 |
 | --------- | ---------------------------------------------------- |
 | `/canvas` | 打开产品设计画布（`/` 菜单中显示为「产品设计画布」） |
+| `/design <需求>` | 提交一条产品设计需求，作为普通用户消息交给 AI，由 AI 调用画布工具生成/修改设计 |
 
-实现：通过客户端命令面 `ctx.commandUi.register(...)` 注册一个 `kind: 'action'` 的贡献项，执行时调用 `ctx.layout.selectPanel('dsh-product-design')` 选中本插件注册的 `main` 面板。
+`/canvas` 实现：通过客户端命令面 `ctx.commandUi.register(...)` 注册一个 `kind: 'action'` 的贡献项，执行时调用 `ctx.layout.selectPanel('dsh-product-design')` 选中本插件注册的 `main` 面板。
+
+`/design` 实现：Host 半通过 `ctx.commands.register({ name: 'design', input: { hint: '<需求>' }, ... })` 注册；handler 将 `rawInput` 包装成普通用户消息并通过 `agent.followup()` 提交，因此 AI 会正常走产品设计工具链，而不是由命令直接改文档。
 
 ## 架构
 
