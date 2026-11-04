@@ -257,6 +257,10 @@ function ProductDesignPanel() {
     const w = Number(loadUi().leftWidth);
     return w >= 168 && w <= 460 ? w : 264;
   });
+  const [rightWidth, setRightWidth] = useState(() => {
+    const w = Number(loadUi().rightWidth);
+    return w >= 200 && w <= 520 ? w : 242;
+  });
   const [section, setSection] = useState(() => {
     const s = loadUi().section;
     return s === null || s === 'pages' || s === 'components' || s === 'layers' ? s : 'pages';
@@ -377,10 +381,11 @@ function ProductDesignPanel() {
   useEffect(() => {
     saveUi({
       leftWidth: leftWidth,
+      rightWidth: rightWidth,
       section: section,
       snapEnabled: snapEnabled,
     });
-  }, [leftWidth, section, snapEnabled]);
+  }, [leftWidth, rightWidth, section, snapEnabled]);
 
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -1291,6 +1296,23 @@ function ProductDesignPanel() {
     window.addEventListener('mouseup', up);
   }
 
+  function startResizeRight(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const sx = ev.clientX;
+    const sw = rightWidth;
+    const move = (e2) => {
+      const nw = Math.max(200, Math.min(520, Math.round(sw - (e2.clientX - sx))));
+      setRightWidth(nw);
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  }
+
   function renderStateFor(el) {
     const base = el.state || defaultState(el.type);
     if (!preview) return base;
@@ -1329,52 +1351,59 @@ function ProductDesignPanel() {
 
   return h(
     'div',
-    { className: 'dpd-root', 'data-dsh-plugin': 'product-design' },
+    {
+      className: 'dpd-root' + (preview ? ' dpd-previewMode' : ''),
+      'data-dsh-plugin': 'product-design',
+    },
     h(StyleBlock),
-    h(ToolbarView, {
-      t,
-      doc,
-      setDoc,
-      activePage,
-      setPreset,
-      pageState,
-      setPageState,
-      zoom,
-      setZoom,
-      preview,
-      setPreview,
-      resetDoc,
-      undo,
-      redo,
-      canUndo,
-      canRedo,
-      setSelId: (id) => setSelIds(id ? [id] : []),
-      snapEnabled,
-      toggleSnap: () => {
-        setSnapEnabled((v) => !v);
-        setGuides([]);
-      },
-    }),
+    preview
+      ? null
+      : h(ToolbarView, {
+          t,
+          doc,
+          setDoc,
+          activePage,
+          setPreset,
+          pageState,
+          setPageState,
+          zoom,
+          setZoom,
+          preview,
+          setPreview,
+          resetDoc,
+          undo,
+          redo,
+          canUndo,
+          canRedo,
+          setSelId: (id) => setSelIds(id ? [id] : []),
+          snapEnabled,
+          toggleSnap: () => {
+            setSnapEnabled((v) => !v);
+            setGuides([]);
+          },
+        }),
     h(
       'div',
       { className: 'dpd-body' },
-      h(LeftView, {
-        t,
-        doc,
-        activePage,
-        setActivePage,
-        addPage,
-        duplicatePage,
-        deletePage,
-        addElement,
-        section,
-        setSection,
-        leftWidth,
-        startResizeLeft,
-        selIds,
-        setSelId: (id) => setSelIds(id ? [id] : []),
-        setPreview,
-      }),
+      preview
+        ? null
+        : h(LeftView, {
+            t,
+            doc,
+            activePage,
+            setActivePage,
+            addPage,
+            duplicatePage,
+            deletePage,
+            addElement,
+            section,
+            setSection,
+            leftWidth,
+            startResizeLeft,
+            selIds,
+            setSelId: (id) => setSelIds(id ? [id] : []),
+            setPreview,
+          }),
       h(CanvasView, {
         t,
         doc,
@@ -1404,26 +1433,42 @@ function ProductDesignPanel() {
         setUiFor,
         activate,
       }),
-      h(InspectorView, {
-        t,
-        sel,
-        selCount: selEntries.length,
-        activePage,
-        setEl,
-        setElProps,
-        duplicateEl,
-        bringFront,
-        sendBack,
-        deleteEl,
-        setPreset,
-        renameActivePage,
-        patchActiveFrame,
-        alignSelection,
-        distributeSelection,
-        groupSelection,
-        ungroupSelection,
-      }),
+      preview
+        ? null
+        : h(InspectorView, {
+            t,
+            sel,
+            selCount: selEntries.length,
+            activePage,
+            setEl,
+            setElProps,
+            duplicateEl,
+            bringFront,
+            sendBack,
+            deleteEl,
+            setPreset,
+            renameActivePage,
+            patchActiveFrame,
+            alignSelection,
+            distributeSelection,
+            groupSelection,
+            ungroupSelection,
+            rightWidth,
+            startResizeRight,
+          }),
     ),
+    preview
+      ? h(
+          'button',
+          {
+            className: 'dpd-previewExit',
+            type: 'button',
+            title: t('toolbar.exitPreview'),
+            onClick: () => setPreview(false),
+          },
+          t('toolbar.exitPreview'),
+        )
+      : null,
   );
 }
 

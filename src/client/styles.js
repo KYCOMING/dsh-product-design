@@ -4,7 +4,7 @@ import { h } from './react.js';
 // styles
 // ------------------------------------------------------------------
 const CSS = [
-  '.dpd-root{display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}',
+  '.dpd-root{position:relative;display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}',
   '.dpd-root *{box-sizing:border-box}',
   '.dpd-root button,.dpd-root input,.dpd-root select{font-family:inherit}',
   '.dpd-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);flex-wrap:wrap;flex-shrink:0}',
@@ -38,8 +38,9 @@ const CSS = [
   '.dpd-sectionwrap{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden}',
   '.dpd-sectionBody{display:flex;flex-direction:column;min-height:0;flex:1;overflow:hidden}',
   '.dpd-resizer{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;z-index:6}',
+  '.dpd-resizer.left{left:0;right:auto}',
   '.dpd-resizer:hover{background:var(--dsw-alias-border-l2,#d6d9e2)}',
-  '.dpd-right{width:242px;flex-shrink:0;border-left:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);display:flex;flex-direction:column;min-height:0;overflow:auto}',
+  '.dpd-right{position:relative;width:242px;flex-shrink:0;border-left:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);display:flex;flex-direction:column;min-height:0;overflow:auto}',
   '.dpd-panelTitle{padding:10px 12px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,#6b7280);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:6px}',
   '.dpd-hint{padding:0 12px 8px;font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280)}',
   '.dpd-pages{display:flex;flex-direction:column;gap:1px;padding:0 8px 8px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}',
@@ -55,6 +56,10 @@ const CSS = [
   '.dpd-libThumb{position:relative;width:100%;height:32px;display:flex;align-items:center;justify-content:center;overflow:hidden}',
   '.dpd-libName{font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}',
   '.dpd-canvas{flex:1;min-width:0;overflow:auto;background-color:var(--dsw-alias-bg-layer-2,#f0f1f4);position:relative}',
+  '.dpd-previewMode .dpd-canvas{background:#e9ebf0}',
+  '.dpd-previewMode .dpd-canvasinner{align-items:center;justify-content:center;padding:24px}',
+  '.dpd-previewExit{position:absolute;top:16px;right:16px;z-index:120;border:none;border-radius:999px;padding:7px 13px;background:rgba(17,24,39,.58);color:#fff;font:inherit;font-size:12px;cursor:pointer;opacity:.65;transition:opacity .15s,background .15s}',
+  '.dpd-previewExit:hover{opacity:1;background:rgba(17,24,39,.82)}',
   '.dpd-canvasinner{display:flex;align-items:flex-start;justify-content:center;min-width:100%;min-height:100%;width:max-content;box-sizing:border-box;padding:32px}',
   '.dpd-stage{position:relative;flex-shrink:0}',
   '.dpd-world{position:absolute;top:0;left:0}',

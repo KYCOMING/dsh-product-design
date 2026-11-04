@@ -131,18 +131,20 @@ export function CanvasView(props) {
     });
   }
 
+  const visiblePages = preview ? [activePage] : doc.pages;
+  const labelOffset = preview ? 0 : LABEL;
   const positions = {};
   let cursorX = 0;
-  doc.pages.forEach((p) => {
+  visiblePages.forEach((p) => {
     positions[p.id] = cursorX;
     cursorX += p.frame.w + GAP;
   });
   const totalW = Math.max(1, cursorX - GAP);
-  const maxH = doc.pages.reduce((m, p) => Math.max(m, p.frame.h), 0);
+  const maxH = visiblePages.reduce((m, p) => Math.max(m, p.frame.h), 0);
   const worldW = totalW;
-  const worldH = LABEL + maxH;
+  const worldH = labelOffset + maxH;
 
-  const pageLabels = doc.pages.map((p) =>
+  const pageLabels = (preview ? [] : doc.pages).map((p) =>
     h(
       'div',
       {
@@ -158,7 +160,7 @@ export function CanvasView(props) {
     ),
   );
 
-  const frameNodes = doc.pages.map((p) => {
+  const frameNodes = visiblePages.map((p) => {
     const pageActive = p.id === activePage.id;
     const els = renderElements(p.elements, p.id);
 
@@ -241,7 +243,7 @@ export function CanvasView(props) {
         className: 'dpd-frame',
         style: {
           left: positions[p.id],
-          top: LABEL,
+          top: labelOffset,
           width: p.frame.w,
           height: p.frame.h,
           background: p.frame.background || '#ffffff',
@@ -318,7 +320,11 @@ export function CanvasView(props) {
       'div',
       {
         className: 'dpd-canvasinner',
-        style: { backgroundImage: gridImage, backgroundSize: gridSize, backgroundPosition: '0 0' },
+        style: {
+          backgroundImage: preview ? 'none' : gridImage,
+          backgroundSize: preview ? 'auto' : gridSize,
+          backgroundPosition: '0 0',
+        },
       },
       h(
         'div',

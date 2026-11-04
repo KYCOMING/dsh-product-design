@@ -21,6 +21,8 @@ export function InspectorView(props) {
     distributeSelection,
     groupSelection,
     ungroupSelection,
+    rightWidth,
+    startResizeRight,
   } = props;
 
   // -------------------------------------------------- right: inspector + layers
@@ -369,7 +371,8 @@ export function InspectorView(props) {
 
   const right = h(
     'div',
-    { className: 'dpd-right' },
+    { className: 'dpd-right', style: { width: rightWidth || 242 } },
+    h('div', { className: 'dpd-resizer left', onMouseDown: startResizeRight }),
     h('div', { className: 'dpd-panelTitle' }, h('span', null, t('inspector.title'))),
     inspectorBody,
   );

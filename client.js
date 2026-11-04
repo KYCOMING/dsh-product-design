@@ -156,6 +156,7 @@ var DICT = {
     "name.placeholder": "\u672A\u547D\u540D\u8BBE\u8BA1",
     "toolbar.preview": "\u9884\u89C8",
     "toolbar.edit": "\u7F16\u8F91",
+    "toolbar.exitPreview": "\u9000\u51FA\u9884\u89C8 (Esc)",
     "toolbar.reset": "\u91CD\u7F6E",
     "toolbar.resetConfirm": "\u786E\u5B9A\u91CD\u7F6E\u4E3A\u793A\u4F8B\u8BBE\u8BA1\uFF1F\u5F53\u524D\u6240\u6709\u9875\u9762\u5C06\u88AB\u6E05\u7A7A\u3002",
     "toolbar.saved": "\u5DF2\u81EA\u52A8\u4FDD\u5B58",
@@ -270,6 +271,7 @@ var DICT = {
     "name.placeholder": "Untitled design",
     "toolbar.preview": "Preview",
     "toolbar.edit": "Edit",
+    "toolbar.exitPreview": "Exit preview (Esc)",
     "toolbar.reset": "Reset",
     "toolbar.resetConfirm": "Reset to the sample design? All pages will be cleared.",
     "toolbar.saved": "Auto-saved",
@@ -975,7 +977,7 @@ function apiFetch(path, init) {
 
 // src/client/styles.js
 var CSS = [
-  ".dpd-root{display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}",
+  ".dpd-root{position:relative;display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}",
   ".dpd-root *{box-sizing:border-box}",
   ".dpd-root button,.dpd-root input,.dpd-root select{font-family:inherit}",
   ".dpd-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);flex-wrap:wrap;flex-shrink:0}",
@@ -1009,8 +1011,9 @@ var CSS = [
   ".dpd-sectionwrap{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden}",
   ".dpd-sectionBody{display:flex;flex-direction:column;min-height:0;flex:1;overflow:hidden}",
   ".dpd-resizer{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;z-index:6}",
+  ".dpd-resizer.left{left:0;right:auto}",
   ".dpd-resizer:hover{background:var(--dsw-alias-border-l2,#d6d9e2)}",
-  ".dpd-right{width:242px;flex-shrink:0;border-left:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);display:flex;flex-direction:column;min-height:0;overflow:auto}",
+  ".dpd-right{position:relative;width:242px;flex-shrink:0;border-left:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);display:flex;flex-direction:column;min-height:0;overflow:auto}",
   ".dpd-panelTitle{padding:10px 12px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,#6b7280);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:6px}",
   ".dpd-hint{padding:0 12px 8px;font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280)}",
   ".dpd-pages{display:flex;flex-direction:column;gap:1px;padding:0 8px 8px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}",
@@ -1026,6 +1029,10 @@ var CSS = [
   ".dpd-libThumb{position:relative;width:100%;height:32px;display:flex;align-items:center;justify-content:center;overflow:hidden}",
   ".dpd-libName{font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}",
   ".dpd-canvas{flex:1;min-width:0;overflow:auto;background-color:var(--dsw-alias-bg-layer-2,#f0f1f4);position:relative}",
+  ".dpd-previewMode .dpd-canvas{background:#e9ebf0}",
+  ".dpd-previewMode .dpd-canvasinner{align-items:center;justify-content:center;padding:24px}",
+  ".dpd-previewExit{position:absolute;top:16px;right:16px;z-index:120;border:none;border-radius:999px;padding:7px 13px;background:rgba(17,24,39,.58);color:#fff;font:inherit;font-size:12px;cursor:pointer;opacity:.65;transition:opacity .15s,background .15s}",
+  ".dpd-previewExit:hover{opacity:1;background:rgba(17,24,39,.82)}",
   ".dpd-canvasinner{display:flex;align-items:flex-start;justify-content:center;min-width:100%;min-height:100%;width:max-content;box-sizing:border-box;padding:32px}",
   ".dpd-stage{position:relative;flex-shrink:0}",
   ".dpd-world{position:absolute;top:0;left:0}",
@@ -1785,17 +1792,19 @@ function CanvasView(props) {
       );
     });
   }
+  const visiblePages = preview ? [activePage] : doc.pages;
+  const labelOffset = preview ? 0 : LABEL;
   const positions = {};
   let cursorX = 0;
-  doc.pages.forEach((p) => {
+  visiblePages.forEach((p) => {
     positions[p.id] = cursorX;
     cursorX += p.frame.w + GAP;
   });
   const totalW = Math.max(1, cursorX - GAP);
-  const maxH = doc.pages.reduce((m, p) => Math.max(m, p.frame.h), 0);
+  const maxH = visiblePages.reduce((m, p) => Math.max(m, p.frame.h), 0);
   const worldW = totalW;
-  const worldH = LABEL + maxH;
-  const pageLabels = doc.pages.map(
+  const worldH = labelOffset + maxH;
+  const pageLabels = (preview ? [] : doc.pages).map(
     (p) => h(
       "div",
       {
@@ -1810,7 +1819,7 @@ function CanvasView(props) {
       h("span", { className: "sz" }, p.frame.w + "\xD7" + p.frame.h)
     )
   );
-  const frameNodes = doc.pages.map((p) => {
+  const frameNodes = visiblePages.map((p) => {
     const pageActive = p.id === activePage.id;
     const els = renderElements(p.elements, p.id);
     const selectionNodes = !preview && pageActive ? selBoxes.map((box) => {
@@ -1871,7 +1880,7 @@ function CanvasView(props) {
         className: "dpd-frame",
         style: {
           left: positions[p.id],
-          top: LABEL,
+          top: labelOffset,
           width: p.frame.w,
           height: p.frame.h,
           background: p.frame.background || "#ffffff"
@@ -1918,7 +1927,11 @@ function CanvasView(props) {
       "div",
       {
         className: "dpd-canvasinner",
-        style: { backgroundImage: gridImage, backgroundSize: gridSize, backgroundPosition: "0 0" }
+        style: {
+          backgroundImage: preview ? "none" : gridImage,
+          backgroundSize: preview ? "auto" : gridSize,
+          backgroundPosition: "0 0"
+        }
       },
       h(
         "div",
@@ -1962,7 +1975,9 @@ function InspectorView(props) {
     alignSelection,
     distributeSelection,
     groupSelection,
-    ungroupSelection
+    ungroupSelection,
+    rightWidth,
+    startResizeRight
   } = props;
   function numInput(value, onChange) {
     return h("input", {
@@ -2290,7 +2305,8 @@ function InspectorView(props) {
   }
   const right = h(
     "div",
-    { className: "dpd-right" },
+    { className: "dpd-right", style: { width: rightWidth || 242 } },
+    h("div", { className: "dpd-resizer left", onMouseDown: startResizeRight }),
     h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.title"))),
     inspectorBody
   );
@@ -2893,6 +2909,10 @@ function ProductDesignPanel() {
     const w = Number(loadUi().leftWidth);
     return w >= 168 && w <= 460 ? w : 264;
   });
+  const [rightWidth, setRightWidth] = useState2(() => {
+    const w = Number(loadUi().rightWidth);
+    return w >= 200 && w <= 520 ? w : 242;
+  });
   const [section, setSection] = useState2(() => {
     const s = loadUi().section;
     return s === null || s === "pages" || s === "components" || s === "layers" ? s : "pages";
@@ -2998,10 +3018,11 @@ function ProductDesignPanel() {
   useEffect2(() => {
     saveUi({
       leftWidth,
+      rightWidth,
       section,
       snapEnabled
     });
-  }, [leftWidth, section, snapEnabled]);
+  }, [leftWidth, rightWidth, section, snapEnabled]);
   const canvasRef = useRef(null);
   useEffect2(() => {
     const el = canvasRef.current;
@@ -3855,6 +3876,22 @@ function ProductDesignPanel() {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   }
+  function startResizeRight(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const sx = ev.clientX;
+    const sw = rightWidth;
+    const move = (e2) => {
+      const nw = Math.max(200, Math.min(520, Math.round(sw - (e2.clientX - sx))));
+      setRightWidth(nw);
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }
   function renderStateFor(el) {
     const base = el.state || defaultState(el.type);
     if (!preview) return base;
@@ -3891,9 +3928,12 @@ function ProductDesignPanel() {
   const canRedo = histRef.current.future.length > 0;
   return h(
     "div",
-    { className: "dpd-root", "data-dsh-plugin": "product-design" },
+    {
+      className: "dpd-root" + (preview ? " dpd-previewMode" : ""),
+      "data-dsh-plugin": "product-design"
+    },
     h(StyleBlock),
-    h(ToolbarView, {
+    preview ? null : h(ToolbarView, {
       t,
       doc,
       setDoc,
@@ -3920,7 +3960,7 @@ function ProductDesignPanel() {
     h(
       "div",
       { className: "dpd-body" },
-      h(LeftView, {
+      preview ? null : h(LeftView, {
         t,
         doc,
         activePage,
@@ -3966,7 +4006,7 @@ function ProductDesignPanel() {
         setUiFor,
         activate
       }),
-      h(InspectorView, {
+      preview ? null : h(InspectorView, {
         t,
         sel,
         selCount: selEntries.length,
@@ -3983,9 +4023,21 @@ function ProductDesignPanel() {
         alignSelection,
         distributeSelection,
         groupSelection,
-        ungroupSelection
+        ungroupSelection,
+        rightWidth,
+        startResizeRight
       })
-    )
+    ),
+    preview ? h(
+      "button",
+      {
+        className: "dpd-previewExit",
+        type: "button",
+        title: t("toolbar.exitPreview"),
+        onClick: () => setPreview(false)
+      },
+      t("toolbar.exitPreview")
+    ) : null
   );
 }
 
