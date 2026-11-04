@@ -187,7 +187,8 @@ function applyOne(doc, op, index) {
   if (kind === 'delete_page') {
     const idx = doc.pages.findIndex((p) => p.id === op.pageId);
     if (idx === -1) throw new Error(`op[${index}] delete_page: unknown page "${op.pageId}"`);
-    if (doc.pages.length <= 1) throw new Error(`op[${index}] delete_page: cannot delete the last page`);
+    if (doc.pages.length <= 1)
+      throw new Error(`op[${index}] delete_page: cannot delete the last page`);
     doc.pages.splice(idx, 1);
     if (doc.activePageId === op.pageId) doc.activePageId = doc.pages[0]?.id ?? null;
     return { op: index, kind, pageId: op.pageId };
@@ -263,7 +264,8 @@ function applyOne(doc, op, index) {
     if (op.y !== undefined) el.y = num(op.y, el.y);
     if (op.w !== undefined) el.w = Math.max(12, num(op.w, el.w));
     if (op.h !== undefined) el.h = Math.max(8, num(op.h, el.h));
-    if (op.state !== undefined && (ELEMENT_STATES[el.type] || []).includes(op.state)) el.state = op.state;
+    if (op.state !== undefined && (ELEMENT_STATES[el.type] || []).includes(op.state))
+      el.state = op.state;
     if (isObj(op.props)) el.props = { ...el.props, ...clone(op.props) };
     return { op: index, kind, pageId: page.id, elementId: el.id };
   }
@@ -272,7 +274,8 @@ function applyOne(doc, op, index) {
     const page = findPage(doc, op, index);
     const before = page.elements.length;
     page.elements = page.elements.filter((e) => e.id !== op.elementId);
-    if (page.elements.length === before) throw new Error(`op[${index}] delete_element: unknown element "${op.elementId}"`);
+    if (page.elements.length === before)
+      throw new Error(`op[${index}] delete_element: unknown element "${op.elementId}"`);
     return { op: index, kind, pageId: page.id, elementId: op.elementId };
   }
 

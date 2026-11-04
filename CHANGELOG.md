@@ -15,6 +15,9 @@
 - 行为回归测试入库（vitest + jsdom）：插件注册、整树渲染、撤销/重做、快捷键、拖拽、平移。
 - Biome 格式化 / 检查与 GitHub Actions CI。
 
+### Changed
+- **工程化重构**：源码迁入 `src/`（`src/client/*` 11 个职责模块 + `src/host/{index,model}.js`），用 esbuild（`scripts/build.mjs`）打包回单文件 `client.js` / `index.js`；新增 `pnpm run build`，`pretest` 自动构建；Host 的 `host-model.js` 迁至 `src/host/model.js`。
+
 ## [1.0.0] - 2026-11-04
 
 ### Added

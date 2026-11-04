@@ -22,11 +22,11 @@
   },
   "files": [
     "index.js",
-    "host-model.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
+    "src",
     "README.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
@@ -40,22 +40,28 @@
     "react": "^18.2.0"
   },
   "scripts": {
-    "syntax": "node --check client.js && node --check index.js && node --check host-model.js",
+    "build": "node scripts/build.mjs",
+    "pretest": "node scripts/build.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "biome check test vitest.config.mjs",
-    "format": "biome format --write test vitest.config.mjs",
-    "check": "pnpm run syntax && pnpm run lint && pnpm run test"
+    "syntax": "node --check client.js && node --check index.js",
+    "lint": "biome check src scripts test vitest.config.mjs",
+    "format": "biome format --write src scripts test vitest.config.mjs",
+    "check": "node scripts/build.mjs && node --check client.js && node --check index.js && biome check src scripts test vitest.config.mjs && vitest run",
+    "prepack": "node scripts/build.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
+    "esbuild": "^0.28.2",
     "jsdom": "^25.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vitest": "^4.1.11"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,

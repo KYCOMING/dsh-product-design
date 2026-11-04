@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, emptyDoc, ensureDoc, summarizeDoc } from '../host-model.js';
+import { applyOps, emptyDoc, ensureDoc, summarizeDoc } from '../src/host/model.js';
 
 describe('host 文档 reducer', () => {
   it('add_page + add_element 生成 id 并保持结构', () => {

@@ -19,5 +19,6 @@ coverage/
 
 # os / editor
 .DS_Store
+.idea/
 *.log
 *.local

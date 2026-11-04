@@ -1,0 +1,57 @@
+/**
+ * Build the two loadable halves from src/:
+ *   - src/host/index.js   → index.js   (Node ESM bundle for the host process)
+ *   - src/client/index.js → client.js   (browser bundle wrapped for the DSH
+ *     client module loader: window.__ModuleLoader__.load({ id, factory }))
+ *
+ * Plain JavaScript + esbuild; no TypeScript. React stays external for the
+ * client because the loader injects it through `require('react')`.
+ */
+import { writeFile } from 'node:fs/promises';
+import { build } from 'esbuild';
+
+async function buildHost() {
+  await build({
+    entryPoints: ['src/host/index.js'],
+    outfile: 'index.js',
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    target: ['node20'],
+    legalComments: 'none',
+    logLevel: 'warning',
+  });
+  console.log('built index.js');
+}
+
+async function buildClient() {
+  const result = await build({
+    entryPoints: ['src/client/index.js'],
+    bundle: true,
+    write: false,
+    format: 'cjs',
+    platform: 'browser',
+    target: ['es2020'],
+    external: ['react'],
+    legalComments: 'none',
+    logLevel: 'warning',
+  });
+  const body = result.outputFiles[0].text.replace(/\n+$/, '');
+  const wrapped = [
+    'window.__ModuleLoader__.load({',
+    "  id: 'dsh-product-design',",
+    '  factory(require) {',
+    '    var module = { exports: {} };',
+    '    var exports = module.exports;',
+    body,
+    '    return module.exports;',
+    '  },',
+    '});',
+    '',
+  ].join('\n');
+  await writeFile('client.js', wrapped, 'utf8');
+  console.log(`built client.js (${wrapped.length} bytes)`);
+}
+
+await buildHost();
+await buildClient();

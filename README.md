@@ -40,30 +40,38 @@
 
 ## 架构
 
-当前为**无构建步骤**的双半插件（Host 权威 + 浏览器视图）：
+双半插件：`src/` 是源码，`client.js` / `index.js` 是 esbuild 产出的**可加载单文件**（DSH 客户端只接受单文件模块）。
 
 ```text
 dsh-product-design/
-├─ index.js            # Host 半：文档 store、HTTP 路由、agent 工具
-├─ host-model.js       # Host 文档 reducer（纯函数，可单测）
-├─ client.js           # 浏览器半：i18n / 模型 / 历史 / 组件 / 画布 / 属性面板 / 入口
-├─ cordis.patch.yml    # bundle 补丁：插入插件行
-├─ locale/{zh,en}.json # 插件元信息（标题 / 描述）
+├─ src/
+│  ├─ client/                 # 浏览器半（按职责拆分）
+│  │  ├─ index.js             # 入口：apply(ctx) 注册 slot / locale / /canvas 命令
+│  │  ├─ react.js             # React 与 h 的极薄适配
+│  │  ├─ constants.js         # NS / PANEL_ID / 存储键 / 组件注册表 / GAP
+│  │  ├─ i18n.js              # DICT + useT / pickDict
+│  │  ├─ color.js             # 颜色工具
+│  │  ├─ widgets.js           # renderWidget：12 类组件渲染
+│  │  ├─ icons.js             # 图标 + 侧边栏 glyph
+│  │  ├─ styles.js            # 画布 CSS
+│  │  ├─ model.js             # 文档模型 / localStorage / Host API 调用
+│  │  ├─ overlay.js           # 页面状态浮层
+│  │  └─ panel.js             # 编辑器主组件（工具栏 / 活动栏 / 画布 / 属性面板）
+│  └─ host/
+│     ├─ index.js             # Host 半：store / HTTP / agent 工具 / prompt
+│     └─ model.js             # Host 文档 reducer（纯函数，可单测）
+├─ scripts/build.mjs          # esbuild：src → client.js + index.js
+├─ client.js   index.js       # 构建产物（提交入库，loader 直接读；勿手改）
+├─ cordis.patch.yml
+├─ locale/{zh,en}.json
 ├─ icon.svg
-├─ test/               # 行为回归测试（vitest + jsdom / node）
-└─ package.json        # exports / dsh 声明 / engines / scripts / devDeps
+├─ test/                      # vitest + jsdom / node 回归测试
+└─ package.json
 ```
 
-`client.js` 内部逻辑分层（为后续拆分预留）：
-
-- **i18n**：`DICT` + `useT()`，经 `ctx.get('locale')` 读取宿主语言。
-- **模型 / 持久化**：`defaultDoc` / `normalizeDoc` / `loadDoc` / `saveDoc`，含 v1→v2 迁移。
-- **历史**：`docRef` + `setDoc(updater, mode)` 的撤销 / 重做栈（拖拽、连续输入按动作合并）。
-- **组件注册**：`TYPE_INFO` + `renderWidget(el, state, t)`。
-- **画布**：多画板布局、缩放、网格、拖拽 / 缩放 / 平移、选择框。
-- **Host 同步**：挂载时从 Host 拉取文档并订阅 SSE；本地编辑 debounce 回写；Host 不可达时退回 localStorage。
-- **UI**：Toolbar / LeftRail（页面 / 组件库 / 图层）/ Inspector。
-- **入口**：`apply(ctx)` 注册 `sidebar.panellist` 与 `main` 两个 slot、locale 词条、以及客户端 `/canvas` 命令。
+- `client.js`：esbuild `format=cjs` 打包后，用 `window.__ModuleLoader__.load({ id, factory })` 包装；`react` 保持 external，由 loader 的 `require('react')` 注入。
+- `index.js`：esbuild 打 Node ESM（内联 `src/host/model.js`）。
+- 职责边界：`model.js` 只管文档/持久化；`widgets.js` 纯渲染；`i18n/constants/color` 无副作用；撤销/重做在 `panel.js`（`docRef` + `setDoc(mode)`）；`host/model.js` 是与 UI 无关的纯 reducer。
 
 ## AI 可编程画布（宿主权威）
 
@@ -77,22 +85,24 @@ dsh-product-design/
   - `GET /events` → SSE，每次变更推送 `{ revision }`
 - **Agent 工具**（`ctx.get('tools').register`）：
   - `product_design_get_document`：读取当前文档（页面 / 元素 / 状态 / 属性）。
-  - `product_design_apply`：按顺序应用操作，返回生成的 page/element id 与新 revision。支持 `add_page` / `delete_page` / `rename_page` / `set_page_frame` / `clear_page` / `add_element` / `update_element` / `delete_element` / `set_document_name`。
-- **模型提示段**：通过 `ctx.systemPrompt.section` 注册一段说明，告诉模型画布与工具的存在、坐标系与组件/状态清单，以及“先 get 再单次 apply 批量搭建”。
+  - `product_design_apply`：按顺序应用操作，返回生成的 page/element id 与新 revision。支持 `add_page` / `delete_page` / `rename_page` / `set_page_frame` / `clear_page` / `add_element` / `update_element` / `delete_element` / `set_document_name`；页面可用 `pageId`、`"@last"` 或 `pageIndex` 定位。
+- **模型提示段**：通过 `ctx.systemPrompt.section` 注册说明，告诉模型画布与工具、坐标系与组件/状态清单，以及“先 get 再单次 apply 批量搭建”。
 - **同步**：客户端 GET + SSE 拉取 Host 变更；本地编辑 400ms debounce 回写；冲突以 409 让客户端采纳服务端版本。Host 不可用时自动退回 localStorage 单机模式。
 - **安全**：路由复用 Host 的 `connection.requestRejection` 同源护栏（若有）；默认仅本机回环绑定。
 
 ## 开发
 
 ```bash
-pnpm install        # 安装开发依赖（测试 / lint 用）
-pnpm run syntax     # node --check 语法检查
-pnpm run test       # vitest 行为测试
-pnpm run lint       # biome 检查 test 目录与配置
-pnpm run check      # syntax + lint + test 一次跑完
+pnpm install
+pnpm run build      # src/ → client.js + index.js（改完 src 必须重新构建）
+pnpm run test       # vitest（pretest 会自动 build）
+pnpm run lint       # biome 检查 src / scripts / test
+pnpm run check      # build + syntax + lint + test 一次跑完
 ```
 
-插件通过 DSH profile 软链安装（`~/.dsh/profiles/desktop/node_modules/dsh-product-design -> 本目录`）。改动 `client.js` / `index.js` 后**刷新页面**；改了 Host 半（`index.js`）需**重启 Harness** 让宿主重新加载插件。
+> `client.js`、`index.js` 是构建产物，**不要手改**；改 `src/**` 后 `pnpm run build`，刷新页面即可。改了 Host 半（`index.js`）需要重启 Harness 让宿主重新加载。
+
+插件通过 DSH profile 软链安装（`~/.dsh/profiles/desktop/node_modules/dsh-product-design -> 本目录`）。
 
 ## 数据存储
 
