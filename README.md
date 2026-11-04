@@ -56,7 +56,12 @@ dsh-product-design/
 │  │  ├─ styles.js            # 画布 CSS
 │  │  ├─ model.js             # 文档模型 / localStorage / Host API 调用
 │  │  ├─ overlay.js           # 页面状态浮层
-│  │  └─ panel.js             # 编辑器主组件（工具栏 / 活动栏 / 画布 / 属性面板）
+│  │  ├─ panel.js             # 编辑器容器：状态 / 撤销历史 / 事件处理
+│  │  └─ ui/                  # 展示层子组件（纯渲染 + 回调）
+│  │     ├─ toolbar.js        #   顶部工具栏
+│  │     ├─ left.js           #   活动栏 + 页面/组件库/图层分区
+│  │     ├─ canvas.js         #   多画板画布
+│  │     └─ inspector.js      #   右侧属性面板
 │  └─ host/
 │     ├─ index.js             # Host 半：store / HTTP / agent 工具 / prompt
 │     └─ model.js             # Host 文档 reducer（纯函数，可单测）

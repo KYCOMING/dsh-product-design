@@ -25,7 +25,7 @@ pnpm install
 
 ## 代码约定
 
-- 源码在 `src/`：`src/client/*` 按职责拆分（constants / i18n / color / widgets / model / styles / icons / overlay / panel / index），`src/host/*` 为 Host 半。**不要直接改 `client.js` / `index.js`**，它们是 `pnpm run build` 的产物。
+- 源码在 `src/`：`src/client/*` 按职责拆分（constants / i18n / color / widgets / model / styles / icons / overlay / panel / index），其中 `src/client/ui/*` 是展示层子组件（toolbar / left / canvas / inspector），`src/host/*` 为 Host 半。**不要直接改 `client.js` / `index.js`**，它们是 `pnpm run build` 的产物。
 - 保持纯逻辑（model / host reducer）与 React 渲染分离，便于单测。
 - 所有面向用户的文案必须同时更新 `src/client/i18n.js` 的 `DICT.zh` 与 `DICT.en`（后续会加 i18n key 对齐测试）。
 - 修改 `doc` 数据结构时，必须同步提升 schema 版本并补迁移逻辑与迁移测试。
