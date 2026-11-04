@@ -25,6 +25,18 @@ const API_PREFIX = '/dsh-product-design/api';
 const MAX_BODY = 4 * 1024 * 1024;
 const HEARTBEAT_MS = 15000;
 
+/** Model-facing guidance so the agent knows the canvas and its tools exist. */
+const GUIDANCE = [
+  '本机已安装 dsh-product-design 插件：一个「简化版 Figma」产品设计画布，宿主权威。',
+  '打开方式：侧边栏「产品设计」图标，或在对话输入框输入 /canvas。',
+  '你可以直接用工具读写画布，不需要用户先打开面板：',
+  '  product_design_get_document：读取页面/元素/状态。',
+  '  product_design_apply：按操作增删改（add_page / add_element / update_element / delete_element / set_page_frame / clear_page / set_document_name 等）。',
+  '画布坐标原点在每页左上角；默认手机页 390×844。元素类型：button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select。',
+  'props 常用键：text、color、fontSize、fontWeight、radius；状态见各类型（如 button: default/hover/active/disabled）。',
+  '当用户提出产品设计/原型需求时：先 get_document，再用一次 apply 批量搭好页面与元素，最后提示用户输入 /canvas 或点侧边栏查看。',
+].join('\n');
+
 export const inject = ['webServer'];
 
 function dshHome() {
@@ -306,6 +318,18 @@ function registerTools(ctx, store) {
   }
 }
 
+function registerPrompt(ctx) {
+  if (typeof ctx.inject !== 'function') return;
+  ctx.inject(['systemPrompt', 'tools'], (scope) => {
+    const prompt = (scope && scope.systemPrompt) || ctx.get('systemPrompt');
+    if (!prompt || typeof prompt.section !== 'function') return;
+    scope.effect(
+      () => prompt.section({ name: 'plugin:dsh-product-design', order: 160, text: GUIDANCE }),
+      'dsh-product-design: prompt section',
+    );
+  });
+}
+
 export function apply(ctx) {
   const store = createStore(docFile());
 
@@ -315,4 +339,5 @@ export function apply(ctx) {
   );
 
   registerTools(ctx, store);
+  registerPrompt(ctx);
 }

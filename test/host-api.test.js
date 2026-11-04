@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { EventEmitter } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -8,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 let home;
 const routes = [];
 const tools = [];
+const sections = [];
 let ctx;
 let apply;
 
@@ -59,6 +61,25 @@ beforeAll(async () => {
       return () => {};
     },
   };
+  const systemPrompt = {
+    section(spec) {
+      sections.push(spec);
+      return () => {};
+    },
+  };
+  const scopeOf = () => ({
+    tools: scopeTools,
+    systemPrompt,
+    get: (name) => {
+      if (name === 'tools') return scopeTools;
+      if (name === 'systemPrompt') return systemPrompt;
+      return undefined;
+    },
+    effect: (fn) => {
+      const d = fn();
+      return typeof d === 'function' ? d : () => {};
+    },
+  });
   ctx = {
     webServer: {
       register(route) {
@@ -71,17 +92,12 @@ beforeAll(async () => {
       return typeof d === 'function' ? d : () => {};
     },
     get(name) {
-      return name === 'tools' ? scopeTools : undefined;
+      if (name === 'tools') return scopeTools;
+      if (name === 'systemPrompt') return systemPrompt;
+      return undefined;
     },
     inject(_deps, cb) {
-      cb({
-        tools: scopeTools,
-        get: (name) => (name === 'tools' ? scopeTools : undefined),
-        effect: (fn) => {
-          const d = fn();
-          return typeof d === 'function' ? d : () => {};
-        },
-      });
+      cb(scopeOf());
     },
   };
   apply(ctx);
@@ -100,6 +116,52 @@ describe('host API + tools', () => {
       'product_design_apply',
       'product_design_get_document',
     ]);
+  });
+
+  it('注册模型提示段（工具可见时）', () => {
+    expect(sections).toHaveLength(1);
+    expect(sections[0].name).toBe('plugin:dsh-product-design');
+    expect(sections[0].text).toContain('product_design_apply');
+  });
+
+  it('工具定义满足 dsh-tools 注册契约（output.render + 受支持的 JSON Schema 子集）', () => {
+    // Mirrors the real registry's checks: output.render must be a function and
+    // schemas may only use the supported keyword subset.
+    const ALLOWED = new Set([
+      'type',
+      'oneOf',
+      'properties',
+      'required',
+      'additionalProperties',
+      'items',
+      'enum',
+      'const',
+      'description',
+      'title',
+    ]);
+    const walk = (node, path) => {
+      expect(
+        node && typeof node === 'object' && !Array.isArray(node),
+        `${path} must be an object`,
+      ).toBe(true);
+      for (const key of Object.keys(node)) {
+        expect(ALLOWED.has(key), `${path}.${key} is not a supported keyword`).toBe(true);
+        if (key === 'properties') {
+          for (const [k, v] of Object.entries(node.properties)) walk(v, `${path}.properties.${k}`);
+        }
+        if (key === 'items') walk(node.items, `${path}.items`);
+        if (key === 'oneOf') {
+          for (const [i, v] of node.oneOf.entries()) walk(v, `${path}.oneOf[${i}]`);
+        }
+      }
+    };
+    for (const tool of tools) {
+      expect(typeof tool.output.render, `${tool.name}.output.render`).toBe('function');
+      walk(tool.output.schema, `${tool.name}.output.schema`);
+      walk(tool.parameters, `${tool.name}.parameters`);
+      expect(tool.parameters.type).toBe('object');
+      expect(typeof tool.execute).toBe('function');
+    }
   });
 
   it('GET /doc 初始为空 → POST 播种 → GET 读到', async () => {
@@ -152,5 +214,28 @@ describe('host API + tools', () => {
     });
     expect(bad.status).toBe(400);
     expect(bad.json.ok).toBe(false);
+  });
+
+  it('真实 HTTP 服务上 GET /doc 与 POST /apply 可用', async () => {
+    const server = createServer((req, res) => routes[0].handler(req, res));
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address();
+    try {
+      const getRes = await fetch(`http://127.0.0.1:${port}/dsh-product-design/api/doc`);
+      expect(getRes.status).toBe(200);
+      const body = await getRes.json();
+      expect(body.doc).toBeTruthy();
+
+      const postRes = await fetch(`http://127.0.0.1:${port}/dsh-product-design/api/apply`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ operations: [{ kind: 'set_document_name', name: 'RealHTTP' }] }),
+      });
+      expect(postRes.status).toBe(200);
+      const applied = await postRes.json();
+      expect(applied.ok).toBe(true);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

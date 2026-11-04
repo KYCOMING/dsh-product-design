@@ -7,7 +7,7 @@
 ## [Unreleased]
 
 ### Added
-- **宿主权威文档 + AI 可编程画布**：Host 半 (`index.js` + `host-model.js`) 持有设计稿、持久化到 `<DSH_HOME>/storages/dsh-product-design/doc.json`，提供同源 HTTP API（`/doc` GET/POST、`/apply`、`/events` SSE）与两个 agent 工具 `product_design_get_document`、`product_design_apply`（支持 add/update/delete 页面与元素、设置状态与属性）。客户端从 Host 拉取并订阅变更，本地编辑 debounce 回写；Host 不可用时退回 localStorage。
+- **宿主权威文档 + AI 可编程画布**：Host 半 (`index.js` + `host-model.js`) 持有设计稿、持久化到 `<DSH_HOME>/storages/dsh-product-design/doc.json`，提供同源 HTTP API（`/doc` GET/POST、`/apply`、`/events` SSE）与两个 agent 工具 `product_design_get_document`、`product_design_apply`（支持 add/update/delete 页面与元素、设置状态与属性）。客户端从 Host 拉取并订阅变更，本地编辑 debounce 回写；Host 不可用时退回 localStorage。另向模型注册一段系统提示，说明画布与工具用法。
 - 新增 `/canvas` 客户端命令：在 composer 通过 `/` 菜单或直接输入 `/canvas` 打开画布（`ctx.commandUi` 动作命令 + `ctx.layout.selectPanel`）。
 - 工程化骨架：git 仓库、`.gitignore` / `.editorconfig` / `.nvmrc`、README / CHANGELOG / CONTRIBUTING / LICENSE。
 - `package.json` 补充 `engines`、`peerDependencies`、`scripts`、`devDependencies`。

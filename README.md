@@ -77,6 +77,7 @@ dsh-product-design/
 - **Agent 工具**（`ctx.get('tools').register`）：
   - `product_design_get_document`：读取当前文档（页面 / 元素 / 状态 / 属性）。
   - `product_design_apply`：按顺序应用操作，返回生成的 page/element id 与新 revision。支持 `add_page` / `delete_page` / `rename_page` / `set_page_frame` / `clear_page` / `add_element` / `update_element` / `delete_element` / `set_document_name`。
+- **模型提示段**：通过 `ctx.systemPrompt.section` 注册一段说明，告诉模型画布与工具的存在、坐标系与组件/状态清单，以及“先 get 再单次 apply 批量搭建”。
 - **同步**：客户端 GET + SSE 拉取 Host 变更；本地编辑 400ms debounce 回写；冲突以 409 让客户端采纳服务端版本。Host 不可用时自动退回 localStorage 单机模式。
 - **安全**：路由复用 Host 的 `connection.requestRejection` 同源护栏（若有）；默认仅本机回环绑定。
 
