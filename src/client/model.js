@@ -1,4 +1,12 @@
-import { API_PREFIX, defaultState, LEGACY_KEY, STORAGE_KEY, UI_KEY } from './constants.js';
+import { isContainerType } from '../shared/elements.js';
+import {
+  API_PREFIX,
+  defaultState,
+  LEGACY_KEY,
+  STORAGE_KEY,
+  TYPE_INFO,
+  UI_KEY,
+} from './constants.js';
 
 // ------------------------------------------------------------------
 // document model + persistence
@@ -8,7 +16,7 @@ function uid() {
   return 'e' + Date.now().toString(36) + (__seq++).toString(36);
 }
 function makeEl(type, x, y, w, hh, props, state) {
-  return {
+  const el = {
     id: uid(),
     type,
     x,
@@ -18,6 +26,8 @@ function makeEl(type, x, y, w, hh, props, state) {
     state: state || defaultState(type),
     props: props || {},
   };
+  if (isContainerType(type)) el.children = [];
+  return el;
 }
 function starterElements(t) {
   return [
@@ -47,6 +57,29 @@ function defaultDoc(t) {
   };
   return { name: '', pages: [page], activePageId: page.id };
 }
+function normalizeElement(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const type = TYPE_INFO[raw.type] ? raw.type : 'text';
+  const el = {
+    id: raw.id || uid(),
+    type,
+    x: Number.isFinite(Number(raw.x)) ? Number(raw.x) : 0,
+    y: Number.isFinite(Number(raw.y)) ? Number(raw.y) : 0,
+    w: Math.max(12, Number.isFinite(Number(raw.w)) ? Number(raw.w) : TYPE_INFO[type].size[0]),
+    h: Math.max(8, Number.isFinite(Number(raw.h)) ? Number(raw.h) : TYPE_INFO[type].size[1]),
+    state: raw.state || defaultState(type),
+    props: raw.props && typeof raw.props === 'object' ? { ...raw.props } : {},
+  };
+  if (isContainerType(type)) {
+    el.children = Array.isArray(raw.children)
+      ? raw.children.map(normalizeElement).filter(Boolean)
+      : [];
+  }
+  return el;
+}
+function normalizeElements(list) {
+  return Array.isArray(list) ? list.map(normalizeElement).filter(Boolean) : [];
+}
 function normalizeDoc(doc) {
   if (!doc) return null;
   if (Array.isArray(doc.pages) && doc.pages.length) {
@@ -63,7 +96,7 @@ function normalizeDoc(doc) {
             preset: fr.preset || 'mobile',
             background: fr.background || '#ffffff',
           },
-          elements: p.elements,
+          elements: normalizeElements(p.elements),
         };
       });
     if (!pages.length) return null;
@@ -84,7 +117,7 @@ function normalizeDoc(doc) {
         preset: fr.preset || 'mobile',
         background: fr.background || '#ffffff',
       },
-      elements: doc.elements,
+      elements: normalizeElements(doc.elements),
     };
     return { name: doc.name || '', pages: [page], activePageId: page.id };
   }
@@ -174,6 +207,8 @@ export {
   loadUi,
   makeEl,
   normalizeDoc,
+  normalizeElement,
+  normalizeElements,
   saveDoc,
   saveUi,
   starterElements,

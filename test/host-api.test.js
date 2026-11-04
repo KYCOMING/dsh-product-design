@@ -202,6 +202,29 @@ describe('host API + tools', () => {
     expect(got.json.doc.pages[0].elements[0].props.text).toBe('开始');
   });
 
+  it('工具支持容器、@last 嵌套与编组操作', async () => {
+    const tool = tools.find((t) => t.name === 'product_design_apply');
+    const out = await tool.execute({
+      operations: [
+        { kind: 'add_page', name: '容器页' },
+        { kind: 'add_container', pageId: '@last', name: '卡片' },
+        {
+          kind: 'add_element',
+          pageId: '@last',
+          containerId: '@last',
+          type: 'button',
+          props: { text: 'OK' },
+        },
+      ],
+    });
+    expect(out.ok).toBe(true);
+    const got = await call('GET', '/dsh-product-design/api/doc');
+    const page = got.json.doc.pages.find((p) => p.name === '容器页');
+    expect(page).toBeTruthy();
+    expect(page.elements[0].type).toBe('container');
+    expect(page.elements[0].children[0].props.text).toBe('OK');
+  });
+
   it('POST /apply 与非法操作', async () => {
     const ok = await call('POST', '/dsh-product-design/api/apply', {
       operations: [{ kind: 'add_element', type: 'card' }],

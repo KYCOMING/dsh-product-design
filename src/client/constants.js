@@ -10,6 +10,22 @@ const API_PREFIX = '/dsh-product-design/api';
 // ------------------------------------------------------------------
 const ACCENT = '#6366f1';
 const TYPE_INFO = {
+  container: {
+    size: [320, 240],
+    states: ['default'],
+    hasText: false,
+    hasColor: false,
+    interactive: false,
+    container: true,
+  },
+  group: {
+    size: [200, 120],
+    states: ['default'],
+    hasText: false,
+    hasColor: false,
+    interactive: false,
+    container: true,
+  },
   button: {
     size: [132, 44],
     states: ['default', 'hover', 'active', 'disabled'],
@@ -69,6 +85,7 @@ const TYPE_INFO = {
   },
 };
 const LIB_ORDER = [
+  'container',
   'button',
   'input',
   'card',

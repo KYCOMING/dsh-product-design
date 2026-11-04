@@ -83,9 +83,18 @@ const IconLayers = () =>
     h('path', { d: 'M8 2l6 3-6 3-6-3 6-3z' }),
     h('path', { d: 'M2 8l6 3 6-3M2 11l6 3 6-3' }),
   );
+const IconMagnet = () =>
+  h(
+    Svg,
+    null,
+    h('path', { d: 'M3 2v6a5 5 0 0 0 10 0V2' }),
+    h('path', { d: 'M3 2H1.5M13 2h1.5M3 6h3M10 6h3' }),
+  );
 
 function libGlyph(type) {
   const map = {
+    container: h('path', { d: 'M2 3.5h12v9H2zM4.5 6h7v4h-7z' }),
+    group: h('path', { d: 'M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z' }),
     button: h('rect', { x: 2, y: 5, width: 12, height: 6, rx: 2 }),
     input: h('rect', { x: 2, y: 4.5, width: 12, height: 7, rx: 1.6 }),
     card: h('rect', { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
@@ -135,6 +144,7 @@ export {
   IconEye,
   IconFront,
   IconLayers,
+  IconMagnet,
   IconMinus,
   IconPages,
   IconPencil,

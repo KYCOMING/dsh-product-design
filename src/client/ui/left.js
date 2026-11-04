@@ -1,3 +1,4 @@
+import { isContainerType } from '../../shared/elements.js';
 import { defaultState, LIB_ORDER } from '../constants.js';
 import {
   IconComponents,
@@ -26,7 +27,7 @@ export function LeftView(props) {
     setSection,
     leftWidth,
     startResizeLeft,
-    selId,
+    selIds,
     setSelId,
     setPreview,
   } = props;
@@ -72,7 +73,20 @@ export function LeftView(props) {
   );
 
   const activeElements = (activePage && activePage.elements) || [];
-  const layers = activeElements.slice().reverse();
+  const layerRows = [];
+  const collectRows = (elements, depth) => {
+    elements
+      .slice()
+      .reverse()
+      .forEach((el) => {
+        layerRows.push({ el, depth });
+        if (isContainerType(el.type) && Array.isArray(el.children)) {
+          collectRows(el.children, depth + 1);
+        }
+      });
+  };
+  collectRows(activeElements, 0);
+  const selectedSet = new Set(selIds || []);
 
   const railBtn = (id, icon, label) =>
     h(
@@ -184,20 +198,24 @@ export function LeftView(props) {
     h(
       'div',
       { className: 'dpd-layers' },
-      layers.map((el) =>
+      layerRows.map(({ el, depth }) =>
         h(
           'div',
           {
             key: el.id,
-            className: 'dpd-layer' + (selId === el.id ? ' active' : ''),
+            className: 'dpd-layer' + (selectedSet.has(el.id) ? ' active' : ''),
+            style: { paddingLeft: 8 + depth * 16 },
             onClick: () => {
               setSelId(el.id);
               setPreview(false);
               setActivePage(activePage.id);
             },
           },
+          isContainerType(el.type)
+            ? h('span', { className: 'caret' }, depth >= 0 ? '▾' : '')
+            : null,
           h('span', { className: 'dot' }, h(Svg, { size: 13 }, libGlyph(el.type))),
-          h('span', { className: 'nm' }, el.props.text || t('comp.' + el.type)),
+          h('span', { className: 'nm' }, el.props.text || el.props.name || t('comp.' + el.type)),
         ),
       ),
     ),

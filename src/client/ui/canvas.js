@@ -1,3 +1,4 @@
+import { isContainerType } from '../../shared/elements.js';
 import { TYPE_INFO } from '../constants.js';
 import { PageOverlay } from '../overlay.js';
 import { h } from '../react.js';
@@ -6,15 +7,27 @@ import { renderWidget } from '../widgets.js';
 const GAP = 72;
 const LABEL = 30;
 
+const HANDLES = [
+  ['nw', 'nwse-resize'],
+  ['n', 'ns-resize'],
+  ['ne', 'nesw-resize'],
+  ['e', 'ew-resize'],
+  ['se', 'nwse-resize'],
+  ['s', 'ns-resize'],
+  ['sw', 'nesw-resize'],
+  ['w', 'ew-resize'],
+];
+
 export function CanvasView(props) {
   const {
     t,
     doc,
     activePage,
     zoom,
-    selId,
+    selIds,
+    selBoxes,
+    multiBounds,
     sel,
-    selPage,
     preview,
     pageState,
     ui,
@@ -22,9 +35,12 @@ export function CanvasView(props) {
     spaceRef,
     spaceDown,
     panning,
+    guides,
+    marquee,
     renderStateFor,
     startDrag,
     startResize,
+    startMarquee,
     startPan,
     setSelId,
     setActivePage,
@@ -33,7 +49,88 @@ export function CanvasView(props) {
     activate,
   } = props;
 
-  // -------------------------------------------------- canvas (all pages side by side)
+  const selectedSet = new Set(selIds || []);
+
+  function renderElements(elements, pageId) {
+    return elements.map((el) => {
+      const st = renderStateFor(el);
+      const u = ui[el.id] || {};
+      const info = TYPE_INFO[el.type] || TYPE_INFO.text;
+      const cursor = spaceDown
+        ? panning
+          ? 'grabbing'
+          : 'grab'
+        : preview
+          ? info.interactive
+            ? 'pointer'
+            : 'default'
+          : 'move';
+      const isBox = isContainerType(el.type);
+      const selected = selectedSet.has(el.id) && !preview;
+      const style = {
+        left: el.x,
+        top: el.y,
+        width: el.w,
+        height: el.h,
+        cursor,
+      };
+      let className = 'dpd-el';
+      if (selected) className += ' dpd-sel';
+      if (isBox) {
+        className += el.type === 'container' ? ' dpd-container' : ' dpd-group';
+        if (el.type === 'container') {
+          style.background = el.props.background || '#ffffff';
+          style.borderRadius = el.props.radius != null ? el.props.radius : 12;
+          style.overflow = el.props.clipContent === false ? 'visible' : 'hidden';
+        }
+      }
+      const handlers = {
+        onMouseDown: (ev) => {
+          if (ev.button === 1 || spaceRef.current) return;
+          if (preview) {
+            if (el.type === 'button') setUiFor(el.id, { press: true });
+            return;
+          }
+          startDrag(ev, pageId, el);
+        },
+        onMouseEnter: () => {
+          if (preview && (el.type === 'button' || el.type === 'card'))
+            setUiFor(el.id, { hover: true });
+        },
+        onMouseLeave: () => {
+          if (preview) setUiFor(el.id, { hover: false, press: false });
+        },
+        onMouseUp: () => {
+          if (preview && el.type === 'button') setUiFor(el.id, { press: false });
+        },
+        onClick: (ev) => {
+          if (preview) {
+            ev.stopPropagation();
+            activate(el, ev);
+          }
+        },
+      };
+      return h(
+        'div',
+        {
+          key: el.id,
+          'data-el-id': el.id,
+          className,
+          style,
+          title: isBox ? el.props.name || t('comp.' + el.type) : undefined,
+          ...handlers,
+        },
+        isBox
+          ? renderElements(el.children || [], pageId)
+          : h(
+              'div',
+              { style: { width: '100%', height: '100%', pointerEvents: 'none' } },
+              renderWidget(el, st, t, { tabsActive: u.tabs, preview }),
+            ),
+      );
+    });
+  }
+
   const positions = {};
   let cursorX = 0;
   doc.pages.forEach((p) => {
@@ -63,68 +160,76 @@ export function CanvasView(props) {
 
   const frameNodes = doc.pages.map((p) => {
     const pageActive = p.id === activePage.id;
-    const els = p.elements.map((el) => {
-      const st = renderStateFor(el);
-      const u = ui[el.id] || {};
-      const info = TYPE_INFO[el.type] || TYPE_INFO.text;
-      const cursor = spaceDown
-        ? panning
-          ? 'grabbing'
-          : 'grab'
-        : preview
-          ? info.interactive
-            ? 'pointer'
-            : 'default'
-          : 'move';
-      return h(
-        'div',
-        {
-          key: el.id,
-          className: 'dpd-el' + (selId === el.id && !preview ? ' dpd-sel' : ''),
-          style: { left: el.x, top: el.y, width: el.w, height: el.h, cursor },
-          onMouseDown: (ev) => {
-            if (ev.button === 1 || spaceRef.current) return; // let the canvas pan
-            if (preview) {
-              if (el.type === 'button') setUiFor(el.id, { press: true });
-              return;
-            }
-            startDrag(ev, p.id, el);
-          },
-          onMouseEnter: () => {
-            if (preview && (el.type === 'button' || el.type === 'card'))
-              setUiFor(el.id, { hover: true });
-          },
-          onMouseLeave: () => {
-            if (preview) setUiFor(el.id, { hover: false, press: false });
-          },
-          onMouseUp: () => {
-            if (preview && el.type === 'button') setUiFor(el.id, { press: false });
-          },
-          onClick: (ev) => {
-            if (preview) {
-              ev.stopPropagation();
-              activate(el, ev);
-            }
-          },
-        },
-        h(
-          'div',
-          { style: { width: '100%', height: '100%', pointerEvents: 'none' } },
-          renderWidget(el, st, t, { tabsActive: u.tabs, preview }),
-        ),
-      );
-    });
+    const els = renderElements(p.elements, p.id);
 
-    const selNode =
-      sel && selPage && selPage.id === p.id && !preview
-        ? h(
-            'div',
-            {
-              className: 'dpd-selBox',
-              style: { left: sel.x, top: sel.y, width: sel.w, height: sel.h },
+    const selectionNodes =
+      !preview && pageActive
+        ? selBoxes.map((box) => {
+            const single = selBoxes.length === 1;
+            const node = sel;
+            return h(
+              'div',
+              {
+                key: 'sel-' + box.id,
+                className: 'dpd-selBox' + (single ? '' : ' multi'),
+                style: { left: box.x, top: box.y, width: box.w, height: box.h },
+              },
+              single && node
+                ? HANDLES.map(([dir, cur]) =>
+                    h('div', {
+                      key: dir,
+                      className: 'dpd-handle h-' + dir,
+                      'data-dir': dir,
+                      style: { cursor: cur },
+                      onMouseDown: (ev) => startResize(ev, node, dir),
+                    }),
+                  )
+                : null,
+            );
+          })
+        : null;
+
+    const multiSelection =
+      !preview && pageActive && multiBounds && selBoxes.length > 1
+        ? h('div', {
+            className: 'dpd-multiBox',
+            style: {
+              left: multiBounds.x,
+              top: multiBounds.y,
+              width: multiBounds.w,
+              height: multiBounds.h,
             },
-            h('div', { className: 'dpd-handle br', onMouseDown: (ev) => startResize(ev, sel) }),
+          })
+        : null;
+
+    const guideNodes =
+      pageActive && !preview && guides && guides.length
+        ? guides.map((g, i) =>
+            g.axis === 'x'
+              ? h('div', {
+                  key: 'gx-' + i,
+                  className: 'dpd-guide v',
+                  style: { left: g.pos, top: g.from, height: Math.max(1, g.to - g.from) },
+                })
+              : h('div', {
+                  key: 'gy-' + i,
+                  className: 'dpd-guide h',
+                  style: { top: g.pos, left: g.from, width: Math.max(1, g.to - g.from) },
+                }),
           )
+        : null;
+
+    const marqueeNode =
+      pageActive && marquee && marquee.pageId === p.id
+        ? h('div', {
+            className: 'dpd-marquee',
+            style: {
+              left: marquee.x,
+              top: marquee.y,
+              width: marquee.w,
+              height: marquee.h,
+            },
+          })
         : null;
 
     const overlay = pageActive && pageState !== 'normal' ? h(PageOverlay, { pageState, t }) : null;
@@ -142,14 +247,19 @@ export function CanvasView(props) {
           background: p.frame.background || '#ffffff',
         },
         onMouseDown: (ev) => {
-          if (ev.button === 1 || spaceRef.current) return; // let the canvas pan
-          ev.stopPropagation();
-          setActivePage(p.id);
-          if (!preview) setSelId(null);
+          if (ev.button === 1 || spaceRef.current) return;
+          if (preview) {
+            setUi({});
+            return;
+          }
+          startMarquee(ev, p);
         },
       },
       els,
-      selNode,
+      selectionNodes,
+      multiSelection,
+      guideNodes,
+      marqueeNode,
       overlay,
     );
   });
@@ -191,7 +301,7 @@ export function CanvasView(props) {
   const canvas = h(
     'div',
     {
-      className: 'dpd-canvas',
+      className: 'dpd-canvas' + (preview ? ' dpd-preview' : ''),
       ref: canvasRef,
       title: t('toolbar.panHint'),
       style: { cursor: panning ? 'grabbing' : spaceDown ? 'grab' : 'default' },

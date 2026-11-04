@@ -3,8 +3,98 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
+// src/shared/elements.js
+var CONTAINER_TYPES = ["container", "group"];
+function isContainerType(type) {
+  return CONTAINER_TYPES.indexOf(type) !== -1;
+}
+function isContainer(el) {
+  return !!el && isContainerType(el.type);
+}
+function collectElementEntries(elements, parent = null, parentAbsX = 0, parentAbsY = 0, depth = 0, ancestors = []) {
+  const out = [];
+  if (!Array.isArray(elements)) return out;
+  elements.forEach((el, index) => {
+    if (!el || typeof el !== "object") return;
+    const x = Number(el.x) || 0;
+    const y = Number(el.y) || 0;
+    const w = Math.max(0, Number(el.w) || 0);
+    const h = Math.max(0, Number(el.h) || 0);
+    const absX = parentAbsX + x;
+    const absY = parentAbsY + y;
+    out.push({ el, parent, ancestors, list: elements, index, depth, absX, absY, w, h });
+    if (isContainer(el) && Array.isArray(el.children) && el.children.length) {
+      out.push(
+        ...collectElementEntries(el.children, el, absX, absY, depth + 1, [...ancestors, el.id])
+      );
+    }
+  });
+  return out;
+}
+function findElementEntry(elements, id, parent = null, parentAbsX = 0, parentAbsY = 0, depth = 0, ancestors = []) {
+  if (!Array.isArray(elements) || !id) return null;
+  for (let index = 0; index < elements.length; index += 1) {
+    const el = elements[index];
+    if (!el || typeof el !== "object") continue;
+    const x = Number(el.x) || 0;
+    const y = Number(el.y) || 0;
+    const absX = parentAbsX + x;
+    const absY = parentAbsY + y;
+    if (el.id === id) {
+      return {
+        el,
+        parent,
+        ancestors,
+        list: elements,
+        index,
+        depth,
+        absX,
+        absY,
+        w: Math.max(0, Number(el.w) || 0),
+        h: Math.max(0, Number(el.h) || 0)
+      };
+    }
+    if (isContainer(el) && Array.isArray(el.children)) {
+      const found = findElementEntry(el.children, id, el, absX, absY, depth + 1, [
+        ...ancestors,
+        el.id
+      ]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+function boundsOfEntries(entries) {
+  if (!entries || !entries.length) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const e of entries) {
+    minX = Math.min(minX, e.absX);
+    minY = Math.min(minY, e.absY);
+    maxX = Math.max(maxX, e.absX + e.w);
+    maxY = Math.max(maxY, e.absY + e.h);
+  }
+  if (minX === Infinity) return null;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+function cloneElementDeep(el, nextId) {
+  if (!el || typeof el !== "object") return null;
+  const copy = { ...el, props: { ...el.props || {} } };
+  copy.id = nextId ? nextId(el.id) : el.id;
+  if (isContainer(el) && Array.isArray(el.children)) {
+    copy.children = el.children.map((child) => cloneElementDeep(child, nextId));
+  } else {
+    delete copy.children;
+  }
+  return copy;
+}
+
 // src/host/model.js
 var ELEMENT_TYPES = {
+  container: [320, 240],
+  group: [200, 120],
   button: [132, 44],
   input: [260, 44],
   card: [300, 120],
@@ -19,6 +109,8 @@ var ELEMENT_TYPES = {
   select: [220, 44]
 };
 var ELEMENT_STATES = {
+  container: ["default"],
+  group: ["default"],
   button: ["default", "hover", "active", "disabled"],
   input: ["default", "focus", "filled", "error", "disabled"],
   card: ["default", "hover"],
@@ -51,23 +143,50 @@ var num = (v, d) => {
 var str = (v, d) => typeof v === "string" ? v : d;
 function elementsBounds(elements) {
   if (!Array.isArray(elements) || elements.length === 0) return null;
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const e of elements) {
-    minX = Math.min(minX, e.x);
-    minY = Math.min(minY, e.y);
-    maxX = Math.max(maxX, e.x + e.w);
-    maxY = Math.max(maxY, e.y + e.h);
-  }
-  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+  const entries = collectElementEntries(elements);
+  const b = boundsOfEntries(entries);
+  if (!b) return null;
+  return { minX: b.x, minY: b.y, maxX: b.x + b.w, maxY: b.y + b.h, w: b.w, h: b.h };
 }
 function scaleProps(props, s) {
   const out = isObj(props) ? { ...props } : {};
   if (typeof out.fontSize === "number") out.fontSize = Math.max(8, Math.round(out.fontSize * s));
   if (typeof out.radius === "number") out.radius = Math.max(0, Math.round(out.radius * s));
   return out;
+}
+function scaleElementDeep(e, sx, sy, sf, ox, oy, isRoot) {
+  const out = {
+    ...e,
+    x: Math.round((isRoot ? e.x - ox : e.x) * sx),
+    y: Math.round((isRoot ? e.y - oy : e.y) * sy),
+    w: Math.max(12, Math.round(e.w * sx)),
+    h: Math.max(8, Math.round(e.h * sy)),
+    props: scaleProps(e.props, sf)
+  };
+  if (isContainerType(e.type) && Array.isArray(e.children)) {
+    out.children = e.children.map((child) => scaleElementDeep(child, sx, sy, sf, 0, 0, false));
+  }
+  return out;
+}
+function removeElementById(elements, id) {
+  let changed = false;
+  const out = [];
+  for (const el of elements) {
+    if (el.id === id) {
+      changed = true;
+      continue;
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = removeElementById(el.children, id);
+      if (kids !== el.children) {
+        changed = true;
+        out.push({ ...el, children: kids });
+        continue;
+      }
+    }
+    out.push(el);
+  }
+  return changed ? out : elements;
 }
 function clone(x) {
   if (typeof structuredClone === "function") {
@@ -117,7 +236,7 @@ function ensureElement(e) {
   const props = isObj(e.props) ? clone(e.props) : {};
   const states = ELEMENT_STATES[type] || ["default"];
   const state = states.includes(e.state) ? e.state : defaultStateFor(type);
-  return {
+  const out = {
     id: str(e.id, "") || newId("e"),
     type,
     x: num(e.x, 0),
@@ -127,6 +246,10 @@ function ensureElement(e) {
     state,
     props
   };
+  if (isContainerType(type)) {
+    out.children = Array.isArray(e.children) ? e.children.filter(isObj).map(ensureElement) : [];
+  }
+  return out;
 }
 function findPage(doc, op, opIndex) {
   let page;
@@ -145,7 +268,7 @@ function findPage(doc, op, opIndex) {
   }
   return page;
 }
-function applyOne(doc, op, index) {
+function applyOne(doc, op, index, state) {
   if (!isObj(op)) throw new Error(`op[${index}] must be an object`);
   const kind = op.kind;
   if (kind === "set_document_name") {
@@ -195,20 +318,14 @@ function applyOne(doc, op, index) {
     if (op.scaleElements !== false && ow > 0 && oh > 0 && (ow !== nw || oh !== nh)) {
       const b = elementsBounds(page.elements);
       const hasContent = b && b.w > 0 && b.h > 0;
-      const inconsistent = hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
+      const hasContainer = page.elements.some((e) => isContainerType(e.type));
+      const inconsistent = !hasContainer && hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
       const sx = inconsistent ? nw / b.w : nw / ow;
       const sy = inconsistent ? nh / b.h : nh / oh;
       const ox = inconsistent ? b.minX : 0;
       const oy = inconsistent ? b.minY : 0;
       const sf = Math.min(sx, sy);
-      page.elements = page.elements.map((e) => ({
-        ...e,
-        x: Math.round((e.x - ox) * sx),
-        y: Math.round((e.y - oy) * sy),
-        w: Math.max(12, Math.round(e.w * sx)),
-        h: Math.max(8, Math.round(e.h * sy)),
-        props: scaleProps(e.props, sf)
-      }));
+      page.elements = page.elements.map((e) => scaleElementDeep(e, sx, sy, sf, ox, oy, true));
     }
     page.frame = {
       preset,
@@ -227,27 +344,64 @@ function applyOne(doc, op, index) {
     const page = findPage(doc, op, index);
     const type = ELEMENT_TYPES[op.type] ? op.type : null;
     if (!type) throw new Error(`op[${index}] add_element: unknown type "${op.type}"`);
+    const containerId = op.containerId === "@last" ? state.lastContainerId : op.containerId;
+    const target = containerId ? findElementEntry(page.elements, containerId) : null;
+    if (containerId && (!target || !isContainerType(target.el.type)))
+      throw new Error(`op[${index}] add_element: unknown container "${containerId}"`);
     const [dw, dh] = ELEMENT_TYPES[type];
     const fullWidth = type === "navbar" || type === "tabs";
-    const w = Math.max(12, num(op.w, fullWidth ? page.frame.w : dw));
-    const n = page.elements.length;
+    const boundW = target ? target.el.w : page.frame.w;
+    const targetList = target ? target.el.children || [] : page.elements;
+    const w = Math.max(12, num(op.w, fullWidth ? boundW : dw));
+    const n = targetList.length;
     const el = ensureElement({
       id: newId("e"),
       type,
-      x: num(op.x, fullWidth ? 0 : 24),
+      x: num(op.x, target ? 16 : fullWidth ? 0 : 24),
       y: num(op.y, 24 + n % 10 * 18),
       w,
       h: Math.max(8, num(op.h, dh)),
       state: op.state,
       props: op.props
     });
-    page.elements.push(el);
+    if (target) target.el.children = [...target.el.children || [], el];
+    else page.elements.push(el);
+    if (type === "container") state.lastContainerId = el.id;
     return { op: index, kind, pageId: page.id, elementId: el.id, type };
+  }
+  if (kind === "add_container") {
+    const page = findPage(doc, op, index);
+    const containerId = op.containerId === "@last" ? state.lastContainerId : op.containerId;
+    const target = containerId ? findElementEntry(page.elements, containerId) : null;
+    if (containerId && (!target || !isContainerType(target.el.type)))
+      throw new Error(`op[${index}] add_container: unknown container "${containerId}"`);
+    const boundW = target ? target.el.w : page.frame.w;
+    const boundH = target ? target.el.h : page.frame.h;
+    const n = (target ? target.el.children || [] : page.elements).length;
+    const el = ensureElement({
+      id: newId("e"),
+      type: "container",
+      x: num(op.x, Math.min(24, Math.max(0, boundW - 40))),
+      y: num(op.y, 24 + n % 8 * 18),
+      w: Math.max(12, num(op.w, Math.min(320, boundW))),
+      h: Math.max(8, num(op.h, Math.min(240, boundH))),
+      props: {
+        name: str(op.name, `Container ${n + 1}`),
+        background: str(op.background, "#ffffff"),
+        radius: num(op.radius, 12),
+        clipContent: op.clipContent !== false
+      }
+    });
+    if (target) target.el.children = [...target.el.children || [], el];
+    else page.elements.push(el);
+    state.lastContainerId = el.id;
+    return { op: index, kind, pageId: page.id, elementId: el.id, type: "container" };
   }
   if (kind === "update_element") {
     const page = findPage(doc, op, index);
-    const el = page.elements.find((e) => e.id === op.elementId);
-    if (!el) throw new Error(`op[${index}] update_element: unknown element "${op.elementId}"`);
+    const entry = findElementEntry(page.elements, op.elementId);
+    if (!entry) throw new Error(`op[${index}] update_element: unknown element "${op.elementId}"`);
+    const el = entry.el;
     if (op.x !== void 0) el.x = num(op.x, el.x);
     if (op.y !== void 0) el.y = num(op.y, el.y);
     if (op.w !== void 0) el.w = Math.max(12, num(op.w, el.w));
@@ -259,11 +413,66 @@ function applyOne(doc, op, index) {
   }
   if (kind === "delete_element") {
     const page = findPage(doc, op, index);
-    const before = page.elements.length;
-    page.elements = page.elements.filter((e) => e.id !== op.elementId);
-    if (page.elements.length === before)
+    const before = collectElementEntries(page.elements).length;
+    page.elements = removeElementById(page.elements, op.elementId);
+    if (collectElementEntries(page.elements).length === before)
       throw new Error(`op[${index}] delete_element: unknown element "${op.elementId}"`);
     return { op: index, kind, pageId: page.id, elementId: op.elementId };
+  }
+  if (kind === "group_elements") {
+    const page = findPage(doc, op, index);
+    const ids = Array.isArray(op.elementIds) ? op.elementIds : [];
+    if (ids.length < 2) throw new Error(`op[${index}] group_elements: need at least two ids`);
+    const entries = ids.map((id) => findElementEntry(page.elements, id));
+    if (entries.some((entry) => !entry))
+      throw new Error(`op[${index}] group_elements: unknown element id`);
+    const list = entries[0].list;
+    if (!entries.every((entry) => entry.list === list))
+      throw new Error(`op[${index}] group_elements: elements must share a parent`);
+    const bounds = boundsOfEntries(entries);
+    const parentAbsX = entries[0].absX - entries[0].el.x;
+    const parentAbsY = entries[0].absY - entries[0].el.y;
+    const group = ensureElement({
+      id: newId("e"),
+      type: "group",
+      x: bounds.x - parentAbsX,
+      y: bounds.y - parentAbsY,
+      w: bounds.w,
+      h: bounds.h,
+      props: { name: str(op.name, "Group") }
+    });
+    group.children = entries.map((entry) => {
+      const copy = cloneElementDeep(entry.el);
+      copy.x = entry.absX - bounds.x;
+      copy.y = entry.absY - bounds.y;
+      return copy;
+    });
+    const idSet = new Set(ids);
+    const insertAt = Math.min(...entries.map((entry) => entry.index));
+    const remaining = list.filter((el) => !idSet.has(el.id));
+    remaining.splice(insertAt, 0, group);
+    if (entries[0].parent) entries[0].parent.children = remaining;
+    else page.elements = remaining;
+    return { op: index, kind, pageId: page.id, groupId: group.id };
+  }
+  if (kind === "ungroup_elements") {
+    const page = findPage(doc, op, index);
+    const entry = findElementEntry(page.elements, op.elementId);
+    if (!entry) throw new Error(`op[${index}] ungroup_elements: unknown element "${op.elementId}"`);
+    if (entry.el.type !== "group")
+      throw new Error(`op[${index}] ungroup_elements: element is not a group`);
+    const group = entry.el;
+    const kids = (group.children || []).map((child) => {
+      const copy = cloneElementDeep(child);
+      copy.x += group.x;
+      copy.y += group.y;
+      return copy;
+    });
+    const next = entry.list.slice();
+    next.splice(entry.index, 1, ...kids);
+    if (entry.parent) entry.parent.children = next;
+    else page.elements = next;
+    return { op: index, kind, pageId: page.id, elementIds: kids.map((kid) => kid.id) };
   }
   throw new Error(`op[${index}] has unknown kind "${kind}"`);
 }
@@ -271,7 +480,8 @@ function applyOps(rawDoc, ops) {
   if (!Array.isArray(ops)) throw new Error("operations must be an array");
   if (ops.length === 0) throw new Error("operations must not be empty");
   const doc = ensureDoc(rawDoc ?? emptyDoc());
-  const results = ops.map((op, i) => applyOne(doc, op, i));
+  const state = { lastContainerId: null };
+  const results = ops.map((op, i) => applyOne(doc, op, i, state));
   if (!doc.activePageId && doc.pages.length) doc.activePageId = doc.pages[0].id;
   return { doc, results };
 }
@@ -285,17 +495,12 @@ function repairDoc(rawDoc) {
     const oh = num(frame.h, 844);
     const b = elementsBounds(page.elements);
     if (!b || b.w <= 0 || b.h <= 0) continue;
-    if (b.w >= ow * 0.4 && b.w < ow * 0.8) {
+    if (!page.elements.some((e) => isContainerType(e.type)) && b.w >= ow * 0.4 && b.w < ow * 0.8) {
       const sx = ow / b.w;
       const sy = oh / b.h;
-      page.elements = page.elements.map((e) => ({
-        ...e,
-        x: Math.round((e.x - b.minX) * sx),
-        y: Math.round((e.y - b.minY) * sy),
-        w: Math.max(12, Math.round(e.w * sx)),
-        h: Math.max(8, Math.round(e.h * sy)),
-        props: scaleProps(e.props, Math.min(sx, sy))
-      }));
+      page.elements = page.elements.map(
+        (e) => scaleElementDeep(e, sx, sy, Math.min(sx, sy), b.minX, b.minY, true)
+      );
       changed = true;
     }
   }
@@ -306,12 +511,16 @@ function summarizeDoc(rawDoc) {
   return {
     name: doc.name,
     activePageId: doc.activePageId,
-    pages: doc.pages.map((p) => ({
-      id: p.id,
-      name: p.name,
-      frame: `${p.frame.w}\xD7${p.frame.h}`,
-      elements: p.elements.length
-    }))
+    pages: doc.pages.map((p) => {
+      const entries = collectElementEntries(p.elements);
+      return {
+        id: p.id,
+        name: p.name,
+        frame: `${p.frame.w}\xD7${p.frame.h}`,
+        elements: entries.length,
+        containers: entries.filter((entry) => isContainerType(entry.el.type)).length
+      };
+    })
   };
 }
 
@@ -324,9 +533,10 @@ var GUIDANCE = [
   "\u6253\u5F00\u65B9\u5F0F\uFF1A\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u56FE\u6807\uFF0C\u6216\u5728\u5BF9\u8BDD\u8F93\u5165\u6846\u8F93\u5165 /canvas\u3002",
   "\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528\u5DE5\u5177\u8BFB\u5199\u753B\u5E03\uFF0C\u4E0D\u9700\u8981\u7528\u6237\u5148\u6253\u5F00\u9762\u677F\uFF1A",
   "  product_design_get_document\uFF1A\u8BFB\u53D6\u9875\u9762/\u5143\u7D20/\u72B6\u6001\u3002",
-  "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / add_element / update_element / delete_element / set_page_frame / clear_page / set_document_name \u7B49\uFF09\u3002",
-  "\u753B\u5E03\u5750\u6807\u539F\u70B9\u5728\u6BCF\u9875\u5DE6\u4E0A\u89D2\uFF1B\u9ED8\u8BA4\u624B\u673A\u9875 390\xD7844\u3002\u5143\u7D20\u7C7B\u578B\uFF1Abutton, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select\u3002",
-  "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u72B6\u6001\u89C1\u5404\u7C7B\u578B\uFF08\u5982 button: default/hover/active/disabled\uFF09\u3002",
+  "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / add_container / add_element / update_element / delete_element / group_elements / ungroup_elements / set_page_frame / clear_page / set_document_name \u7B49\uFF09\u3002",
+  "\u753B\u5E03\u5750\u6807\u539F\u70B9\u5728\u6BCF\u9875\u5DE6\u4E0A\u89D2\uFF1B\u9ED8\u8BA4\u624B\u673A\u9875 390\xD7844\u3002\u5143\u7D20\u7C7B\u578B\uFF1Acontainer, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select\u3002",
+  "\u5BB9\u5668\uFF08container\uFF09\u53EF\u4EE5\u5D4C\u5957\u5B50\u5143\u7D20\uFF1Aadd_element/add_container \u4F20 containerId \u5373\u53EF\u653E\u5165\u5BB9\u5668\uFF0C\u5B50\u5143\u7D20\u5750\u6807\u76F8\u5BF9\u5BB9\u5668\u5DE6\u4E0A\u89D2\uFF1B\u5BB9\u5668\u652F\u6301\u88C1\u526A\u5185\u5BB9\u3002",
+  "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u5BB9\u5668\u8FD8\u53EF\u4F20 name\u3001background\u3001clipContent\u3002\u72B6\u6001\u89C1\u5404\u7C7B\u578B\uFF08\u5982 button: default/hover/active/disabled\uFF09\u3002",
   '\u64CD\u4F5C\u91CC\u9700\u8981\u9875\u9762\u65F6\u53EF\u7528 pageId\uFF0C\u6216\u7528 pageId:"@last" / pageIndex\uFF080\u57FA\uFF09\u6307\u5411\u540C\u4E00\u6B21 apply \u5185\u65B0\u5EFA\u7684\u9875\u9762\uFF0C\u65E0\u9700\u5148\u77E5\u9053 id\u3002',
   "\u5F53\u7528\u6237\u63D0\u51FA\u4EA7\u54C1\u8BBE\u8BA1/\u539F\u578B\u9700\u6C42\u65F6\uFF1A\u5148 get_document\uFF0C\u518D\u7528\u4E00\u6B21 apply \u6279\u91CF\u642D\u597D\u9875\u9762\u4E0E\u5143\u7D20\uFF0C\u6700\u540E\u63D0\u793A\u7528\u6237\u8F93\u5165 /canvas \u6216\u70B9\u4FA7\u8FB9\u680F\u67E5\u770B\u3002"
 ].join("\n");
@@ -542,11 +752,13 @@ function applyTool(store) {
       "Operations (each an object with `kind`):",
       "add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} \u2192 pageId",
       "delete_page {pageId}; rename_page {pageId, name}; set_page_frame {pageId, preset?|width?, height?, background?}; clear_page {pageId}",
-      "add_element {pageId, type, x?, y?, w?, h?, props?: {text,color,fontSize,fontWeight,radius}, state?} \u2192 elementId",
-      "update_element {pageId, elementId, x?, y?, w?, h?, state?, props?}; delete_element {pageId, elementId}",
+      'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?} \u2192 elementId (a frame-like container; pass containerId (or "@last") to nest it)',
+      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, props?: {text,color,fontSize,fontWeight,radius}, state?} \u2192 elementId (containerId also accepts "@last" for the most recently added container in this apply)',
+      "update_element {pageId?, elementId, x?, y?, w?, h?, state?, props?}; delete_element {pageId?, elementId}",
+      "group_elements {pageId?, elementIds: string[]} \u2192 groupId; ungroup_elements {pageId?, elementId}",
       "set_document_name {name}",
-      "Element types: button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select.",
-      "States: button[default,hover,active,disabled]; input[default,focus,filled,error,disabled]; card[default,hover]; toggle[on,off]; checkbox[unchecked,checked]; select[default,open,disabled]; others default.",
+      "Element types: container, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select.",
+      "Container children use coordinates relative to the container; containers clip content by default. States: button[default,hover,active,disabled]; input[default,focus,filled,error,disabled]; card[default,hover]; toggle[on,off]; checkbox[unchecked,checked]; select[default,open,disabled]; others default.",
       'Page targeting: any op that needs a page accepts pageId, or pageId: "@last" for the most recently added page, or pageIndex (0-based). This lets one apply call add a page then place elements on it without knowing its id.',
       "Returns generated page/element ids and the new revision. Prefer one apply call with several ops over many calls."
     ].join(" "),

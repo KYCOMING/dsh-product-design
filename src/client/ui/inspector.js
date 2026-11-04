@@ -6,6 +6,7 @@ export function InspectorView(props) {
   const {
     t,
     sel,
+    selCount,
     activePage,
     setEl,
     setElProps,
@@ -16,6 +17,10 @@ export function InspectorView(props) {
     setPreset,
     renameActivePage,
     patchActiveFrame,
+    alignSelection,
+    distributeSelection,
+    groupSelection,
+    ungroupSelection,
   } = props;
 
   // -------------------------------------------------- right: inspector + layers
@@ -31,8 +36,70 @@ export function InspectorView(props) {
     });
   }
 
+  const alignButtons = [
+    ['left', 'align.left'],
+    ['centerX', 'align.centerX'],
+    ['right', 'align.right'],
+    ['top', 'align.top'],
+    ['centerY', 'align.centerY'],
+    ['bottom', 'align.bottom'],
+  ].map(([mode, key]) =>
+    h(
+      'button',
+      {
+        key: mode,
+        type: 'button',
+        className: 'dpd-alignBtn',
+        title: t(key),
+        onClick: () => alignSelection(mode),
+      },
+      t(key),
+    ),
+  );
+
   let inspectorBody;
-  if (sel) {
+  if (selCount > 1) {
+    inspectorBody = h(
+      'div',
+      null,
+      h('div', { className: 'dpd-empty' }, t('inspector.multi') + ' · ' + selCount),
+      h(
+        'div',
+        { className: 'dpd-section' },
+        h('div', { className: 'dpd-panelTitle' }, h('span', null, t('inspector.align'))),
+        h('div', { className: 'dpd-alignGrid' }, alignButtons),
+        h(
+          'div',
+          { className: 'dpd-actions' },
+          h(
+            'button',
+            { className: 'dpd-btn', type: 'button', onClick: () => distributeSelection('x') },
+            t('align.distributeH'),
+          ),
+          h(
+            'button',
+            { className: 'dpd-btn', type: 'button', onClick: () => distributeSelection('y') },
+            t('align.distributeV'),
+          ),
+        ),
+      ),
+      h(
+        'div',
+        { className: 'dpd-actions' },
+        h(
+          'button',
+          { className: 'dpd-btn primary', type: 'button', onClick: groupSelection },
+          t('inspector.group'),
+        ),
+        h(
+          'button',
+          { className: 'dpd-btn', type: 'button', onClick: deleteEl },
+          h(IconTrash),
+          t('inspector.delete'),
+        ),
+      ),
+    );
+  } else if (sel) {
     const info = TYPE_INFO[sel.type] || TYPE_INFO.text;
     const stateList = info.states || ['default'];
     inspectorBody = h(
@@ -123,6 +190,59 @@ export function InspectorView(props) {
             ),
           )
         : null,
+      sel.type === 'container' || sel.type === 'group'
+        ? h(
+            'div',
+            { className: 'dpd-section' },
+            h('div', { className: 'dpd-panelTitle' }, h('span', null, t('inspector.container'))),
+            h(
+              'div',
+              { className: 'dpd-row' },
+              h('label', null, t('inspector.containerName')),
+              h('input', {
+                className: 'dpd-input',
+                type: 'text',
+                value: sel.props.name || '',
+                placeholder: t('comp.' + sel.type),
+                onChange: (e) => setElProps(sel.id, { name: e.target.value }, 'cname:' + sel.id),
+              }),
+            ),
+            sel.type === 'container'
+              ? h(
+                  'div',
+                  { className: 'dpd-row' },
+                  h('label', null, t('inspector.background')),
+                  h('input', {
+                    className: 'dpd-color',
+                    type: 'color',
+                    value: sel.props.background || '#ffffff',
+                    onChange: (e) =>
+                      setElProps(sel.id, { background: e.target.value }, 'cbg:' + sel.id),
+                  }),
+                  h('input', {
+                    className: 'dpd-input',
+                    type: 'text',
+                    value: sel.props.background || '#ffffff',
+                    onChange: (e) =>
+                      setElProps(sel.id, { background: e.target.value }, 'cbg:' + sel.id),
+                  }),
+                )
+              : null,
+            sel.type === 'container'
+              ? h(
+                  'label',
+                  { className: 'dpd-checkRow' },
+                  h('input', {
+                    type: 'checkbox',
+                    checked: sel.props.clipContent !== false,
+                    onChange: (e) =>
+                      setElProps(sel.id, { clipContent: e.target.checked }, 'clip:' + sel.id),
+                  }),
+                  t('inspector.clipContent'),
+                )
+              : null,
+          )
+        : null,
       h(
         'div',
         { className: 'dpd-row' },
@@ -174,6 +294,13 @@ export function InspectorView(props) {
           h(IconBack),
           t('inspector.back'),
         ),
+        sel.type === 'group'
+          ? h(
+              'button',
+              { className: 'dpd-btn', type: 'button', onClick: ungroupSelection },
+              t('inspector.ungroup'),
+            )
+          : null,
         h(
           'button',
           { className: 'dpd-btn', type: 'button', onClick: deleteEl },

@@ -48,6 +48,22 @@ var UI_KEY = "dsh-product-design:ui:v1";
 var API_PREFIX = "/dsh-product-design/api";
 var ACCENT = "#6366f1";
 var TYPE_INFO = {
+  container: {
+    size: [320, 240],
+    states: ["default"],
+    hasText: false,
+    hasColor: false,
+    interactive: false,
+    container: true
+  },
+  group: {
+    size: [200, 120],
+    states: ["default"],
+    hasText: false,
+    hasColor: false,
+    interactive: false,
+    container: true
+  },
   button: {
     size: [132, 44],
     states: ["default", "hover", "active", "disabled"],
@@ -107,6 +123,7 @@ var TYPE_INFO = {
   }
 };
 var LIB_ORDER = [
+  "container",
   "button",
   "input",
   "card",
@@ -145,6 +162,7 @@ var DICT = {
     "toolbar.undo": "\u64A4\u9500 (\u2318Z)",
     "toolbar.redo": "\u91CD\u505A (\u21E7\u2318Z)",
     "toolbar.panHint": "\u7A7A\u683C / \u4E2D\u952E\u62D6\u62FD\u5E73\u79FB\u753B\u5E03",
+    "toolbar.snap": "\u78C1\u5438",
     "command.canvas.label": "\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03",
     "command.canvas.desc": "\u6253\u5F00\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\uFF0C\u5F00\u59CB\u642D\u539F\u578B",
     "frame.title": "\u753B\u5E03\u5C3A\u5BF8",
@@ -181,7 +199,24 @@ var DICT = {
     "inspector.delete": "\u5220\u9664",
     "inspector.front": "\u7F6E\u9876",
     "inspector.back": "\u7F6E\u5E95",
+    "inspector.multi": "\u5DF2\u9009\u591A\u4E2A\u56FE\u5C42",
+    "inspector.align": "\u5BF9\u9F50",
+    "inspector.group": "\u7F16\u7EC4 (\u2318G)",
+    "inspector.ungroup": "\u53D6\u6D88\u7F16\u7EC4 (\u21E7\u2318G)",
+    "inspector.container": "\u5BB9\u5668\u8BBE\u7F6E",
+    "inspector.containerName": "\u5BB9\u5668\u540D",
+    "inspector.clipContent": "\u88C1\u526A\u8D85\u51FA\u5185\u5BB9",
+    "align.left": "\u5DE6\u5BF9\u9F50",
+    "align.centerX": "\u6C34\u5E73\u5C45\u4E2D",
+    "align.right": "\u53F3\u5BF9\u9F50",
+    "align.top": "\u9876\u5BF9\u9F50",
+    "align.centerY": "\u5782\u76F4\u5C45\u4E2D",
+    "align.bottom": "\u5E95\u5BF9\u9F50",
+    "align.distributeH": "\u6C34\u5E73\u5206\u5E03",
+    "align.distributeV": "\u5782\u76F4\u5206\u5E03",
     "layers.title": "\u56FE\u5C42",
+    "comp.container": "\u5BB9\u5668",
+    "comp.group": "\u7F16\u7EC4",
     "comp.button": "\u6309\u94AE",
     "comp.input": "\u8F93\u5165\u6846",
     "comp.card": "\u5361\u7247",
@@ -241,6 +276,7 @@ var DICT = {
     "toolbar.undo": "Undo (\u2318Z)",
     "toolbar.redo": "Redo (\u21E7\u2318Z)",
     "toolbar.panHint": "Hold Space / middle-drag to pan the canvas",
+    "toolbar.snap": "Snap",
     "command.canvas.label": "Product Design Canvas",
     "command.canvas.desc": "Open the product design canvas to build a prototype",
     "frame.title": "Frame size",
@@ -277,7 +313,24 @@ var DICT = {
     "inspector.delete": "Delete",
     "inspector.front": "Bring front",
     "inspector.back": "Send back",
+    "inspector.multi": "Multiple layers selected",
+    "inspector.align": "Align",
+    "inspector.group": "Group (\u2318G)",
+    "inspector.ungroup": "Ungroup (\u21E7\u2318G)",
+    "inspector.container": "Container settings",
+    "inspector.containerName": "Container name",
+    "inspector.clipContent": "Clip content",
+    "align.left": "Align left",
+    "align.centerX": "Center horizontally",
+    "align.right": "Align right",
+    "align.top": "Align top",
+    "align.centerY": "Center vertically",
+    "align.bottom": "Align bottom",
+    "align.distributeH": "Distribute horizontally",
+    "align.distributeV": "Distribute vertically",
     "layers.title": "Layers",
+    "comp.container": "Container",
+    "comp.group": "Group",
     "comp.button": "Button",
     "comp.input": "Input",
     "comp.card": "Card",
@@ -457,8 +510,16 @@ var IconLayers = () => h(
   h("path", { d: "M8 2l6 3-6 3-6-3 6-3z" }),
   h("path", { d: "M2 8l6 3 6-3M2 11l6 3 6-3" })
 );
+var IconMagnet = () => h(
+  Svg,
+  null,
+  h("path", { d: "M3 2v6a5 5 0 0 0 10 0V2" }),
+  h("path", { d: "M3 2H1.5M13 2h1.5M3 6h3M10 6h3" })
+);
 function libGlyph(type) {
   const map = {
+    container: h("path", { d: "M2 3.5h12v9H2zM4.5 6h7v4h-7z" }),
+    group: h("path", { d: "M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z" }),
     button: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 2 }),
     input: h("rect", { x: 2, y: 4.5, width: 12, height: 7, rx: 1.6 }),
     card: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
@@ -497,13 +558,258 @@ function ProductDesignIcon(props) {
   );
 }
 
+// src/shared/elements.js
+var CONTAINER_TYPES = ["container", "group"];
+function isContainerType(type) {
+  return CONTAINER_TYPES.indexOf(type) !== -1;
+}
+function isContainer(el) {
+  return !!el && isContainerType(el.type);
+}
+function collectElementEntries(elements, parent = null, parentAbsX = 0, parentAbsY = 0, depth = 0, ancestors = []) {
+  const out = [];
+  if (!Array.isArray(elements)) return out;
+  elements.forEach((el, index) => {
+    if (!el || typeof el !== "object") return;
+    const x = Number(el.x) || 0;
+    const y = Number(el.y) || 0;
+    const w = Math.max(0, Number(el.w) || 0);
+    const h2 = Math.max(0, Number(el.h) || 0);
+    const absX = parentAbsX + x;
+    const absY = parentAbsY + y;
+    out.push({ el, parent, ancestors, list: elements, index, depth, absX, absY, w, h: h2 });
+    if (isContainer(el) && Array.isArray(el.children) && el.children.length) {
+      out.push(
+        ...collectElementEntries(el.children, el, absX, absY, depth + 1, [...ancestors, el.id])
+      );
+    }
+  });
+  return out;
+}
+function findElementEntry(elements, id, parent = null, parentAbsX = 0, parentAbsY = 0, depth = 0, ancestors = []) {
+  if (!Array.isArray(elements) || !id) return null;
+  for (let index = 0; index < elements.length; index += 1) {
+    const el = elements[index];
+    if (!el || typeof el !== "object") continue;
+    const x = Number(el.x) || 0;
+    const y = Number(el.y) || 0;
+    const absX = parentAbsX + x;
+    const absY = parentAbsY + y;
+    if (el.id === id) {
+      return {
+        el,
+        parent,
+        ancestors,
+        list: elements,
+        index,
+        depth,
+        absX,
+        absY,
+        w: Math.max(0, Number(el.w) || 0),
+        h: Math.max(0, Number(el.h) || 0)
+      };
+    }
+    if (isContainer(el) && Array.isArray(el.children)) {
+      const found = findElementEntry(el.children, id, el, absX, absY, depth + 1, [
+        ...ancestors,
+        el.id
+      ]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+function descendantIds(el, out = []) {
+  if (!el || !isContainer(el) || !Array.isArray(el.children)) return out;
+  for (const child of el.children) {
+    if (!child) continue;
+    out.push(child.id);
+    descendantIds(child, out);
+  }
+  return out;
+}
+function isUnderAny(entry, ancestorIds) {
+  if (!entry || !Array.isArray(entry.ancestors) || !ancestorIds || !ancestorIds.length)
+    return false;
+  return entry.ancestors.some((id) => ancestorIds.indexOf(id) !== -1);
+}
+function boundsOfEntries(entries) {
+  if (!entries || !entries.length) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const e of entries) {
+    minX = Math.min(minX, e.absX);
+    minY = Math.min(minY, e.absY);
+    maxX = Math.max(maxX, e.absX + e.w);
+    maxY = Math.max(maxY, e.absY + e.h);
+  }
+  if (minX === Infinity) return null;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+function pointInBox(x, y, box, pad = 0) {
+  return !!box && x >= box.x - pad && x <= box.x + box.w + pad && y >= box.y - pad && y <= box.y + box.h + pad;
+}
+function findDropContainer(entries, excludeIds, x, y) {
+  let best = null;
+  for (const entry of entries) {
+    if (!entry || entry.el.type !== "container") continue;
+    if (excludeIds && excludeIds.has(entry.el.id)) continue;
+    if (!pointInBox(x, y, { x: entry.absX, y: entry.absY, w: entry.w, h: entry.h })) continue;
+    if (!best || entry.depth > best.depth) best = entry;
+  }
+  return best;
+}
+function cloneElementDeep(el, nextId) {
+  if (!el || typeof el !== "object") return null;
+  const copy = { ...el, props: { ...el.props || {} } };
+  copy.id = nextId ? nextId(el.id) : el.id;
+  if (isContainer(el) && Array.isArray(el.children)) {
+    copy.children = el.children.map((child) => cloneElementDeep(child, nextId));
+  } else {
+    delete copy.children;
+  }
+  return copy;
+}
+
+// src/shared/snapping.js
+var SNAP_THRESHOLD = 5;
+function xCandidates(targets) {
+  const out = [];
+  for (const t of targets) {
+    out.push({ pos: t.x, target: t, kind: "left" });
+    out.push({ pos: t.x + t.w / 2, target: t, kind: "centerX" });
+    out.push({ pos: t.x + t.w, target: t, kind: "right" });
+  }
+  return out;
+}
+function yCandidates(targets) {
+  const out = [];
+  for (const t of targets) {
+    out.push({ pos: t.y, target: t, kind: "top" });
+    out.push({ pos: t.y + t.h / 2, target: t, kind: "centerY" });
+    out.push({ pos: t.y + t.h, target: t, kind: "bottom" });
+  }
+  return out;
+}
+function bestSnap(movingPositions, candidates, threshold) {
+  let best = null;
+  for (const moving of movingPositions) {
+    for (const cand of candidates) {
+      const delta = cand.pos - moving.pos;
+      if (Math.abs(delta) > threshold) continue;
+      if (!best || Math.abs(delta) < Math.abs(best.delta)) {
+        best = { delta, candidate: cand, moving };
+      }
+    }
+  }
+  return best;
+}
+function span(aStart, aEnd, bStart, bEnd) {
+  return { from: Math.min(aStart, bStart), to: Math.max(aEnd, bEnd) };
+}
+function snapMoveBox(box, targets, threshold = SNAP_THRESHOLD) {
+  const xs = xCandidates(targets);
+  const ys = yCandidates(targets);
+  const movingX = [
+    { pos: box.x, edge: "left" },
+    { pos: box.x + box.w / 2, edge: "centerX" },
+    { pos: box.x + box.w, edge: "right" }
+  ];
+  const movingY = [
+    { pos: box.y, edge: "top" },
+    { pos: box.y + box.h / 2, edge: "centerY" },
+    { pos: box.y + box.h, edge: "bottom" }
+  ];
+  const sx = bestSnap(movingX, xs, threshold);
+  const sy = bestSnap(movingY, ys, threshold);
+  const dx = sx ? sx.delta : 0;
+  const dy = sy ? sy.delta : 0;
+  const guides = [];
+  if (sx) {
+    const t = sx.candidate.target;
+    const v = span(box.y + dy, box.y + box.h + dy, t.y, t.y + t.h);
+    guides.push({ axis: "x", pos: sx.candidate.pos, from: v.from, to: v.to });
+  }
+  if (sy) {
+    const t = sy.candidate.target;
+    const h2 = span(box.x + dx, box.x + box.w + dx, t.x, t.x + t.w);
+    guides.push({ axis: "y", pos: sy.candidate.pos, from: h2.from, to: h2.to });
+  }
+  return { dx, dy, guides };
+}
+function snapResizeBox(box, dir, targets, threshold = SNAP_THRESHOLD) {
+  const xCands = xCandidates(targets);
+  const yCands = yCandidates(targets);
+  const next = { ...box };
+  const guides = [];
+  const snapEdge = (value, candidates, axis, spanStart, spanEnd, targetSpan) => {
+    let best = null;
+    for (const cand of candidates) {
+      const delta = cand.pos - value;
+      if (Math.abs(delta) > threshold) continue;
+      if (!best || Math.abs(delta) < Math.abs(best.delta)) best = { delta, candidate: cand };
+    }
+    if (!best) return null;
+    const t = best.candidate.target;
+    const s = targetSpan(t);
+    const v = span(spanStart, spanEnd, s.start, s.end);
+    guides.push({ axis, pos: best.candidate.pos, from: v.from, to: v.to });
+    return best.delta;
+  };
+  if (dir.indexOf("w") !== -1) {
+    const d = snapEdge(next.x, xCands, "x", next.y, next.y + next.h, (t) => ({
+      start: t.y,
+      end: t.y + t.h
+    }));
+    if (d != null) {
+      next.x += d;
+      next.w -= d;
+    }
+  }
+  if (dir.indexOf("e") !== -1) {
+    const d = snapEdge(next.x + next.w, xCands, "x", next.y, next.y + next.h, (t) => ({
+      start: t.y,
+      end: t.y + t.h
+    }));
+    if (d != null) next.w += d;
+  }
+  if (dir.indexOf("n") !== -1) {
+    const d = snapEdge(next.y, yCands, "y", next.x, next.x + next.w, (t) => ({
+      start: t.x,
+      end: t.x + t.w
+    }));
+    if (d != null) {
+      next.y += d;
+      next.h -= d;
+    }
+  }
+  if (dir.indexOf("s") !== -1) {
+    const d = snapEdge(next.y + next.h, yCands, "y", next.x, next.x + next.w, (t) => ({
+      start: t.x,
+      end: t.x + t.w
+    }));
+    if (d != null) next.h += d;
+  }
+  if (next.w < 12) {
+    if (dir.indexOf("w") !== -1) next.x -= 12 - next.w;
+    next.w = 12;
+  }
+  if (next.h < 8) {
+    if (dir.indexOf("n") !== -1) next.y -= 8 - next.h;
+    next.h = 8;
+  }
+  return { box: next, guides };
+}
+
 // src/client/model.js
 var __seq = 1;
 function uid() {
   return "e" + Date.now().toString(36) + (__seq++).toString(36);
 }
 function makeEl(type, x, y, w, hh, props, state) {
-  return {
+  const el = {
     id: uid(),
     type,
     x,
@@ -513,6 +819,8 @@ function makeEl(type, x, y, w, hh, props, state) {
     state: state || defaultState(type),
     props: props || {}
   };
+  if (isContainerType(type)) el.children = [];
+  return el;
 }
 function starterElements(t) {
   return [
@@ -542,6 +850,27 @@ function defaultDoc(t) {
   };
   return { name: "", pages: [page], activePageId: page.id };
 }
+function normalizeElement(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const type = TYPE_INFO[raw.type] ? raw.type : "text";
+  const el = {
+    id: raw.id || uid(),
+    type,
+    x: Number.isFinite(Number(raw.x)) ? Number(raw.x) : 0,
+    y: Number.isFinite(Number(raw.y)) ? Number(raw.y) : 0,
+    w: Math.max(12, Number.isFinite(Number(raw.w)) ? Number(raw.w) : TYPE_INFO[type].size[0]),
+    h: Math.max(8, Number.isFinite(Number(raw.h)) ? Number(raw.h) : TYPE_INFO[type].size[1]),
+    state: raw.state || defaultState(type),
+    props: raw.props && typeof raw.props === "object" ? { ...raw.props } : {}
+  };
+  if (isContainerType(type)) {
+    el.children = Array.isArray(raw.children) ? raw.children.map(normalizeElement).filter(Boolean) : [];
+  }
+  return el;
+}
+function normalizeElements(list) {
+  return Array.isArray(list) ? list.map(normalizeElement).filter(Boolean) : [];
+}
 function normalizeDoc(doc) {
   if (!doc) return null;
   if (Array.isArray(doc.pages) && doc.pages.length) {
@@ -556,7 +885,7 @@ function normalizeDoc(doc) {
           preset: fr.preset || "mobile",
           background: fr.background || "#ffffff"
         },
-        elements: p.elements
+        elements: normalizeElements(p.elements)
       };
     });
     if (!pages.length) return null;
@@ -574,7 +903,7 @@ function normalizeDoc(doc) {
         preset: fr.preset || "mobile",
         background: fr.background || "#ffffff"
       },
-      elements: doc.elements
+      elements: normalizeElements(doc.elements)
     };
     return { name: doc.name || "", pages: [page], activePageId: page.id };
   }
@@ -706,10 +1035,26 @@ var CSS = [
   ".dpd-pageLabel .sz{font-variant-numeric:tabular-nums;opacity:.75}",
   ".dpd-pageLabel.active .pin{color:var(--dsw-alias-brand-primary,#6366f1)}",
   ".dpd-el{position:absolute;box-sizing:border-box}",
+  ".dpd-el.dpd-container{outline:1px dashed rgba(99,102,241,.30);outline-offset:-1px}",
+  ".dpd-el.dpd-group{outline:1px dashed rgba(107,114,128,.28);outline-offset:-1px}",
+  ".dpd-canvas.dpd-preview .dpd-container,.dpd-canvas.dpd-preview .dpd-group{outline:none}",
   ".dpd-el.dpd-sel{outline:1.5px solid var(--dsw-alias-brand-primary,#6366f1)}",
   ".dpd-selBox{position:absolute;pointer-events:none;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);z-index:40}",
-  ".dpd-handle{position:absolute;width:10px;height:10px;background:#fff;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);border-radius:2px}",
-  ".dpd-handle.br{right:-6px;bottom:-6px;pointer-events:auto;cursor:nwse-resize}",
+  ".dpd-selBox.multi{border-style:dashed}",
+  ".dpd-multiBox{position:absolute;pointer-events:none;border:1px dashed var(--dsw-alias-brand-primary,#6366f1);z-index:39}",
+  ".dpd-handle{position:absolute;width:8px;height:8px;background:#fff;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);border-radius:2px;pointer-events:auto}",
+  ".dpd-handle.h-nw{left:-5px;top:-5px}",
+  ".dpd-handle.h-n{left:calc(50% - 4px);top:-5px}",
+  ".dpd-handle.h-ne{right:-5px;top:-5px}",
+  ".dpd-handle.h-e{right:-5px;top:calc(50% - 4px)}",
+  ".dpd-handle.h-se{right:-5px;bottom:-5px}",
+  ".dpd-handle.h-s{left:calc(50% - 4px);bottom:-5px}",
+  ".dpd-handle.h-sw{left:-5px;bottom:-5px}",
+  ".dpd-handle.h-w{left:-5px;top:calc(50% - 4px)}",
+  ".dpd-guide{position:absolute;background:#ff3d8b;z-index:70;pointer-events:none;box-shadow:0 0 0 .5px rgba(255,61,139,.18)}",
+  ".dpd-guide.v{width:1px}",
+  ".dpd-guide.h{height:1px}",
+  ".dpd-marquee{position:absolute;border:1px solid var(--dsw-alias-brand-primary,#6366f1);background:rgba(99,102,241,.08);z-index:65;pointer-events:none}",
   ".dpd-section{border-top:1px solid var(--dsw-alias-border-l1,#e5e6eb);padding:8px 0 10px}",
   ".dpd-row{display:flex;align-items:center;gap:8px;padding:5px 12px}",
   ".dpd-row>label{width:56px;flex-shrink:0;font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280)}",
@@ -720,6 +1065,10 @@ var CSS = [
   ".dpd-numPair .dpd-field{flex:1;display:flex;align-items:center;gap:3px;min-width:0}",
   ".dpd-numPair .dpd-field span{font-size:10.5px;color:var(--dsw-alias-label-secondary,#6b7280)}",
   ".dpd-chips{display:flex;flex-wrap:wrap;gap:5px;padding:2px 12px 6px}",
+  ".dpd-alignGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:2px 12px 6px}",
+  ".dpd-alignBtn{border:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:6px;padding:5px 4px;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+  ".dpd-alignBtn:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-checkRow{display:flex;align-items:center;gap:7px;padding:5px 12px;font-size:12px;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer}",
   ".dpd-chip{border:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:999px;padding:3px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap}",
   ".dpd-chip:hover{border-color:var(--dsw-alias-brand-primary,#6366f1)}",
   ".dpd-chip.active{background:var(--dsw-alias-brand-primary,#6366f1);color:#fff;border-color:transparent}",
@@ -730,6 +1079,7 @@ var CSS = [
   ".dpd-layer:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
   ".dpd-layer.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary,#6366f1)}",
   ".dpd-layer .dot{width:14px;height:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;opacity:.85}",
+  ".dpd-layer .caret{width:10px;flex-shrink:0;font-size:10px;color:var(--dsw-alias-label-secondary,#6b7280);opacity:.8}",
   ".dpd-layer .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
   ".dpd-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,.9);z-index:60;text-align:center;padding:24px}",
   ".dpd-overlayTitle{font-size:15px;font-weight:600;color:#161a22}",
@@ -807,6 +1157,42 @@ function renderWidget(el, state, t, opts) {
   opts = opts || {};
   const p = el.props || {};
   const acc = p.color || ACCENT;
+  if (el.type === "container" || el.type === "group") {
+    return h(
+      "div",
+      {
+        style: {
+          width: "100%",
+          height: "100%",
+          boxSizing: "border-box",
+          borderRadius: el.type === "container" ? p.radius != null ? p.radius : 12 : 0,
+          border: el.type === "container" ? "1.5px dashed rgba(99,102,241,.45)" : "1px dashed rgba(107,114,128,.45)",
+          background: el.type === "container" ? p.background || "rgba(255,255,255,.6)" : "transparent",
+          display: "flex",
+          alignItems: "flex-start",
+          padding: 8,
+          overflow: "hidden"
+        }
+      },
+      h(
+        "span",
+        {
+          style: {
+            fontSize: 11,
+            color: "#6b7280",
+            background: "rgba(255,255,255,.85)",
+            borderRadius: 4,
+            padding: "1px 4px",
+            whiteSpace: "nowrap",
+            maxWidth: "100%",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+          }
+        },
+        p.name || t("comp." + el.type)
+      )
+    );
+  }
   if (el.type === "button") {
     let bg = acc;
     let fg = "#ffffff";
@@ -1289,15 +1675,26 @@ function renderWidget(el, state, t, opts) {
 // src/client/ui/canvas.js
 var GAP = 72;
 var LABEL = 30;
+var HANDLES = [
+  ["nw", "nwse-resize"],
+  ["n", "ns-resize"],
+  ["ne", "nesw-resize"],
+  ["e", "ew-resize"],
+  ["se", "nwse-resize"],
+  ["s", "ns-resize"],
+  ["sw", "nesw-resize"],
+  ["w", "ew-resize"]
+];
 function CanvasView(props) {
   const {
     t,
     doc,
     activePage,
     zoom,
-    selId,
+    selIds,
+    selBoxes,
+    multiBounds,
     sel,
-    selPage,
     preview,
     pageState,
     ui,
@@ -1305,9 +1702,12 @@ function CanvasView(props) {
     spaceRef,
     spaceDown,
     panning,
+    guides,
+    marquee,
     renderStateFor,
     startDrag,
     startResize,
+    startMarquee,
     startPan,
     setSelId,
     setActivePage,
@@ -1315,6 +1715,76 @@ function CanvasView(props) {
     setUiFor,
     activate
   } = props;
+  const selectedSet = new Set(selIds || []);
+  function renderElements(elements, pageId) {
+    return elements.map((el) => {
+      const st = renderStateFor(el);
+      const u = ui[el.id] || {};
+      const info = TYPE_INFO[el.type] || TYPE_INFO.text;
+      const cursor = spaceDown ? panning ? "grabbing" : "grab" : preview ? info.interactive ? "pointer" : "default" : "move";
+      const isBox = isContainerType(el.type);
+      const selected = selectedSet.has(el.id) && !preview;
+      const style = {
+        left: el.x,
+        top: el.y,
+        width: el.w,
+        height: el.h,
+        cursor
+      };
+      let className = "dpd-el";
+      if (selected) className += " dpd-sel";
+      if (isBox) {
+        className += el.type === "container" ? " dpd-container" : " dpd-group";
+        if (el.type === "container") {
+          style.background = el.props.background || "#ffffff";
+          style.borderRadius = el.props.radius != null ? el.props.radius : 12;
+          style.overflow = el.props.clipContent === false ? "visible" : "hidden";
+        }
+      }
+      const handlers = {
+        onMouseDown: (ev) => {
+          if (ev.button === 1 || spaceRef.current) return;
+          if (preview) {
+            if (el.type === "button") setUiFor(el.id, { press: true });
+            return;
+          }
+          startDrag(ev, pageId, el);
+        },
+        onMouseEnter: () => {
+          if (preview && (el.type === "button" || el.type === "card"))
+            setUiFor(el.id, { hover: true });
+        },
+        onMouseLeave: () => {
+          if (preview) setUiFor(el.id, { hover: false, press: false });
+        },
+        onMouseUp: () => {
+          if (preview && el.type === "button") setUiFor(el.id, { press: false });
+        },
+        onClick: (ev) => {
+          if (preview) {
+            ev.stopPropagation();
+            activate(el, ev);
+          }
+        }
+      };
+      return h(
+        "div",
+        {
+          key: el.id,
+          "data-el-id": el.id,
+          className,
+          style,
+          title: isBox ? el.props.name || t("comp." + el.type) : void 0,
+          ...handlers
+        },
+        isBox ? renderElements(el.children || [], pageId) : h(
+          "div",
+          { style: { width: "100%", height: "100%", pointerEvents: "none" } },
+          renderWidget(el, st, t, { tabsActive: u.tabs, preview })
+        )
+      );
+    });
+  }
   const positions = {};
   let cursorX = 0;
   doc.pages.forEach((p) => {
@@ -1342,57 +1812,57 @@ function CanvasView(props) {
   );
   const frameNodes = doc.pages.map((p) => {
     const pageActive = p.id === activePage.id;
-    const els = p.elements.map((el) => {
-      const st = renderStateFor(el);
-      const u = ui[el.id] || {};
-      const info = TYPE_INFO[el.type] || TYPE_INFO.text;
-      const cursor = spaceDown ? panning ? "grabbing" : "grab" : preview ? info.interactive ? "pointer" : "default" : "move";
+    const els = renderElements(p.elements, p.id);
+    const selectionNodes = !preview && pageActive ? selBoxes.map((box) => {
+      const single = selBoxes.length === 1;
+      const node = sel;
       return h(
         "div",
         {
-          key: el.id,
-          className: "dpd-el" + (selId === el.id && !preview ? " dpd-sel" : ""),
-          style: { left: el.x, top: el.y, width: el.w, height: el.h, cursor },
-          onMouseDown: (ev) => {
-            if (ev.button === 1 || spaceRef.current) return;
-            if (preview) {
-              if (el.type === "button") setUiFor(el.id, { press: true });
-              return;
-            }
-            startDrag(ev, p.id, el);
-          },
-          onMouseEnter: () => {
-            if (preview && (el.type === "button" || el.type === "card"))
-              setUiFor(el.id, { hover: true });
-          },
-          onMouseLeave: () => {
-            if (preview) setUiFor(el.id, { hover: false, press: false });
-          },
-          onMouseUp: () => {
-            if (preview && el.type === "button") setUiFor(el.id, { press: false });
-          },
-          onClick: (ev) => {
-            if (preview) {
-              ev.stopPropagation();
-              activate(el, ev);
-            }
-          }
+          key: "sel-" + box.id,
+          className: "dpd-selBox" + (single ? "" : " multi"),
+          style: { left: box.x, top: box.y, width: box.w, height: box.h }
         },
-        h(
-          "div",
-          { style: { width: "100%", height: "100%", pointerEvents: "none" } },
-          renderWidget(el, st, t, { tabsActive: u.tabs, preview })
-        )
+        single && node ? HANDLES.map(
+          ([dir, cur]) => h("div", {
+            key: dir,
+            className: "dpd-handle h-" + dir,
+            "data-dir": dir,
+            style: { cursor: cur },
+            onMouseDown: (ev) => startResize(ev, node, dir)
+          })
+        ) : null
       );
-    });
-    const selNode = sel && selPage && selPage.id === p.id && !preview ? h(
-      "div",
-      {
-        className: "dpd-selBox",
-        style: { left: sel.x, top: sel.y, width: sel.w, height: sel.h }
-      },
-      h("div", { className: "dpd-handle br", onMouseDown: (ev) => startResize(ev, sel) })
+    }) : null;
+    const multiSelection = !preview && pageActive && multiBounds && selBoxes.length > 1 ? h("div", {
+      className: "dpd-multiBox",
+      style: {
+        left: multiBounds.x,
+        top: multiBounds.y,
+        width: multiBounds.w,
+        height: multiBounds.h
+      }
+    }) : null;
+    const guideNodes = pageActive && !preview && guides && guides.length ? guides.map(
+      (g, i) => g.axis === "x" ? h("div", {
+        key: "gx-" + i,
+        className: "dpd-guide v",
+        style: { left: g.pos, top: g.from, height: Math.max(1, g.to - g.from) }
+      }) : h("div", {
+        key: "gy-" + i,
+        className: "dpd-guide h",
+        style: { top: g.pos, left: g.from, width: Math.max(1, g.to - g.from) }
+      })
     ) : null;
+    const marqueeNode = pageActive && marquee && marquee.pageId === p.id ? h("div", {
+      className: "dpd-marquee",
+      style: {
+        left: marquee.x,
+        top: marquee.y,
+        width: marquee.w,
+        height: marquee.h
+      }
+    }) : null;
     const overlay = pageActive && pageState !== "normal" ? h(PageOverlay, { pageState, t }) : null;
     return h(
       "div",
@@ -1408,13 +1878,18 @@ function CanvasView(props) {
         },
         onMouseDown: (ev) => {
           if (ev.button === 1 || spaceRef.current) return;
-          ev.stopPropagation();
-          setActivePage(p.id);
-          if (!preview) setSelId(null);
+          if (preview) {
+            setUi({});
+            return;
+          }
+          startMarquee(ev, p);
         }
       },
       els,
-      selNode,
+      selectionNodes,
+      multiSelection,
+      guideNodes,
+      marqueeNode,
       overlay
     );
   });
@@ -1426,7 +1901,7 @@ function CanvasView(props) {
   const canvas = h(
     "div",
     {
-      className: "dpd-canvas",
+      className: "dpd-canvas" + (preview ? " dpd-preview" : ""),
       ref: canvasRef,
       title: t("toolbar.panHint"),
       style: { cursor: panning ? "grabbing" : spaceDown ? "grab" : "default" },
@@ -1473,6 +1948,7 @@ function InspectorView(props) {
   const {
     t,
     sel,
+    selCount,
     activePage,
     setEl,
     setElProps,
@@ -1482,7 +1958,11 @@ function InspectorView(props) {
     deleteEl,
     setPreset,
     renameActivePage,
-    patchActiveFrame
+    patchActiveFrame,
+    alignSelection,
+    distributeSelection,
+    groupSelection,
+    ungroupSelection
   } = props;
   function numInput(value, onChange) {
     return h("input", {
@@ -1495,8 +1975,69 @@ function InspectorView(props) {
       }
     });
   }
+  const alignButtons = [
+    ["left", "align.left"],
+    ["centerX", "align.centerX"],
+    ["right", "align.right"],
+    ["top", "align.top"],
+    ["centerY", "align.centerY"],
+    ["bottom", "align.bottom"]
+  ].map(
+    ([mode, key]) => h(
+      "button",
+      {
+        key: mode,
+        type: "button",
+        className: "dpd-alignBtn",
+        title: t(key),
+        onClick: () => alignSelection(mode)
+      },
+      t(key)
+    )
+  );
   let inspectorBody;
-  if (sel) {
+  if (selCount > 1) {
+    inspectorBody = h(
+      "div",
+      null,
+      h("div", { className: "dpd-empty" }, t("inspector.multi") + " \xB7 " + selCount),
+      h(
+        "div",
+        { className: "dpd-section" },
+        h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.align"))),
+        h("div", { className: "dpd-alignGrid" }, alignButtons),
+        h(
+          "div",
+          { className: "dpd-actions" },
+          h(
+            "button",
+            { className: "dpd-btn", type: "button", onClick: () => distributeSelection("x") },
+            t("align.distributeH")
+          ),
+          h(
+            "button",
+            { className: "dpd-btn", type: "button", onClick: () => distributeSelection("y") },
+            t("align.distributeV")
+          )
+        )
+      ),
+      h(
+        "div",
+        { className: "dpd-actions" },
+        h(
+          "button",
+          { className: "dpd-btn primary", type: "button", onClick: groupSelection },
+          t("inspector.group")
+        ),
+        h(
+          "button",
+          { className: "dpd-btn", type: "button", onClick: deleteEl },
+          h(IconTrash),
+          t("inspector.delete")
+        )
+      )
+    );
+  } else if (sel) {
     const info = TYPE_INFO[sel.type] || TYPE_INFO.text;
     const stateList = info.states || ["default"];
     inspectorBody = h(
@@ -1582,6 +2123,50 @@ function InspectorView(props) {
           (v) => setElProps(sel.id, { fontSize: v }, "fs:" + sel.id)
         )
       ) : null,
+      sel.type === "container" || sel.type === "group" ? h(
+        "div",
+        { className: "dpd-section" },
+        h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.container"))),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.containerName")),
+          h("input", {
+            className: "dpd-input",
+            type: "text",
+            value: sel.props.name || "",
+            placeholder: t("comp." + sel.type),
+            onChange: (e) => setElProps(sel.id, { name: e.target.value }, "cname:" + sel.id)
+          })
+        ),
+        sel.type === "container" ? h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.background")),
+          h("input", {
+            className: "dpd-color",
+            type: "color",
+            value: sel.props.background || "#ffffff",
+            onChange: (e) => setElProps(sel.id, { background: e.target.value }, "cbg:" + sel.id)
+          }),
+          h("input", {
+            className: "dpd-input",
+            type: "text",
+            value: sel.props.background || "#ffffff",
+            onChange: (e) => setElProps(sel.id, { background: e.target.value }, "cbg:" + sel.id)
+          })
+        ) : null,
+        sel.type === "container" ? h(
+          "label",
+          { className: "dpd-checkRow" },
+          h("input", {
+            type: "checkbox",
+            checked: sel.props.clipContent !== false,
+            onChange: (e) => setElProps(sel.id, { clipContent: e.target.checked }, "clip:" + sel.id)
+          }),
+          t("inspector.clipContent")
+        ) : null
+      ) : null,
       h(
         "div",
         { className: "dpd-row" },
@@ -1633,6 +2218,11 @@ function InspectorView(props) {
           h(IconBack),
           t("inspector.back")
         ),
+        sel.type === "group" ? h(
+          "button",
+          { className: "dpd-btn", type: "button", onClick: ungroupSelection },
+          t("inspector.ungroup")
+        ) : null,
         h(
           "button",
           { className: "dpd-btn", type: "button", onClick: deleteEl },
@@ -1722,7 +2312,7 @@ function LeftView(props) {
     setSection,
     leftWidth,
     startResizeLeft,
-    selId,
+    selIds,
     setSelId,
     setPreview
   } = props;
@@ -1765,7 +2355,17 @@ function LeftView(props) {
     )
   );
   const activeElements = activePage && activePage.elements || [];
-  const layers = activeElements.slice().reverse();
+  const layerRows = [];
+  const collectRows = (elements, depth) => {
+    elements.slice().reverse().forEach((el) => {
+      layerRows.push({ el, depth });
+      if (isContainerType(el.type) && Array.isArray(el.children)) {
+        collectRows(el.children, depth + 1);
+      }
+    });
+  };
+  collectRows(activeElements, 0);
+  const selectedSet = new Set(selIds || []);
   const railBtn = (id, icon, label) => h(
     "button",
     {
@@ -1872,20 +2472,22 @@ function LeftView(props) {
     h(
       "div",
       { className: "dpd-layers" },
-      layers.map(
-        (el) => h(
+      layerRows.map(
+        ({ el, depth }) => h(
           "div",
           {
             key: el.id,
-            className: "dpd-layer" + (selId === el.id ? " active" : ""),
+            className: "dpd-layer" + (selectedSet.has(el.id) ? " active" : ""),
+            style: { paddingLeft: 8 + depth * 16 },
             onClick: () => {
               setSelId(el.id);
               setPreview(false);
               setActivePage(activePage.id);
             }
           },
+          isContainerType(el.type) ? h("span", { className: "caret" }, depth >= 0 ? "\u25BE" : "") : null,
           h("span", { className: "dot" }, h(Svg, { size: 13 }, libGlyph(el.type))),
-          h("span", { className: "nm" }, el.props.text || t("comp." + el.type))
+          h("span", { className: "nm" }, el.props.text || el.props.name || t("comp." + el.type))
         )
       )
     )
@@ -1936,7 +2538,9 @@ function ToolbarView(props) {
     redo,
     canUndo,
     canRedo,
-    setSelId
+    setSelId,
+    snapEnabled,
+    toggleSnap
   } = props;
   const toolbar = h(
     "div",
@@ -2026,6 +2630,18 @@ function ToolbarView(props) {
     h(
       "button",
       {
+        className: "dpd-btn" + (snapEnabled ? " primary" : ""),
+        type: "button",
+        title: t("toolbar.snap"),
+        "aria-pressed": !!snapEnabled,
+        onClick: toggleSnap
+      },
+      h(IconMagnet),
+      t("toolbar.snap")
+    ),
+    h(
+      "button",
+      {
         className: "dpd-iconbtn",
         type: "button",
         title: "\u7F29\u5C0F",
@@ -2072,6 +2688,162 @@ function ToolbarView(props) {
 }
 
 // src/client/panel.js
+function mapTree(elements, fn) {
+  let changed = false;
+  const out = elements.map((el) => {
+    let next = fn(el);
+    if (isContainerType(next.type) && Array.isArray(next.children)) {
+      const kids = mapTree(next.children, fn);
+      if (kids !== next.children) next = { ...next, children: kids };
+    }
+    if (next !== el) changed = true;
+    return next;
+  });
+  return changed ? out : elements;
+}
+function removeFromTree(elements, idSet) {
+  let changed = false;
+  const out = [];
+  for (const el of elements) {
+    if (idSet.has(el.id)) {
+      changed = true;
+      continue;
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = removeFromTree(el.children, idSet);
+      if (kids !== el.children) {
+        changed = true;
+        out.push({ ...el, children: kids });
+        continue;
+      }
+    }
+    out.push(el);
+  }
+  return changed ? out : elements;
+}
+function extractFromTree(elements, id) {
+  let extracted = null;
+  let changed = false;
+  const walk = (list) => {
+    const out = [];
+    for (const el of list) {
+      if (el.id === id) {
+        extracted = el;
+        changed = true;
+        continue;
+      }
+      if (isContainerType(el.type) && Array.isArray(el.children)) {
+        const kids = walk(el.children);
+        if (kids !== el.children) {
+          out.push({ ...el, children: kids });
+          continue;
+        }
+      }
+      out.push(el);
+    }
+    return out;
+  };
+  const next = walk(elements);
+  return { elements: changed ? next : elements, extracted };
+}
+function appendToContainer(elements, containerId, el) {
+  let changed = false;
+  const out = elements.map((cur) => {
+    if (cur.id === containerId) {
+      changed = true;
+      return { ...cur, children: [...cur.children || [], el] };
+    }
+    if (isContainerType(cur.type) && Array.isArray(cur.children)) {
+      const kids = appendToContainer(cur.children, containerId, el);
+      if (kids !== cur.children) {
+        changed = true;
+        return { ...cur, children: kids };
+      }
+    }
+    return cur;
+  });
+  return changed ? out : elements;
+}
+function replaceInTree(elements, id, updater) {
+  let changed = false;
+  const out = elements.map((el) => {
+    if (el.id === id) {
+      changed = true;
+      return updater(el);
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = replaceInTree(el.children, id, updater);
+      if (kids !== el.children) {
+        changed = true;
+        return { ...el, children: kids };
+      }
+    }
+    return el;
+  });
+  return changed ? out : elements;
+}
+function reorderInTree(elements, id, toFront) {
+  const index = elements.findIndex((el) => el.id === id);
+  if (index !== -1) {
+    const arr = elements.slice();
+    const [el] = arr.splice(index, 1);
+    if (toFront) arr.push(el);
+    else arr.unshift(el);
+    return arr;
+  }
+  for (let i = 0; i < elements.length; i += 1) {
+    const el = elements[i];
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = reorderInTree(el.children, id, toFront);
+      if (kids !== el.children) {
+        const arr = elements.slice();
+        arr[i] = { ...el, children: kids };
+        return arr;
+      }
+    }
+  }
+  return elements;
+}
+function duplicateInTree(elements, idSet, rootIds) {
+  const out = [];
+  for (const el of elements) {
+    if (idSet.has(el.id)) {
+      const copy = cloneElementDeep(el, () => uid());
+      copy.x += 16;
+      copy.y += 16;
+      rootIds.push(copy.id);
+      out.push(el, copy);
+      continue;
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = duplicateInTree(el.children, idSet, rootIds);
+      out.push(kids !== el.children ? { ...el, children: kids } : el);
+      continue;
+    }
+    out.push(el);
+  }
+  return out;
+}
+function scaleTree(elements, sx, sy, sf, ox, oy, isRoot) {
+  return elements.map((el) => {
+    const props = { ...el.props || {} };
+    if (typeof props.fontSize === "number")
+      props.fontSize = Math.max(8, Math.round(props.fontSize * sf));
+    if (typeof props.radius === "number") props.radius = Math.max(0, Math.round(props.radius * sf));
+    const scaled = {
+      ...el,
+      x: Math.round((isRoot ? el.x - ox : el.x) * sx),
+      y: Math.round((isRoot ? el.y - oy : el.y) * sy),
+      w: Math.max(12, Math.round(el.w * sx)),
+      h: Math.max(8, Math.round(el.h * sy)),
+      props
+    };
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      scaled.children = scaleTree(el.children, sx, sy, sf, 0, 0, false);
+    }
+    return scaled;
+  });
+}
 function ProductDesignPanel() {
   const t = useT();
   const [doc, setDocState] = useState2(() => loadDoc() || defaultDoc(t));
@@ -2102,7 +2874,7 @@ function ProductDesignPanel() {
     docRef.current = next;
     setDocState(next);
   }, []);
-  const [selId, setSelId] = useState2(null);
+  const [selIds, setSelIds] = useState2([]);
   const [preview, setPreview] = useState2(false);
   const [pageState, setPageState] = useState2("normal");
   const [zoom, setZoom] = useState2(1);
@@ -2110,6 +2882,13 @@ function ProductDesignPanel() {
   const [spaceDown, setSpaceDown] = useState2(false);
   const spaceRef = useRef(false);
   const [panning, setPanning] = useState2(false);
+  const [guides, setGuides] = useState2([]);
+  const [marquee, setMarquee] = useState2(null);
+  const [snapEnabled, setSnapEnabled] = useState2(() => loadUi().snapEnabled !== false);
+  const snapRef = useRef(snapEnabled);
+  snapRef.current = snapEnabled;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
   const [leftWidth, setLeftWidth] = useState2(() => {
     const w = Number(loadUi().leftWidth);
     return w >= 168 && w <= 460 ? w : 264;
@@ -2217,8 +2996,12 @@ function ProductDesignPanel() {
     };
   }, []);
   useEffect2(() => {
-    saveUi({ leftWidth, section });
-  }, [leftWidth, section]);
+    saveUi({
+      leftWidth,
+      section,
+      snapEnabled
+    });
+  }, [leftWidth, section, snapEnabled]);
   const canvasRef = useRef(null);
   useEffect2(() => {
     const el = canvasRef.current;
@@ -2290,6 +3073,16 @@ function ProductDesignPanel() {
       redo();
       return;
     }
+    if (mod && !e.shiftKey && (k === "g" || k === "G")) {
+      e.preventDefault();
+      groupSelection();
+      return;
+    }
+    if (mod && e.shiftKey && (k === "g" || k === "G")) {
+      e.preventDefault();
+      ungroupSelection();
+      return;
+    }
     if (mod && (k === "d" || k === "D")) {
       e.preventDefault();
       duplicateEl();
@@ -2297,11 +3090,11 @@ function ProductDesignPanel() {
     }
     if (k === "Escape") {
       if (preview) setPreview(false);
-      else setSelId(null);
+      else setSelIds([]);
       return;
     }
     if (preview) return;
-    if (!selId) return;
+    if (!selIds.length) return;
     if (k === "Delete" || k === "Backspace") {
       e.preventDefault();
       deleteEl();
@@ -2321,7 +3114,30 @@ function ProductDesignPanel() {
     return () => window.removeEventListener("keydown", fn);
   }, []);
   const activePage = doc.pages.find((p) => p.id === doc.activePageId) || doc.pages[0];
-  const setActivePage = useCallback2((id) => setDoc((d) => ({ ...d, activePageId: id })), []);
+  const treeEntries = activePage ? collectElementEntries(activePage.elements) : [];
+  const entryById = new Map(treeEntries.map((entry) => [entry.el.id, entry]));
+  const selEntries = selIds.map((id) => entryById.get(id)).filter(Boolean);
+  const sel = selEntries.length === 1 ? selEntries[0].el : null;
+  const selBoxes = selEntries.map((entry) => ({
+    id: entry.el.id,
+    x: entry.absX,
+    y: entry.absY,
+    w: entry.w,
+    h: entry.h
+  }));
+  const multiBounds = selEntries.length > 1 ? boundsOfEntries(selEntries) : null;
+  const setActivePage = useCallback2(
+    (id) => {
+      setSelIds((ids) => {
+        const page = docRef.current.pages.find((p) => p.id === id);
+        if (!page) return [];
+        const kept = ids.filter((item) => !!findElementEntry(page.elements, item));
+        return kept.length === ids.length ? ids : kept;
+      });
+      setDoc((d) => d.activePageId === id ? d : { ...d, activePageId: id });
+    },
+    [setDoc]
+  );
   const setUiFor = useCallback2((id, patch) => {
     setUi((u) => ({ ...u, [id]: { ...u[id] || {}, ...patch } }));
   }, []);
@@ -2332,7 +3148,7 @@ function ProductDesignPanel() {
           ...d,
           pages: d.pages.map((p) => ({
             ...p,
-            elements: p.elements.map((e) => e.id === elId ? fn(e) : e)
+            elements: replaceInTree(p.elements, elId, fn)
           }))
         }),
         mode
@@ -2370,18 +3186,21 @@ function ProductDesignPanel() {
     bumpHist((v) => v + 1);
   }
   function nudgeSelected(dx, dy) {
-    if (!selId) return;
+    if (!selIds.length) return;
+    const ids = new Set(topSelectedEntries().map((entry) => entry.el.id));
+    if (!ids.size) return;
     setDoc(
       (d) => ({
         ...d,
         pages: d.pages.map((p) => ({
           ...p,
-          elements: p.elements.map(
-            (e) => e.id === selId ? { ...e, x: e.x + dx, y: e.y + dy } : e
+          elements: mapTree(
+            p.elements,
+            (e) => ids.has(e.id) ? { ...e, x: e.x + dx, y: e.y + dy } : e
           )
         }))
       }),
-      "nudge:" + selId
+      "nudge:" + selIds.join(",")
     );
   }
   function pushPastSnapshot(snapshot) {
@@ -2391,18 +3210,6 @@ function ProductDesignPanel() {
     h2.future = [];
     lastKeyRef.current = { key: null, time: 0 };
     bumpHist((v) => v + 1);
-  }
-  let sel = null;
-  let selPage = null;
-  if (selId) {
-    for (const p of doc.pages) {
-      const e = p.elements.find((x) => x.id === selId);
-      if (e) {
-        sel = e;
-        selPage = p;
-        break;
-      }
-    }
   }
   function addPage() {
     const base = activePage;
@@ -2418,6 +3225,7 @@ function ProductDesignPanel() {
       elements: []
     };
     setDoc((d) => ({ ...d, pages: [...d.pages, page], activePageId: page.id }));
+    setSelIds([]);
   }
   function duplicatePage(id) {
     const src = doc.pages.find((p) => p.id === id);
@@ -2426,7 +3234,10 @@ function ProductDesignPanel() {
       id: uid(),
       name: src.name + " " + t("pages.copySuffix"),
       frame: { ...src.frame },
-      elements: src.elements.map((e) => ({ ...e, id: uid(), props: { ...e.props } }))
+      elements: cloneElementDeep(
+        { id: "root", type: "group", x: 0, y: 0, w: 0, h: 0, children: src.elements },
+        () => uid()
+      ).children
     };
     setDoc((d) => {
       const idx = d.pages.findIndex((p) => p.id === id);
@@ -2434,12 +3245,11 @@ function ProductDesignPanel() {
       pages.splice(idx + 1, 0, copy);
       return { ...d, pages, activePageId: copy.id };
     });
+    setSelIds([]);
   }
   function deletePage(id) {
     if (doc.pages.length <= 1) return;
     if (!window.confirm(t("pages.deleteConfirm"))) return;
-    const removing = doc.pages.find((p) => p.id === id);
-    if (removing && selId && removing.elements.some((e) => e.id === selId)) setSelId(null);
     setDoc((d) => {
       const idx = d.pages.findIndex((p) => p.id === id);
       const pages = d.pages.filter((p) => p.id !== id);
@@ -2450,71 +3260,91 @@ function ProductDesignPanel() {
       }
       return { ...d, pages, activePageId: active };
     });
+    setSelIds([]);
   }
   function addElement(type) {
     const target = activePage;
     if (!target) return;
     const info = TYPE_INFO[type];
+    if (!info) return;
+    const selectedEntry = selIds.length === 1 ? entryById.get(selIds[0]) : null;
+    const parentEntry = selectedEntry && isContainerType(selectedEntry.el.type) ? selectedEntry : null;
+    const parent = parentEntry ? parentEntry.el : null;
+    const boundW = parent ? parent.w : target.frame.w;
+    const boundH = parent ? parent.h : target.frame.h;
     let w = info.size[0];
     const hh = info.size[1];
     const fullWidth = type === "navbar" || type === "tabs";
-    if (fullWidth) w = target.frame.w;
-    const n = target.elements.length;
-    const x = fullWidth ? 0 : 24;
-    const y = fullWidth ? Math.min(24 + n % 6 * 16, target.frame.h - hh) : 24 + n % 8 * 18;
+    if (fullWidth) w = boundW;
+    const n = (parent ? parent.children || [] : target.elements).length;
+    const x = fullWidth ? 0 : parent ? 16 : 24;
+    const y = fullWidth ? Math.min(24 + n % 6 * 16, Math.max(0, boundH - hh)) : 24 + n % 8 * 18;
+    const props = type === "container" ? {
+      name: t("comp.container") + " " + (n + 1),
+      background: "#ffffff",
+      radius: 12,
+      clipContent: true
+    } : {};
     const el = makeEl(
       type,
-      Math.max(0, Math.min(x, target.frame.w - w)),
-      Math.max(0, Math.min(y, target.frame.h - hh)),
+      Math.max(0, Math.min(x, boundW - w)),
+      Math.max(0, Math.min(y, boundH - hh)),
       w,
-      hh
+      hh,
+      props
     );
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => p.id === target.id ? { ...p, elements: [...p.elements, el] } : p)
+      pages: d.pages.map((p) => {
+        if (p.id !== target.id) return p;
+        if (!parent) return { ...p, elements: [...p.elements, el] };
+        return { ...p, elements: appendToContainer(p.elements, parent.id, el) };
+      })
     }));
-    setSelId(el.id);
+    setSelIds([el.id]);
     setPreview(false);
   }
   function duplicateEl() {
-    if (!sel || !selPage) return;
-    const c = { ...sel, id: uid(), x: sel.x + 16, y: sel.y + 16, props: { ...sel.props } };
+    if (!selIds.length) return;
+    const ids = new Set(topSelectedEntries().map((entry) => entry.el.id));
+    if (!ids.size) return;
+    const rootIds = [];
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => p.id === selPage.id ? { ...p, elements: [...p.elements, c] } : p)
+      pages: d.pages.map((p) => ({
+        ...p,
+        elements: duplicateInTree(p.elements, ids, rootIds)
+      }))
     }));
-    setSelId(c.id);
+    if (rootIds.length) setSelIds(rootIds);
   }
   function deleteEl() {
+    if (!selIds.length) return;
+    const ids = new Set(selIds);
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => ({ ...p, elements: removeFromTree(p.elements, ids) }))
+    }));
+    setSelIds([]);
+  }
+  function bringFront() {
     if (!selId) return;
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => ({ ...p, elements: p.elements.filter((e) => e.id !== selId) }))
-    }));
-    setSelId(null);
-  }
-  function bringFront() {
-    if (!sel || !selPage) return;
-    setDoc((d) => ({
-      ...d,
-      pages: d.pages.map(
-        (p) => p.id === selPage.id ? { ...p, elements: [...p.elements.filter((e) => e.id !== selId), sel] } : p
-      )
+      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, true) }))
     }));
   }
   function sendBack() {
-    if (!sel || !selPage) return;
+    if (!selId) return;
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map(
-        (p) => p.id === selPage.id ? { ...p, elements: [sel, ...p.elements.filter((e) => e.id !== selId)] } : p
-      )
+      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, false) }))
     }));
   }
   function resetDoc() {
     if (window.confirm(t("toolbar.resetConfirm"))) {
       setDoc(defaultDoc(t));
-      setSelId(null);
+      setSelIds([]);
       setPageState("normal");
       setPreview(false);
     }
@@ -2549,28 +3379,14 @@ function ProductDesignPanel() {
         if (ow === nw && oh === nh) return { ...p, frame };
         const b = elementsBounds(p.elements);
         const hasContent = b && b.w > 0 && b.h > 0;
-        const inconsistent = hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
+        const hasContainer = p.elements.some((e) => isContainerType(e.type));
+        const inconsistent = !hasContainer && hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
         const sx = inconsistent ? nw / b.w : nw / ow;
         const sy = inconsistent ? nh / b.h : nh / oh;
         const ox = inconsistent ? b.minX : 0;
         const oy = inconsistent ? b.minY : 0;
         const sf = Math.min(sx, sy);
-        const scaleEl = (e) => {
-          const props = { ...e.props };
-          if (typeof props.fontSize === "number")
-            props.fontSize = Math.max(8, Math.round(props.fontSize * sf));
-          if (typeof props.radius === "number")
-            props.radius = Math.max(0, Math.round(props.radius * sf));
-          return {
-            ...e,
-            x: Math.round((e.x - ox) * sx),
-            y: Math.round((e.y - oy) * sy),
-            w: Math.max(12, Math.round(e.w * sx)),
-            h: Math.max(8, Math.round(e.h * sy)),
-            props
-          };
-        };
-        return { ...p, frame, elements: p.elements.map(scaleEl) };
+        return { ...p, frame, elements: scaleTree(p.elements, sx, sy, sf, ox, oy, true) };
       })
     }));
   }
@@ -2594,51 +3410,410 @@ function ProductDesignPanel() {
       "pagename:" + (activePage ? activePage.id : "")
     );
   }
+  function topSelectedEntries() {
+    return selEntries.filter((entry) => !isUnderAny(entry, selIds));
+  }
+  function groupSelection() {
+    const entries = topSelectedEntries();
+    if (entries.length < 2) return;
+    const list = entries[0].list;
+    if (!entries.every((entry) => entry.list === list)) return;
+    const bounds = boundsOfEntries(entries);
+    if (!bounds) return;
+    const parentAbsX = entries[0].absX - entries[0].el.x;
+    const parentAbsY = entries[0].absY - entries[0].el.y;
+    const group = makeEl(
+      "group",
+      bounds.x - parentAbsX,
+      bounds.y - parentAbsY,
+      bounds.w,
+      bounds.h,
+      { name: t("comp.group") }
+    );
+    group.children = entries.map((entry) => {
+      const copy = cloneElementDeep(entry.el);
+      copy.x = entry.absX - bounds.x;
+      copy.y = entry.absY - bounds.y;
+      return copy;
+    });
+    const ids = new Set(entries.map((entry) => entry.el.id));
+    const insertAt = Math.min(...entries.map((entry) => entry.index));
+    const remaining = list.filter((el) => !ids.has(el.id));
+    remaining.splice(insertAt, 0, group);
+    const parentId = entries[0].parent ? entries[0].parent.id : null;
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => {
+        if (p.id !== activePage.id) return p;
+        if (!parentId) return { ...p, elements: remaining };
+        return {
+          ...p,
+          elements: replaceInTree(p.elements, parentId, (el) => ({ ...el, children: remaining }))
+        };
+      })
+    }));
+    setSelIds([group.id]);
+  }
+  function ungroupSelection() {
+    const entry = selEntries[0];
+    if (!entry || entry.el.type !== "group") return;
+    const group = entry.el;
+    const kids = (group.children || []).map((child) => {
+      const copy = cloneElementDeep(child);
+      copy.x += group.x;
+      copy.y += group.y;
+      return copy;
+    });
+    const list = entry.list;
+    const next = list.slice();
+    next.splice(entry.index, 1, ...kids);
+    const parentId = entry.parent ? entry.parent.id : null;
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => {
+        if (p.id !== activePage.id) return p;
+        if (!parentId) return { ...p, elements: next };
+        return {
+          ...p,
+          elements: replaceInTree(p.elements, parentId, (el) => ({ ...el, children: next }))
+        };
+      })
+    }));
+    setSelIds(kids.map((k) => k.id));
+  }
+  function alignSelection(mode) {
+    const entries = topSelectedEntries();
+    if (!entries.length) return;
+    const target = entries.length === 1 && activePage ? { x: 0, y: 0, w: activePage.frame.w, h: activePage.frame.h } : boundsOfEntries(entries);
+    if (!target) return;
+    const ids = new Set(entries.map((entry) => entry.el.id));
+    setDoc(
+      (d) => ({
+        ...d,
+        pages: d.pages.map((p) => {
+          if (p.id !== activePage.id) return p;
+          return {
+            ...p,
+            elements: mapTree(p.elements, (el) => {
+              if (!ids.has(el.id)) return el;
+              const entry = findElementEntry(p.elements, el.id);
+              if (!entry) return el;
+              const parentAbsX = entry.absX - el.x;
+              const parentAbsY = entry.absY - el.y;
+              let absX = entry.absX;
+              let absY = entry.absY;
+              if (mode === "left") absX = target.x;
+              else if (mode === "centerX") absX = target.x + (target.w - el.w) / 2;
+              else if (mode === "right") absX = target.x + target.w - el.w;
+              else if (mode === "top") absY = target.y;
+              else if (mode === "centerY") absY = target.y + (target.h - el.h) / 2;
+              else if (mode === "bottom") absY = target.y + target.h - el.h;
+              return { ...el, x: Math.round(absX - parentAbsX), y: Math.round(absY - parentAbsY) };
+            })
+          };
+        })
+      }),
+      "align:" + mode
+    );
+  }
+  function distributeSelection(axis) {
+    const entries = topSelectedEntries();
+    if (entries.length < 3) return;
+    const sorted = entries.slice().sort((a, b) => axis === "x" ? a.absX - b.absX : a.absY - b.absY);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const total = axis === "x" ? last.absX + last.w - first.absX : last.absY + last.h - first.absY;
+    const sum = sorted.reduce((acc, entry) => acc + (axis === "x" ? entry.w : entry.h), 0);
+    const gap = (total - sum) / (sorted.length - 1);
+    let cursor = axis === "x" ? first.absX : first.absY;
+    const positions = /* @__PURE__ */ new Map();
+    for (const entry of sorted) {
+      positions.set(entry.el.id, cursor);
+      cursor += (axis === "x" ? entry.w : entry.h) + gap;
+    }
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => {
+        if (p.id !== activePage.id) return p;
+        return {
+          ...p,
+          elements: mapTree(p.elements, (el) => {
+            if (!positions.has(el.id)) return el;
+            const entry = findElementEntry(p.elements, el.id);
+            if (!entry) return el;
+            const parentAbs = axis === "x" ? entry.absX - el.x : entry.absY - el.y;
+            const pos = Math.round(positions.get(el.id) - parentAbs);
+            return axis === "x" ? { ...el, x: pos } : { ...el, y: pos };
+          })
+        };
+      })
+    }));
+  }
+  function snapTargets(page, excludeIds) {
+    const targets = [{ x: 0, y: 0, w: page.frame.w, h: page.frame.h, id: "__frame__" }];
+    for (const entry of collectElementEntries(page.elements)) {
+      if (excludeIds.has(entry.el.id)) continue;
+      targets.push({
+        id: entry.el.id,
+        x: entry.absX,
+        y: entry.absY,
+        w: entry.w,
+        h: entry.h
+      });
+    }
+    return targets;
+  }
   function startDrag(ev, pageId, el) {
     if (preview) return;
     if (ev.button === 1 || spaceRef.current) return;
     ev.stopPropagation();
-    setSelId(el.id);
-    setActivePage(pageId);
+    const page = docRef.current.pages.find((p) => p.id === pageId);
+    if (!page) return;
+    if (pageId !== activePage.id) setActivePage(pageId);
+    let ids = selIds.slice();
+    if (ev.shiftKey) {
+      if (ids.includes(el.id)) {
+        ids = ids.filter((id) => id !== el.id);
+        setSelIds(ids);
+        return;
+      }
+      ids = [...ids, el.id];
+    } else if (!ids.includes(el.id) || ids.length > 1) {
+      ids = [el.id];
+    }
+    setSelIds(ids);
+    const allEntries = collectElementEntries(page.elements);
+    const entries = ids.map((id) => allEntries.find((entry) => entry.el.id === id)).filter(Boolean);
+    const top = entries.filter((entry) => !isUnderAny(entry, ids));
+    if (!top.length) return;
+    const box = boundsOfEntries(top);
+    if (!box) return;
+    const origins = new Map(top.map((entry) => [entry.el.id, { x: entry.el.x, y: entry.el.y }]));
+    const exclude = /* @__PURE__ */ new Set();
+    for (const entry of top) {
+      exclude.add(entry.el.id);
+      for (const id of descendantIds(entry.el)) exclude.add(id);
+    }
+    const targets = snapTargets(page, exclude);
     const before = docRef.current;
     const sx = ev.clientX;
     const sy = ev.clientY;
-    const ox = el.x;
-    const oy = el.y;
     let moved = false;
+    let reparented = false;
     const move = (e2) => {
-      const nx = Math.round(ox + (e2.clientX - sx) / zoom);
-      const ny = Math.round(oy + (e2.clientY - sy) / zoom);
-      if (nx !== ox || ny !== oy) moved = true;
-      mapEl(el.id, (x) => ({ ...x, x: nx, y: ny }), false);
+      const zoomNow = zoomRef.current || 1;
+      let dx = Math.round((e2.clientX - sx) / zoomNow);
+      let dy = Math.round((e2.clientY - sy) / zoomNow);
+      if (snapRef.current) {
+        const snapped = snapMoveBox(
+          { x: box.x + dx, y: box.y + dy, w: box.w, h: box.h },
+          targets,
+          SNAP_THRESHOLD / zoomNow
+        );
+        dx += snapped.dx;
+        dy += snapped.dy;
+        setGuides(snapped.guides);
+      } else {
+        setGuides([]);
+      }
+      if (dx !== 0 || dy !== 0) moved = true;
+      setDoc(
+        (d) => ({
+          ...d,
+          pages: d.pages.map((p) => {
+            if (p.id !== pageId) return p;
+            return {
+              ...p,
+              elements: mapTree(p.elements, (cur) => {
+                const origin = origins.get(cur.id);
+                if (!origin) return cur;
+                return { ...cur, x: origin.x + dx, y: origin.y + dy };
+              })
+            };
+          })
+        }),
+        false
+      );
     };
     const up = () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
+      setGuides([]);
+      if (top.length === 1) {
+        const currentPage = docRef.current.pages.find((p) => p.id === pageId);
+        const entry = currentPage ? findElementEntry(currentPage.elements, top[0].el.id) : null;
+        if (entry) {
+          const cx = entry.absX + entry.w / 2;
+          const cy = entry.absY + entry.h / 2;
+          const excludeNow = /* @__PURE__ */ new Set([entry.el.id, ...descendantIds(entry.el)]);
+          const target = findDropContainer(
+            collectElementEntries(currentPage.elements),
+            excludeNow,
+            cx,
+            cy
+          );
+          const parentId = entry.parent ? entry.parent.id : null;
+          let nextParent = null;
+          if (target && target.el.id !== parentId) nextParent = target.el.id;
+          else if (entry.parent) {
+            const parentBox = {
+              x: entry.absX - entry.el.x,
+              y: entry.absY - entry.el.y,
+              w: entry.parent.w,
+              h: entry.parent.h
+            };
+            if (!pointInBox(cx, cy, parentBox)) nextParent = null;
+            else nextParent = parentId;
+          }
+          if (nextParent !== parentId) {
+            reparented = reparentElement(entry.el.id, nextParent);
+          }
+        }
+      }
+      if ((moved || reparented) && docRef.current !== before) pushPastSnapshot(before);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }
+  function reparentElement(elId, containerId) {
+    let changed = false;
+    setDoc((d) => {
+      const page = d.pages.find((p) => p.id === d.activePageId);
+      if (!page) return d;
+      const entry = findElementEntry(page.elements, elId);
+      if (!entry) return d;
+      const target = containerId ? findElementEntry(page.elements, containerId) : null;
+      if (containerId && (!target || !isContainerType(target.el.type))) return d;
+      const absX = entry.absX;
+      const absY = entry.absY;
+      const targetAbsX = target ? target.absX : 0;
+      const targetAbsY = target ? target.absY : 0;
+      const extracted = extractFromTree(page.elements, elId);
+      if (!extracted.extracted) return d;
+      const moved = {
+        ...extracted.extracted,
+        x: Math.round(absX - targetAbsX),
+        y: Math.round(absY - targetAbsY)
+      };
+      const nextElements = containerId ? appendToContainer(extracted.elements, containerId, moved) : [...extracted.elements, moved];
+      changed = true;
+      return {
+        ...d,
+        pages: d.pages.map((p) => p.id === page.id ? { ...p, elements: nextElements } : p)
+      };
+    }, false);
+    return changed;
+  }
+  function startResize(ev, el, dir) {
+    if (ev.button === 1 || spaceRef.current) return;
+    ev.stopPropagation();
+    const page = docRef.current.pages.find((p) => p.id === doc.activePageId);
+    if (!page) return;
+    const entry = findElementEntry(page.elements, el.id);
+    if (!entry) return;
+    const before = docRef.current;
+    const sx = ev.clientX;
+    const sy = ev.clientY;
+    const absX = entry.absX;
+    const absY = entry.absY;
+    const ow = entry.w;
+    const oh = entry.h;
+    const parentAbsX = absX - el.x;
+    const parentAbsY = absY - el.y;
+    const exclude = /* @__PURE__ */ new Set([el.id, ...descendantIds(el)]);
+    const targets = snapTargets(page, exclude);
+    let moved = false;
+    const move = (e2) => {
+      const zoomNow = zoomRef.current || 1;
+      const dx = Math.round((e2.clientX - sx) / zoomNow);
+      const dy = Math.round((e2.clientY - sy) / zoomNow);
+      let next = { x: absX, y: absY, w: ow, h: oh };
+      if (dir.indexOf("e") !== -1) next.w = ow + dx;
+      if (dir.indexOf("s") !== -1) next.h = oh + dy;
+      if (dir.indexOf("w") !== -1) {
+        next.x = absX + dx;
+        next.w = ow - dx;
+      }
+      if (dir.indexOf("n") !== -1) {
+        next.y = absY + dy;
+        next.h = oh - dy;
+      }
+      if (next.w < 12) {
+        if (dir.indexOf("w") !== -1) next.x = absX + ow - 12;
+        next.w = 12;
+      }
+      if (next.h < 8) {
+        if (dir.indexOf("n") !== -1) next.y = absY + oh - 8;
+        next.h = 8;
+      }
+      if (snapRef.current) {
+        const snapped = snapResizeBox(next, dir, targets, SNAP_THRESHOLD / zoomNow);
+        next = snapped.box;
+        setGuides(snapped.guides);
+      } else {
+        setGuides([]);
+      }
+      moved = true;
+      mapEl(
+        el.id,
+        (cur) => ({
+          ...cur,
+          x: Math.round(next.x - parentAbsX),
+          y: Math.round(next.y - parentAbsY),
+          w: Math.round(next.w),
+          h: Math.round(next.h)
+        }),
+        false
+      );
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      setGuides([]);
       if (moved && docRef.current !== before) pushPastSnapshot(before);
     };
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   }
-  function startResize(ev, el) {
-    if (ev.button === 1 || spaceRef.current) return;
+  function startMarquee(ev, page) {
+    if (preview || ev.button === 1 || spaceRef.current) return;
+    ev.preventDefault();
     ev.stopPropagation();
-    const before = docRef.current;
-    const sx = ev.clientX;
-    const sy = ev.clientY;
-    const ow = el.w;
-    const oh = el.h;
+    if (page.id !== activePage.id) setActivePage(page.id);
+    const frameEl = ev.currentTarget;
+    const rect = frameEl.getBoundingClientRect();
+    const zoomNow = zoomRef.current || 1;
+    const start = {
+      x: (ev.clientX - rect.left) / zoomNow,
+      y: (ev.clientY - rect.top) / zoomNow
+    };
+    const shift = ev.shiftKey;
+    const baseSel = shift ? selIds.slice() : [];
     let moved = false;
     const move = (e2) => {
-      const nw = Math.max(20, Math.round(ow + (e2.clientX - sx) / zoom));
-      const nh = Math.max(16, Math.round(oh + (e2.clientY - sy) / zoom));
-      if (nw !== ow || nh !== oh) moved = true;
-      mapEl(el.id, (x) => ({ ...x, w: nw, h: nh }), false);
+      const cur = {
+        x: (e2.clientX - rect.left) / zoomNow,
+        y: (e2.clientY - rect.top) / zoomNow
+      };
+      if (Math.abs(cur.x - start.x) > 1 || Math.abs(cur.y - start.y) > 1) moved = true;
+      const box = {
+        x: Math.min(start.x, cur.x),
+        y: Math.min(start.y, cur.y),
+        w: Math.abs(cur.x - start.x),
+        h: Math.abs(cur.y - start.y)
+      };
+      setMarquee({ pageId: page.id, ...box });
+      const entries = collectElementEntries(page.elements).filter((entry) => entry.depth === 0);
+      const ids = entries.filter(
+        (entry) => entry.absX < box.x + box.w && entry.absX + entry.w > box.x && entry.absY < box.y + box.h && entry.absY + entry.h > box.y
+      ).map((entry) => entry.el.id);
+      setSelIds(Array.from(/* @__PURE__ */ new Set([...baseSel, ...ids])));
     };
     const up = () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
-      if (moved && docRef.current !== before) pushPastSnapshot(before);
+      setMarquee(null);
+      if (!moved) setSelIds(shift ? baseSel : []);
     };
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
@@ -2735,7 +3910,12 @@ function ProductDesignPanel() {
       redo,
       canUndo,
       canRedo,
-      setSelId
+      setSelId: (id) => setSelIds(id ? [id] : []),
+      snapEnabled,
+      toggleSnap: () => {
+        setSnapEnabled((v) => !v);
+        setGuides([]);
+      }
     }),
     h(
       "div",
@@ -2753,8 +3933,8 @@ function ProductDesignPanel() {
         setSection,
         leftWidth,
         startResizeLeft,
-        selId,
-        setSelId,
+        selIds,
+        setSelId: (id) => setSelIds(id ? [id] : []),
         setPreview
       }),
       h(CanvasView, {
@@ -2762,9 +3942,10 @@ function ProductDesignPanel() {
         doc,
         activePage,
         zoom,
-        selId,
+        selIds,
+        selBoxes,
+        multiBounds,
         sel,
-        selPage,
         preview,
         pageState,
         ui,
@@ -2772,11 +3953,14 @@ function ProductDesignPanel() {
         spaceRef,
         spaceDown,
         panning,
+        guides,
+        marquee,
         renderStateFor,
         startDrag,
         startResize,
+        startMarquee,
         startPan,
-        setSelId,
+        setSelId: (id) => setSelIds(id ? [id] : []),
         setActivePage,
         setUi,
         setUiFor,
@@ -2785,6 +3969,7 @@ function ProductDesignPanel() {
       h(InspectorView, {
         t,
         sel,
+        selCount: selEntries.length,
         activePage,
         setEl,
         setElProps,
@@ -2794,7 +3979,11 @@ function ProductDesignPanel() {
         deleteEl,
         setPreset,
         renameActivePage,
-        patchActiveFrame
+        patchActiveFrame,
+        alignSelection,
+        distributeSelection,
+        groupSelection,
+        ungroupSelection
       })
     )
   );

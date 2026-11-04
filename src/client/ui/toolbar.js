@@ -1,5 +1,6 @@
 import {
   IconEye,
+  IconMagnet,
   IconMinus,
   IconPencil,
   IconPlus,
@@ -35,6 +36,8 @@ export function ToolbarView(props) {
     canUndo,
     canRedo,
     setSelId,
+    snapEnabled,
+    toggleSnap,
   } = props;
 
   const toolbar = h(
@@ -121,6 +124,18 @@ export function ToolbarView(props) {
         onClick: redo,
       },
       h(IconRedo),
+    ),
+    h(
+      'button',
+      {
+        className: 'dpd-btn' + (snapEnabled ? ' primary' : ''),
+        type: 'button',
+        title: t('toolbar.snap'),
+        'aria-pressed': !!snapEnabled,
+        onClick: toggleSnap,
+      },
+      h(IconMagnet),
+      t('toolbar.snap'),
     ),
     h(
       'button',
