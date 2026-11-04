@@ -86,4 +86,34 @@ describe('host 文档 reducer', () => {
     expect(doc.pages[1].elements.map((e) => e.props.text)).toEqual(['on last']);
     expect(results[3].pageId).toBe(doc.pages[1].id);
   });
+
+  it('set_page_frame 切换尺寸时等比缩放组件（可关闭）', () => {
+    const { doc } = applyOps(emptyDoc(), [
+      { kind: 'add_page', preset: 'desktop' },
+      {
+        kind: 'add_element',
+        type: 'button',
+        x: 200,
+        y: 100,
+        w: 200,
+        h: 60,
+        props: { fontSize: 20, radius: 10 },
+      },
+    ]);
+    const pageId = doc.pages[0].id;
+    const before = doc.pages[0].elements[0];
+
+    const shrunk = applyOps(doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
+    const after = shrunk.pages[0].elements[0];
+    expect(shrunk.pages[0].frame).toMatchObject({ w: 390, h: 844, preset: 'mobile' });
+    const s = Math.min(390 / 1280, 844 / 800);
+    expect(after.w).toBe(Math.max(12, Math.round(before.w * s)));
+    expect(after.x).toBe(Math.round(before.x * s));
+    expect(after.props.fontSize).toBe(Math.max(8, Math.round(before.props.fontSize * s)));
+
+    const kept = applyOps(doc, [
+      { kind: 'set_page_frame', pageId, preset: 'mobile', scaleElements: false },
+    ]).doc;
+    expect(kept.pages[0].elements[0].w).toBe(before.w);
+  });
 });

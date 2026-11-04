@@ -64,6 +64,14 @@ const num = (v, d) => {
 };
 const str = (v, d) => (typeof v === 'string' ? v : d);
 
+/** Scale a component's font size / radius with the frame change factor. */
+function scaleProps(props, s) {
+  const out = isObj(props) ? { ...props } : {};
+  if (typeof out.fontSize === 'number') out.fontSize = Math.max(8, Math.round(out.fontSize * s));
+  if (typeof out.radius === 'number') out.radius = Math.max(0, Math.round(out.radius * s));
+  return out;
+}
+
 function clone(x) {
   if (typeof structuredClone === 'function') {
     try {
@@ -195,13 +203,28 @@ function applyOne(doc, op, index) {
     const page = findPage(doc, op, index);
     const preset = PRESETS[op.preset] ? op.preset : page.frame.preset;
     const size = PRESETS[preset] || [page.frame.w, page.frame.h];
+    const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
+    const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
+    const ow = page.frame.w;
+    const oh = page.frame.h;
+    if (op.scaleElements !== false && ow > 0 && oh > 0 && (ow !== nw || oh !== nh)) {
+      const s = Math.min(nw / ow, nh / oh);
+      page.elements = page.elements.map((e) => ({
+        ...e,
+        x: Math.round(e.x * s),
+        y: Math.round(e.y * s),
+        w: Math.max(12, Math.round(e.w * s)),
+        h: Math.max(8, Math.round(e.h * s)),
+        props: scaleProps(e.props, s),
+      }));
+    }
     page.frame = {
       preset,
-      w: Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w)),
-      h: Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h)),
+      w: nw,
+      h: nh,
       background: str(op.background, page.frame.background),
     };
-    return { op: index, kind, pageId: page.id };
+    return { op: index, kind, pageId: page.id, scaled: op.scaleElements !== false };
   }
 
   if (kind === 'clear_page') {

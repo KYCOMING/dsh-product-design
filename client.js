@@ -1179,7 +1179,34 @@ window.__ModuleLoader__.load({
         const map = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
         const sz = map[key];
         if (!sz) return;
-        setDoc((d) => ({ ...d, pages: d.pages.map((p) => (p.id === d.activePageId ? { ...p, frame: { ...p.frame, w: sz[0], h: sz[1], preset: key } } : p)) }));
+        // Changing the frame size scales the page's components with it (uniform
+        // fit: min of the width/height ratios), so a desktop layout does not
+        // spill out when previewed at phone size, and vice versa. Font size and
+        // radius follow the same factor to keep proportions.
+        setDoc((d) => ({ ...d, pages: d.pages.map((p) => {
+          if (p.id !== d.activePageId) return p;
+          const nw = sz[0];
+          const nh = sz[1];
+          const frame = { ...p.frame, w: nw, h: nh, preset: key };
+          const ow = p.frame.w || nw;
+          const oh = p.frame.h || nh;
+          if (ow === nw && oh === nh) return { ...p, frame };
+          const s = Math.min(nw / ow, nh / oh);
+          const scaleEl = (e) => {
+            const props = { ...e.props };
+            if (typeof props.fontSize === 'number') props.fontSize = Math.max(8, Math.round(props.fontSize * s));
+            if (typeof props.radius === 'number') props.radius = Math.max(0, Math.round(props.radius * s));
+            return {
+              ...e,
+              x: Math.round(e.x * s),
+              y: Math.round(e.y * s),
+              w: Math.max(12, Math.round(e.w * s)),
+              h: Math.max(8, Math.round(e.h * s)),
+              props,
+            };
+          };
+          return { ...p, frame, elements: p.elements.map(scaleEl) };
+        }) }));
       }
       function patchActiveFrame(patch) {
         setDoc((d) => ({ ...d, pages: d.pages.map((p) => (p.id === d.activePageId ? { ...p, frame: { ...p.frame, ...patch } } : p)) }), 'frame:' + Object.keys(patch).join(','));

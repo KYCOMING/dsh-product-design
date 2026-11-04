@@ -162,4 +162,24 @@ describe('编辑行为', () => {
     await click(toggle);
     expect(doc().pages[0].elements[6].state).not.toBe(before);
   });
+
+  it('切换画布尺寸会等比缩放组件', async () => {
+    const select = container.querySelector('select.dpd-select');
+    const setSelect = async (el, value) => {
+      await act(async () => {
+        const desc = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+        if (desc?.set) desc.set.call(el, value);
+        else el.value = value;
+        el.dispatchEvent(new window.Event('change', { bubbles: true }));
+      });
+    };
+
+    const beforeW = doc().pages[0].elements[0].w;
+    await setSelect(select, 'desktop');
+    expect(doc().pages[0].frame.w).toBe(1280);
+
+    await setSelect(select, 'mobile');
+    expect(doc().pages[0].frame.w).toBe(390);
+    expect(doc().pages[0].elements[0].w).toBeLessThan(beforeW * 0.5);
+  });
 });
