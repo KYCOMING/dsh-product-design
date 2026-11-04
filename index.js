@@ -179,14 +179,16 @@ function applyOne(doc, op, index) {
     const ow = page.frame.w;
     const oh = page.frame.h;
     if (op.scaleElements !== false && ow > 0 && oh > 0 && (ow !== nw || oh !== nh)) {
-      const s = Math.min(nw / ow, nh / oh);
+      const sx = nw / ow;
+      const sy = nh / oh;
+      const sf = Math.min(sx, sy);
       page.elements = page.elements.map((e) => ({
         ...e,
-        x: Math.round(e.x * s),
-        y: Math.round(e.y * s),
-        w: Math.max(12, Math.round(e.w * s)),
-        h: Math.max(8, Math.round(e.h * s)),
-        props: scaleProps(e.props, s)
+        x: Math.round(e.x * sx),
+        y: Math.round(e.y * sy),
+        w: Math.max(12, Math.round(e.w * sx)),
+        h: Math.max(8, Math.round(e.h * sy)),
+        props: scaleProps(e.props, sf)
       }));
     }
     page.frame = {

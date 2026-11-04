@@ -2533,19 +2533,21 @@ function ProductDesignPanel() {
         const ow = p.frame.w || nw;
         const oh = p.frame.h || nh;
         if (ow === nw && oh === nh) return { ...p, frame };
-        const s = Math.min(nw / ow, nh / oh);
+        const sx = nw / ow;
+        const sy = nh / oh;
+        const sf = Math.min(sx, sy);
         const scaleEl = (e) => {
           const props = { ...e.props };
           if (typeof props.fontSize === "number")
-            props.fontSize = Math.max(8, Math.round(props.fontSize * s));
+            props.fontSize = Math.max(8, Math.round(props.fontSize * sf));
           if (typeof props.radius === "number")
-            props.radius = Math.max(0, Math.round(props.radius * s));
+            props.radius = Math.max(0, Math.round(props.radius * sf));
           return {
             ...e,
-            x: Math.round(e.x * s),
-            y: Math.round(e.y * s),
-            w: Math.max(12, Math.round(e.w * s)),
-            h: Math.max(8, Math.round(e.h * s)),
+            x: Math.round(e.x * sx),
+            y: Math.round(e.y * sy),
+            w: Math.max(12, Math.round(e.w * sx)),
+            h: Math.max(8, Math.round(e.h * sy)),
             props
           };
         };

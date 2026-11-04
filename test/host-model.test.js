@@ -87,7 +87,7 @@ describe('host 文档 reducer', () => {
     expect(results[3].pageId).toBe(doc.pages[1].id);
   });
 
-  it('set_page_frame 切换尺寸时等比缩放组件（可关闭）', () => {
+  it('set_page_frame 切换尺寸时按宽高分别缩放（可还原、可关闭）', () => {
     const { doc } = applyOps(emptyDoc(), [
       { kind: 'add_page', preset: 'desktop' },
       {
@@ -106,10 +106,19 @@ describe('host 文档 reducer', () => {
     const shrunk = applyOps(doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
     const after = shrunk.pages[0].elements[0];
     expect(shrunk.pages[0].frame).toMatchObject({ w: 390, h: 844, preset: 'mobile' });
-    const s = Math.min(390 / 1280, 844 / 800);
-    expect(after.w).toBe(Math.max(12, Math.round(before.w * s)));
-    expect(after.x).toBe(Math.round(before.x * s));
-    expect(after.props.fontSize).toBe(Math.max(8, Math.round(before.props.fontSize * s)));
+    const sx = 390 / 1280;
+    const sy = 844 / 800;
+    const sf = Math.min(sx, sy);
+    expect(after.w).toBe(Math.max(12, Math.round(before.w * sx)));
+    expect(after.h).toBe(Math.max(8, Math.round(before.h * sy)));
+    expect(after.x).toBe(Math.round(before.x * sx));
+    expect(after.y).toBe(Math.round(before.y * sy));
+    expect(after.props.fontSize).toBe(Math.max(8, Math.round(before.props.fontSize * sf)));
+
+    // 切回桌面应还原（四舍五入误差内）
+    const restored = applyOps(shrunk, [{ kind: 'set_page_frame', pageId, preset: 'desktop' }]).doc;
+    expect(Math.abs(restored.pages[0].elements[0].w - before.w)).toBeLessThanOrEqual(1);
+    expect(Math.abs(restored.pages[0].elements[0].h - before.h)).toBeLessThanOrEqual(1);
 
     const kept = applyOps(doc, [
       { kind: 'set_page_frame', pageId, preset: 'mobile', scaleElements: false },
