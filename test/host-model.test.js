@@ -72,4 +72,18 @@ describe('host 文档 reducer', () => {
     const summary = summarizeDoc(doc);
     expect(summary.pages[0]).toMatchObject({ name: 'A', frame: '390×844', elements: 1 });
   });
+
+  it('支持 @last 与 pageIndex 定位同批次新建页面', () => {
+    const { doc, results } = applyOps(emptyDoc(), [
+      { kind: 'add_page', name: 'P1' },
+      { kind: 'add_element', type: 'text', props: { text: 'on first' } },
+      { kind: 'add_page', name: 'P2' },
+      { kind: 'add_element', pageId: '@last', type: 'button', props: { text: 'on last' } },
+      { kind: 'add_element', pageIndex: 0, type: 'badge', props: { text: 'A' } },
+    ]);
+    expect(doc.pages).toHaveLength(2);
+    expect(doc.pages[0].elements.map((e) => e.props.text)).toEqual(['on first', 'A']);
+    expect(doc.pages[1].elements.map((e) => e.props.text)).toEqual(['on last']);
+    expect(results[3].pageId).toBe(doc.pages[1].id);
+  });
 });

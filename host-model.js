@@ -130,9 +130,21 @@ function ensureElement(e) {
   };
 }
 
-function findPage(doc, pageId, opIndex) {
-  const page = pageId ? doc.pages.find((p) => p.id === pageId) : doc.pages[0];
-  if (!page) throw new Error(`op[${opIndex}] references unknown page "${pageId}"; add a page first`);
+function findPage(doc, op, opIndex) {
+  let page;
+  if (op && op.pageId === '@last') {
+    page = doc.pages[doc.pages.length - 1];
+  } else if (op && typeof op.pageIndex === 'number' && Number.isFinite(op.pageIndex)) {
+    page = doc.pages[op.pageIndex];
+  } else if (op && op.pageId) {
+    page = doc.pages.find((p) => p.id === op.pageId);
+  } else {
+    page = doc.pages[0];
+  }
+  if (!page) {
+    const target = op && op.pageId !== undefined ? `"${op.pageId}"` : String(op && op.pageIndex);
+    throw new Error(`op[${opIndex}] references unknown page ${target}; add a page first`);
+  }
   return page;
 }
 
@@ -174,13 +186,13 @@ function applyOne(doc, op, index) {
   }
 
   if (kind === 'rename_page') {
-    const page = findPage(doc, op.pageId, index);
+    const page = findPage(doc, op, index);
     page.name = str(op.name, page.name);
     return { op: index, kind, pageId: page.id };
   }
 
   if (kind === 'set_page_frame') {
-    const page = findPage(doc, op.pageId, index);
+    const page = findPage(doc, op, index);
     const preset = PRESETS[op.preset] ? op.preset : page.frame.preset;
     const size = PRESETS[preset] || [page.frame.w, page.frame.h];
     page.frame = {
@@ -193,13 +205,13 @@ function applyOne(doc, op, index) {
   }
 
   if (kind === 'clear_page') {
-    const page = findPage(doc, op.pageId, index);
+    const page = findPage(doc, op, index);
     page.elements = [];
     return { op: index, kind, pageId: page.id };
   }
 
   if (kind === 'add_element') {
-    const page = findPage(doc, op.pageId, index);
+    const page = findPage(doc, op, index);
     const type = ELEMENT_TYPES[op.type] ? op.type : null;
     if (!type) throw new Error(`op[${index}] add_element: unknown type "${op.type}"`);
     const [dw, dh] = ELEMENT_TYPES[type];
@@ -221,7 +233,7 @@ function applyOne(doc, op, index) {
   }
 
   if (kind === 'update_element') {
-    const page = findPage(doc, op.pageId, index);
+    const page = findPage(doc, op, index);
     const el = page.elements.find((e) => e.id === op.elementId);
     if (!el) throw new Error(`op[${index}] update_element: unknown element "${op.elementId}"`);
     if (op.x !== undefined) el.x = num(op.x, el.x);
@@ -234,7 +246,7 @@ function applyOne(doc, op, index) {
   }
 
   if (kind === 'delete_element') {
-    const page = findPage(doc, op.pageId, index);
+    const page = findPage(doc, op, index);
     const before = page.elements.length;
     page.elements = page.elements.filter((e) => e.id !== op.elementId);
     if (page.elements.length === before) throw new Error(`op[${index}] delete_element: unknown element "${op.elementId}"`);

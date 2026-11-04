@@ -34,6 +34,7 @@ const GUIDANCE = [
   '  product_design_apply：按操作增删改（add_page / add_element / update_element / delete_element / set_page_frame / clear_page / set_document_name 等）。',
   '画布坐标原点在每页左上角；默认手机页 390×844。元素类型：button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select。',
   'props 常用键：text、color、fontSize、fontWeight、radius；状态见各类型（如 button: default/hover/active/disabled）。',
+  '操作里需要页面时可用 pageId，或用 pageId:"@last" / pageIndex（0基）指向同一次 apply 内新建的页面，无需先知道 id。',
   '当用户提出产品设计/原型需求时：先 get_document，再用一次 apply 批量搭好页面与元素，最后提示用户输入 /canvas 或点侧边栏查看。',
 ].join('\n');
 
@@ -267,6 +268,7 @@ function applyTool(store) {
       'set_document_name {name}',
       'Element types: button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select.',
       'States: button[default,hover,active,disabled]; input[default,focus,filled,error,disabled]; card[default,hover]; toggle[on,off]; checkbox[unchecked,checked]; select[default,open,disabled]; others default.',
+      'Page targeting: any op that needs a page accepts pageId, or pageId: "@last" for the most recently added page, or pageIndex (0-based). This lets one apply call add a page then place elements on it without knowing its id.',
       'Returns generated page/element ids and the new revision. Prefer one apply call with several ops over many calls.',
     ].join(' '),
     parameters: {
