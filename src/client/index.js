@@ -1,3 +1,4 @@
+import { registerProductDesignCards, setCanvasOpener } from './cards.js';
 import { NS, PANEL_ID } from './constants.js';
 import { activeLocale, DICT, pickDict, setAppCtx } from './i18n.js';
 import { ProductDesignIcon } from './icons.js';
@@ -7,6 +8,14 @@ export const inject = ['slots', 'layout'];
 
 export function apply(ctx) {
   setAppCtx(ctx);
+  setCanvasOpener(() => {
+    try {
+      const layout = ctx.get('layout');
+      if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID);
+    } catch (e) {
+      /* layout service unavailable */
+    }
+  });
 
   let loc = null;
   try {
@@ -41,6 +50,7 @@ export function apply(ctx) {
 
   const slots = ctx.slots;
   const disposers = [];
+  disposers.push(registerProductDesignCards(ctx));
 
   disposers.push(
     slots.inject('sidebar.panellist', () =>

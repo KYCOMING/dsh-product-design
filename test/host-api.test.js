@@ -223,6 +223,9 @@ describe('host API + tools', () => {
     expect(page).toBeTruthy();
     expect(page.elements[0].type).toBe('container');
     expect(page.elements[0].children[0].props.text).toBe('OK');
+    const meta = await tool.output.presentationMeta({}, out);
+    expect(meta.kind).toBe('product-design');
+    expect(meta.page.elements[0].children).toHaveLength(1);
   });
 
   it('POST /apply 与非法操作', async () => {

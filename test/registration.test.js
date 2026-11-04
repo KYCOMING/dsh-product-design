@@ -15,6 +15,8 @@ describe('插件注册', () => {
     const main = registered.find((r) => r.slot === 'main');
     expect(entry?.config?.id).toBe('dsh-product-design');
     expect(main?.config?.key).toBe('dsh-product-design');
+    const cards = registered.find((r) => r.slot === 'conversation.chat.turnTail');
+    expect(cards?.config?.id).toBe('dsh-product-design-cards');
   });
 
   it('侧边栏图标可渲染', () => {

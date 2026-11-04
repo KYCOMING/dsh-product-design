@@ -19,7 +19,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { applyOps, emptyDoc, repairDoc, summarizeDoc } from './model.js';
+import { applyOps, emptyDoc, ensureDoc, repairDoc, summarizeDoc } from './model.js';
 
 const API_PREFIX = '/dsh-product-design/api';
 const MAX_BODY = 4 * 1024 * 1024;
@@ -250,6 +250,32 @@ function makeHandler(ctx, store) {
   };
 }
 
+/** Build the inline preview descriptor attached to an apply result. */
+function productPreviewMeta(store, results) {
+  const snapshot = store.snapshot();
+  const doc = ensureDoc(snapshot.doc ?? emptyDoc());
+  const pageIds = Array.isArray(results)
+    ? results.map((result) => result && result.pageId).filter(Boolean)
+    : [];
+  let page = null;
+  for (let i = pageIds.length - 1; i >= 0 && !page; i -= 1) {
+    page = doc.pages.find((candidate) => candidate.id === pageIds[i]) || null;
+  }
+  if (!page)
+    page = doc.pages.find((candidate) => candidate.id === doc.activePageId) || doc.pages[0];
+  if (!page) return null;
+  const index = doc.pages.findIndex((candidate) => candidate.id === page.id);
+  return {
+    kind: 'product-design',
+    title: page.name || 'Product design',
+    pageId: page.id,
+    pageIndex: index,
+    pageCount: doc.pages.length,
+    page: { id: page.id, name: page.name, frame: page.frame, elements: page.elements },
+    revision: snapshot.revision,
+  };
+}
+
 function renderJson(_args, value) {
   return [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }];
 }
@@ -262,7 +288,11 @@ function getDocumentTool(store) {
       'Call this before editing, and after changes to verify the result. The document may be empty (no pages) on first use.',
     ].join(' '),
     parameters: { type: 'object', properties: {} },
-    output: { schema: {}, render: renderJson },
+    output: {
+      schema: {},
+      render: renderJson,
+      presentationMeta: () => productPreviewMeta(store, []),
+    },
     isConcurrencySafe: () => true,
     async execute() {
       const snap = store.snapshot();
@@ -300,7 +330,11 @@ function applyTool(store) {
       },
       required: ['operations'],
     },
-    output: { schema: {}, render: renderJson },
+    output: {
+      schema: {},
+      render: renderJson,
+      presentationMeta: (_args, value) => productPreviewMeta(store, value && value.results),
+    },
     isConcurrencySafe: () => false,
     async execute(args) {
       const result = store.apply(args?.operations);

@@ -39,6 +39,121 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 
+// src/shared/elements.js
+var CONTAINER_TYPES = ["container", "group"];
+function isContainerType(type) {
+  return CONTAINER_TYPES.indexOf(type) !== -1;
+}
+function isContainer(el) {
+  return !!el && isContainerType(el.type);
+}
+function collectElementEntries(elements, parent = null, parentAbsX = 0, parentAbsY = 0, depth = 0, ancestors = []) {
+  const out = [];
+  if (!Array.isArray(elements)) return out;
+  elements.forEach((el, index) => {
+    if (!el || typeof el !== "object") return;
+    const x = Number(el.x) || 0;
+    const y = Number(el.y) || 0;
+    const w = Math.max(0, Number(el.w) || 0);
+    const h2 = Math.max(0, Number(el.h) || 0);
+    const absX = parentAbsX + x;
+    const absY = parentAbsY + y;
+    out.push({ el, parent, ancestors, list: elements, index, depth, absX, absY, w, h: h2 });
+    if (isContainer(el) && Array.isArray(el.children) && el.children.length) {
+      out.push(
+        ...collectElementEntries(el.children, el, absX, absY, depth + 1, [...ancestors, el.id])
+      );
+    }
+  });
+  return out;
+}
+function findElementEntry(elements, id, parent = null, parentAbsX = 0, parentAbsY = 0, depth = 0, ancestors = []) {
+  if (!Array.isArray(elements) || !id) return null;
+  for (let index = 0; index < elements.length; index += 1) {
+    const el = elements[index];
+    if (!el || typeof el !== "object") continue;
+    const x = Number(el.x) || 0;
+    const y = Number(el.y) || 0;
+    const absX = parentAbsX + x;
+    const absY = parentAbsY + y;
+    if (el.id === id) {
+      return {
+        el,
+        parent,
+        ancestors,
+        list: elements,
+        index,
+        depth,
+        absX,
+        absY,
+        w: Math.max(0, Number(el.w) || 0),
+        h: Math.max(0, Number(el.h) || 0)
+      };
+    }
+    if (isContainer(el) && Array.isArray(el.children)) {
+      const found = findElementEntry(el.children, id, el, absX, absY, depth + 1, [
+        ...ancestors,
+        el.id
+      ]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+function descendantIds(el, out = []) {
+  if (!el || !isContainer(el) || !Array.isArray(el.children)) return out;
+  for (const child of el.children) {
+    if (!child) continue;
+    out.push(child.id);
+    descendantIds(child, out);
+  }
+  return out;
+}
+function isUnderAny(entry, ancestorIds) {
+  if (!entry || !Array.isArray(entry.ancestors) || !ancestorIds || !ancestorIds.length)
+    return false;
+  return entry.ancestors.some((id) => ancestorIds.indexOf(id) !== -1);
+}
+function boundsOfEntries(entries) {
+  if (!entries || !entries.length) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const e of entries) {
+    minX = Math.min(minX, e.absX);
+    minY = Math.min(minY, e.absY);
+    maxX = Math.max(maxX, e.absX + e.w);
+    maxY = Math.max(maxY, e.absY + e.h);
+  }
+  if (minX === Infinity) return null;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+function pointInBox(x, y, box, pad = 0) {
+  return !!box && x >= box.x - pad && x <= box.x + box.w + pad && y >= box.y - pad && y <= box.y + box.h + pad;
+}
+function findDropContainer(entries, excludeIds, x, y) {
+  let best = null;
+  for (const entry of entries) {
+    if (!entry || entry.el.type !== "container") continue;
+    if (excludeIds && excludeIds.has(entry.el.id)) continue;
+    if (!pointInBox(x, y, { x: entry.absX, y: entry.absY, w: entry.w, h: entry.h })) continue;
+    if (!best || entry.depth > best.depth) best = entry;
+  }
+  return best;
+}
+function cloneElementDeep(el, nextId) {
+  if (!el || typeof el !== "object") return null;
+  const copy = { ...el, props: { ...el.props || {} } };
+  copy.id = nextId ? nextId(el.id) : el.id;
+  if (isContainer(el) && Array.isArray(el.children)) {
+    copy.children = el.children.map((child) => cloneElementDeep(child, nextId));
+  } else {
+    delete copy.children;
+  }
+  return copy;
+}
+
 // src/client/constants.js
 var NS = "dsh-product-design";
 var PANEL_ID = "dsh-product-design";
@@ -184,6 +299,7 @@ var DICT = {
     "library.title": "\u7EC4\u4EF6\u5E93",
     "library.hint": "\u70B9\u51FB\u6DFB\u52A0\u5230\u5F53\u524D\u9875\u9762",
     "inspector.title": "\u5C5E\u6027",
+    "visualize.openCanvas": "\u6253\u5F00\u753B\u5E03",
     "inspector.collapse": "\u6536\u8D77\u5C5E\u6027\u680F",
     "inspector.expand": "\u5C55\u5F00\u5C5E\u6027\u680F",
     "inspector.frame": "\u753B\u5E03\u8BBE\u7F6E",
@@ -301,6 +417,7 @@ var DICT = {
     "library.title": "Components",
     "library.hint": "Click to add to the current page",
     "inspector.title": "Properties",
+    "visualize.openCanvas": "Open canvas",
     "inspector.collapse": "Collapse properties",
     "inspector.expand": "Expand properties",
     "inspector.frame": "Frame settings",
@@ -442,710 +559,6 @@ function useT() {
 var import_react2 = __toESM(require("react"), 1);
 var h = import_react2.default.createElement;
 var { useState: useState2, useEffect: useEffect2, useCallback: useCallback2, useRef } = import_react2.default;
-
-// src/client/icons.js
-function Svg(props) {
-  const { size, children, ...rest } = props;
-  return h(
-    "svg",
-    Object.assign(
-      {
-        width: size || 14,
-        height: size || 14,
-        viewBox: "0 0 16 16",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: 1.5,
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        "aria-hidden": true
-      },
-      rest
-    ),
-    children
-  );
-}
-var IconPlus = () => h(Svg, null, h("path", { d: "M8 3v10M3 8h10" }));
-var IconMinus = () => h(Svg, null, h("path", { d: "M3 8h10" }));
-var IconEye = () => h(
-  Svg,
-  null,
-  h("path", { d: "M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" }),
-  h("circle", { cx: 8, cy: 8, r: 1.8 })
-);
-var IconPencil = () => h(Svg, null, h("path", { d: "M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z" }));
-var IconReset = () => h(Svg, null, h("path", { d: "M3 8a5 5 0 1 0 1.6-3.7M3 3.2V6h2.8" }));
-var IconTrash = () => h(Svg, null, h("path", { d: "M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4" }));
-var IconCopy = () => h(
-  Svg,
-  null,
-  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.4 }),
-  h("path", { d: "M3 11V4a1 1 0 0 1 1-1h7" })
-);
-var IconFront = () => h(
-  Svg,
-  null,
-  h("rect", { x: 3, y: 3, width: 8, height: 8, rx: 1.2 }),
-  h("path", { d: "M8 8h5v5" })
-);
-var IconBack = () => h(
-  Svg,
-  null,
-  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.2 }),
-  h("path", { d: "M3 8V3h5" })
-);
-var IconUndo = () => h(Svg, null, h("path", { d: "M3.2 8.4a5 5 0 1 1 1.5 3.3M3 4.6V8h3.4" }));
-var IconRedo = () => h(Svg, null, h("path", { d: "M12.8 8.4a5 5 0 1 0-1.5 3.3M13 4.6V8H9.6" }));
-var IconPages = () => h(
-  Svg,
-  null,
-  h("rect", { x: 3, y: 1.8, width: 10, height: 12.4, rx: 1.6 }),
-  h("path", { d: "M3 5.2h10M5.4 8.2h5.2M5.4 10.8h3.4" })
-);
-var IconComponents = () => h(
-  Svg,
-  null,
-  h("rect", { x: 2, y: 2, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 9, y: 2, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 2, y: 9, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 9, y: 9, width: 5, height: 5, rx: 1 })
-);
-var IconLayers = () => h(
-  Svg,
-  null,
-  h("path", { d: "M8 2l6 3-6 3-6-3 6-3z" }),
-  h("path", { d: "M2 8l6 3 6-3M2 11l6 3 6-3" })
-);
-var IconMagnet = () => h(
-  Svg,
-  null,
-  h("path", { d: "M3 2v6a5 5 0 0 0 10 0V2" }),
-  h("path", { d: "M3 2H1.5M13 2h1.5M3 6h3M10 6h3" })
-);
-function libGlyph(type) {
-  const map = {
-    container: h("path", { d: "M2 3.5h12v9H2zM4.5 6h7v4h-7z" }),
-    group: h("path", { d: "M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z" }),
-    button: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 2 }),
-    input: h("rect", { x: 2, y: 4.5, width: 12, height: 7, rx: 1.6 }),
-    card: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
-    navbar: h("path", { d: "M2 4h12M2 4v8h12V4M6 7h4" }),
-    tabs: h("path", { d: "M2 5h12M5 5v6M10 5v6" }),
-    toggle: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 3 }),
-    checkbox: h("rect", { x: 3, y: 3, width: 10, height: 10, rx: 2 }),
-    avatar: h("circle", { cx: 8, cy: 8, r: 5 }),
-    text: h("path", { d: "M3 4h10M8 4v8M5.5 12h5" }),
-    image: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
-    badge: h("rect", { x: 2, y: 6, width: 12, height: 4, rx: 2 }),
-    select: h("path", { d: "M2 4.5h12v7H2zM10 8l1.5 1.5L13 8" })
-  };
-  return map[type] || map.text;
-}
-function ProductDesignIcon(props) {
-  const size = props && props.size;
-  return h(
-    "svg",
-    {
-      viewBox: "0 0 16 16",
-      width: size || 16,
-      height: size || 16,
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: 1.2,
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      "aria-hidden": true,
-      "data-dsh-panel-entry": PANEL_ID
-    },
-    h("rect", { x: 1.5, y: 2, width: 13, height: 11.5, rx: 2 }),
-    h("path", { d: "M1.5 5.4h13" }),
-    h("rect", { x: 3.6, y: 8, width: 4, height: 3.2, rx: 0.6 }),
-    h("circle", { cx: 10.6, cy: 9.6, r: 1.4 })
-  );
-}
-
-// src/shared/elements.js
-var CONTAINER_TYPES = ["container", "group"];
-function isContainerType(type) {
-  return CONTAINER_TYPES.indexOf(type) !== -1;
-}
-function isContainer(el) {
-  return !!el && isContainerType(el.type);
-}
-function collectElementEntries(elements, parent = null, parentAbsX = 0, parentAbsY = 0, depth = 0, ancestors = []) {
-  const out = [];
-  if (!Array.isArray(elements)) return out;
-  elements.forEach((el, index) => {
-    if (!el || typeof el !== "object") return;
-    const x = Number(el.x) || 0;
-    const y = Number(el.y) || 0;
-    const w = Math.max(0, Number(el.w) || 0);
-    const h2 = Math.max(0, Number(el.h) || 0);
-    const absX = parentAbsX + x;
-    const absY = parentAbsY + y;
-    out.push({ el, parent, ancestors, list: elements, index, depth, absX, absY, w, h: h2 });
-    if (isContainer(el) && Array.isArray(el.children) && el.children.length) {
-      out.push(
-        ...collectElementEntries(el.children, el, absX, absY, depth + 1, [...ancestors, el.id])
-      );
-    }
-  });
-  return out;
-}
-function findElementEntry(elements, id, parent = null, parentAbsX = 0, parentAbsY = 0, depth = 0, ancestors = []) {
-  if (!Array.isArray(elements) || !id) return null;
-  for (let index = 0; index < elements.length; index += 1) {
-    const el = elements[index];
-    if (!el || typeof el !== "object") continue;
-    const x = Number(el.x) || 0;
-    const y = Number(el.y) || 0;
-    const absX = parentAbsX + x;
-    const absY = parentAbsY + y;
-    if (el.id === id) {
-      return {
-        el,
-        parent,
-        ancestors,
-        list: elements,
-        index,
-        depth,
-        absX,
-        absY,
-        w: Math.max(0, Number(el.w) || 0),
-        h: Math.max(0, Number(el.h) || 0)
-      };
-    }
-    if (isContainer(el) && Array.isArray(el.children)) {
-      const found = findElementEntry(el.children, id, el, absX, absY, depth + 1, [
-        ...ancestors,
-        el.id
-      ]);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-function descendantIds(el, out = []) {
-  if (!el || !isContainer(el) || !Array.isArray(el.children)) return out;
-  for (const child of el.children) {
-    if (!child) continue;
-    out.push(child.id);
-    descendantIds(child, out);
-  }
-  return out;
-}
-function isUnderAny(entry, ancestorIds) {
-  if (!entry || !Array.isArray(entry.ancestors) || !ancestorIds || !ancestorIds.length)
-    return false;
-  return entry.ancestors.some((id) => ancestorIds.indexOf(id) !== -1);
-}
-function boundsOfEntries(entries) {
-  if (!entries || !entries.length) return null;
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const e of entries) {
-    minX = Math.min(minX, e.absX);
-    minY = Math.min(minY, e.absY);
-    maxX = Math.max(maxX, e.absX + e.w);
-    maxY = Math.max(maxY, e.absY + e.h);
-  }
-  if (minX === Infinity) return null;
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-}
-function pointInBox(x, y, box, pad = 0) {
-  return !!box && x >= box.x - pad && x <= box.x + box.w + pad && y >= box.y - pad && y <= box.y + box.h + pad;
-}
-function findDropContainer(entries, excludeIds, x, y) {
-  let best = null;
-  for (const entry of entries) {
-    if (!entry || entry.el.type !== "container") continue;
-    if (excludeIds && excludeIds.has(entry.el.id)) continue;
-    if (!pointInBox(x, y, { x: entry.absX, y: entry.absY, w: entry.w, h: entry.h })) continue;
-    if (!best || entry.depth > best.depth) best = entry;
-  }
-  return best;
-}
-function cloneElementDeep(el, nextId) {
-  if (!el || typeof el !== "object") return null;
-  const copy = { ...el, props: { ...el.props || {} } };
-  copy.id = nextId ? nextId(el.id) : el.id;
-  if (isContainer(el) && Array.isArray(el.children)) {
-    copy.children = el.children.map((child) => cloneElementDeep(child, nextId));
-  } else {
-    delete copy.children;
-  }
-  return copy;
-}
-
-// src/shared/snapping.js
-var SNAP_THRESHOLD = 5;
-function xCandidates(targets) {
-  const out = [];
-  for (const t of targets) {
-    out.push({ pos: t.x, target: t, kind: "left" });
-    out.push({ pos: t.x + t.w / 2, target: t, kind: "centerX" });
-    out.push({ pos: t.x + t.w, target: t, kind: "right" });
-  }
-  return out;
-}
-function yCandidates(targets) {
-  const out = [];
-  for (const t of targets) {
-    out.push({ pos: t.y, target: t, kind: "top" });
-    out.push({ pos: t.y + t.h / 2, target: t, kind: "centerY" });
-    out.push({ pos: t.y + t.h, target: t, kind: "bottom" });
-  }
-  return out;
-}
-function bestSnap(movingPositions, candidates, threshold) {
-  let best = null;
-  for (const moving of movingPositions) {
-    for (const cand of candidates) {
-      const delta = cand.pos - moving.pos;
-      if (Math.abs(delta) > threshold) continue;
-      if (!best || Math.abs(delta) < Math.abs(best.delta)) {
-        best = { delta, candidate: cand, moving };
-      }
-    }
-  }
-  return best;
-}
-function span(aStart, aEnd, bStart, bEnd) {
-  return { from: Math.min(aStart, bStart), to: Math.max(aEnd, bEnd) };
-}
-function snapMoveBox(box, targets, threshold = SNAP_THRESHOLD) {
-  const xs = xCandidates(targets);
-  const ys = yCandidates(targets);
-  const movingX = [
-    { pos: box.x, edge: "left" },
-    { pos: box.x + box.w / 2, edge: "centerX" },
-    { pos: box.x + box.w, edge: "right" }
-  ];
-  const movingY = [
-    { pos: box.y, edge: "top" },
-    { pos: box.y + box.h / 2, edge: "centerY" },
-    { pos: box.y + box.h, edge: "bottom" }
-  ];
-  const sx = bestSnap(movingX, xs, threshold);
-  const sy = bestSnap(movingY, ys, threshold);
-  const dx = sx ? sx.delta : 0;
-  const dy = sy ? sy.delta : 0;
-  const guides = [];
-  if (sx) {
-    const t = sx.candidate.target;
-    const v = span(box.y + dy, box.y + box.h + dy, t.y, t.y + t.h);
-    guides.push({ axis: "x", pos: sx.candidate.pos, from: v.from, to: v.to });
-  }
-  if (sy) {
-    const t = sy.candidate.target;
-    const h2 = span(box.x + dx, box.x + box.w + dx, t.x, t.x + t.w);
-    guides.push({ axis: "y", pos: sy.candidate.pos, from: h2.from, to: h2.to });
-  }
-  return { dx, dy, guides };
-}
-function snapResizeBox(box, dir, targets, threshold = SNAP_THRESHOLD) {
-  const xCands = xCandidates(targets);
-  const yCands = yCandidates(targets);
-  const next = { ...box };
-  const guides = [];
-  const snapEdge = (value, candidates, axis, spanStart, spanEnd, targetSpan) => {
-    let best = null;
-    for (const cand of candidates) {
-      const delta = cand.pos - value;
-      if (Math.abs(delta) > threshold) continue;
-      if (!best || Math.abs(delta) < Math.abs(best.delta)) best = { delta, candidate: cand };
-    }
-    if (!best) return null;
-    const t = best.candidate.target;
-    const s = targetSpan(t);
-    const v = span(spanStart, spanEnd, s.start, s.end);
-    guides.push({ axis, pos: best.candidate.pos, from: v.from, to: v.to });
-    return best.delta;
-  };
-  if (dir.indexOf("w") !== -1) {
-    const d = snapEdge(next.x, xCands, "x", next.y, next.y + next.h, (t) => ({
-      start: t.y,
-      end: t.y + t.h
-    }));
-    if (d != null) {
-      next.x += d;
-      next.w -= d;
-    }
-  }
-  if (dir.indexOf("e") !== -1) {
-    const d = snapEdge(next.x + next.w, xCands, "x", next.y, next.y + next.h, (t) => ({
-      start: t.y,
-      end: t.y + t.h
-    }));
-    if (d != null) next.w += d;
-  }
-  if (dir.indexOf("n") !== -1) {
-    const d = snapEdge(next.y, yCands, "y", next.x, next.x + next.w, (t) => ({
-      start: t.x,
-      end: t.x + t.w
-    }));
-    if (d != null) {
-      next.y += d;
-      next.h -= d;
-    }
-  }
-  if (dir.indexOf("s") !== -1) {
-    const d = snapEdge(next.y + next.h, yCands, "y", next.x, next.x + next.w, (t) => ({
-      start: t.x,
-      end: t.x + t.w
-    }));
-    if (d != null) next.h += d;
-  }
-  if (next.w < 12) {
-    if (dir.indexOf("w") !== -1) next.x -= 12 - next.w;
-    next.w = 12;
-  }
-  if (next.h < 8) {
-    if (dir.indexOf("n") !== -1) next.y -= 8 - next.h;
-    next.h = 8;
-  }
-  return { box: next, guides };
-}
-
-// src/client/model.js
-var __seq = 1;
-function uid() {
-  return "e" + Date.now().toString(36) + (__seq++).toString(36);
-}
-function makeEl(type, x, y, w, hh, props, state) {
-  const el = {
-    id: uid(),
-    type,
-    x,
-    y,
-    w,
-    h: hh,
-    state: state || defaultState(type),
-    props: props || {}
-  };
-  if (isContainerType(type)) el.children = [];
-  return el;
-}
-function starterElements(t) {
-  return [
-    makeEl("navbar", 0, 0, 390, 56),
-    makeEl("text", 24, 84, 320, 30, { fontSize: 22, text: t ? t("sample.welcome") : "\u6B22\u8FCE\u56DE\u6765" }),
-    makeEl("text", 24, 120, 320, 22, {
-      fontSize: 13,
-      fontWeight: 400,
-      color: "#6b7280",
-      text: t ? t("sample.welcomeSub") : "\u4ECA\u5929\u60F3\u8BBE\u8BA1\u70B9\u4EC0\u4E48\uFF1F"
-    }),
-    makeEl("card", 24, 158, 342, 116),
-    makeEl("input", 24, 296, 342, 44),
-    makeEl("button", 24, 356, 150, 44),
-    makeEl("toggle", 300, 364, 50, 28),
-    makeEl("badge", 24, 420, 70, 24),
-    makeEl("tabs", 0, 470, 390, 48),
-    makeEl("image", 24, 540, 342, 160)
-  ];
-}
-function defaultDoc(t) {
-  const page = {
-    id: uid(),
-    name: t ? t("pages.default") + " 1" : "Page 1",
-    frame: { w: 390, h: 844, preset: "mobile", background: "#ffffff" },
-    elements: starterElements(t)
-  };
-  return { name: "", pages: [page], activePageId: page.id };
-}
-function normalizeElement(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const type = TYPE_INFO[raw.type] ? raw.type : "text";
-  const el = {
-    id: raw.id || uid(),
-    type,
-    x: Number.isFinite(Number(raw.x)) ? Number(raw.x) : 0,
-    y: Number.isFinite(Number(raw.y)) ? Number(raw.y) : 0,
-    w: Math.max(12, Number.isFinite(Number(raw.w)) ? Number(raw.w) : TYPE_INFO[type].size[0]),
-    h: Math.max(8, Number.isFinite(Number(raw.h)) ? Number(raw.h) : TYPE_INFO[type].size[1]),
-    state: raw.state || defaultState(type),
-    props: raw.props && typeof raw.props === "object" ? { ...raw.props } : {}
-  };
-  if (isContainerType(type)) {
-    el.children = Array.isArray(raw.children) ? raw.children.map(normalizeElement).filter(Boolean) : [];
-  }
-  return el;
-}
-function normalizeElements(list) {
-  return Array.isArray(list) ? list.map(normalizeElement).filter(Boolean) : [];
-}
-function normalizeDoc(doc) {
-  if (!doc) return null;
-  if (Array.isArray(doc.pages) && doc.pages.length) {
-    const pages = doc.pages.filter((p) => p && Array.isArray(p.elements)).map((p) => {
-      const fr = p.frame || {};
-      return {
-        id: p.id || uid(),
-        name: p.name || "Page",
-        frame: {
-          w: fr.w || 390,
-          h: fr.h || 844,
-          preset: fr.preset || "mobile",
-          background: fr.background || "#ffffff"
-        },
-        elements: normalizeElements(p.elements)
-      };
-    });
-    if (!pages.length) return null;
-    const activePageId = pages.some((p) => p.id === doc.activePageId) ? doc.activePageId : pages[0].id;
-    return { name: doc.name || "", pages, activePageId };
-  }
-  if (doc.frame && Array.isArray(doc.elements)) {
-    const fr = doc.frame;
-    const page = {
-      id: uid(),
-      name: "Page 1",
-      frame: {
-        w: fr.w || 390,
-        h: fr.h || 844,
-        preset: fr.preset || "mobile",
-        background: fr.background || "#ffffff"
-      },
-      elements: normalizeElements(doc.elements)
-    };
-    return { name: doc.name || "", pages: [page], activePageId: page.id };
-  }
-  return null;
-}
-function loadDoc() {
-  try {
-    let raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) raw = window.localStorage.getItem(LEGACY_KEY);
-    if (!raw) return null;
-    return normalizeDoc(JSON.parse(raw));
-  } catch (e) {
-    return null;
-  }
-}
-function saveDoc(doc) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
-  } catch (e) {
-  }
-}
-function loadUi() {
-  try {
-    const raw = window.localStorage.getItem(UI_KEY);
-    return raw ? JSON.parse(raw) || {} : {};
-  } catch (e) {
-    return {};
-  }
-}
-function saveUi(ui) {
-  try {
-    window.localStorage.setItem(UI_KEY, JSON.stringify(ui));
-  } catch (e) {
-  }
-}
-function apiFetch(path, init) {
-  if (typeof fetch !== "function") return Promise.resolve(null);
-  let url;
-  try {
-    url = new URL(
-      API_PREFIX + path,
-      window.location && window.location.href ? window.location.href : "http://localhost/"
-    ).toString();
-  } catch (e) {
-    return Promise.resolve(null);
-  }
-  const opts = Object.assign({}, init);
-  if (!opts.signal && typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
-    try {
-      opts.signal = AbortSignal.timeout(4e3);
-    } catch (e) {
-    }
-  }
-  return fetch(url, opts).then(
-    (res) => res.text().then((text) => {
-      let body = null;
-      if (text) {
-        try {
-          body = JSON.parse(text);
-        } catch (e) {
-          body = null;
-        }
-      }
-      return { status: res.status, body };
-    }),
-    () => null
-  );
-}
-
-// src/client/styles.js
-var CSS = [
-  ".dpd-root{position:relative;display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}",
-  ".dpd-root *{box-sizing:border-box}",
-  ".dpd-root button,.dpd-root input,.dpd-root select{font-family:inherit}",
-  ".dpd-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);flex-wrap:wrap;flex-shrink:0}",
-  ".dpd-brand{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13.5px;margin-right:2px;color:var(--dsw-alias-label-primary,#111)}",
-  ".dpd-nameInput{background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 7px;color:inherit;font:inherit;font-weight:600;width:150px;max-width:26vw}",
-  ".dpd-nameInput:hover{border-color:var(--dsw-alias-border-l1,#e5e6eb)}",
-  ".dpd-nameInput:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#6366f1);background:var(--dsw-alias-bg-base,#fff)}",
-  ".dpd-spacer{flex:1}",
-  ".dpd-select{background:var(--dsw-alias-bg-base,#fff);color:inherit;border:1px solid var(--dsw-alias-border-l2,#d6d9e2);border-radius:7px;padding:5px 8px;font:inherit;font-size:12px;cursor:pointer}",
-  ".dpd-select:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#6366f1)}",
-  ".dpd-seg{display:inline-flex;background:var(--dsw-alias-bg-layer-2,#f0f1f4);border-radius:8px;padding:2px;gap:2px}",
-  ".dpd-seg button{border:none;background:transparent;color:var(--dsw-alias-label-secondary,#6b7280);padding:4px 9px;border-radius:6px;cursor:pointer;font:inherit;font-size:12px;white-space:nowrap}",
-  ".dpd-seg button.active{background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);box-shadow:0 1px 2px rgba(0,0,0,.08);font-weight:600}",
-  ".dpd-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--dsw-alias-border-l2,#d6d9e2);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);padding:5px 10px;border-radius:7px;cursor:pointer;font:inherit;font-size:12px;white-space:nowrap}",
-  ".dpd-btn:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
-  ".dpd-btn.primary{background:var(--dsw-alias-brand-primary,#6366f1);color:#fff;border-color:transparent}",
-  ".dpd-btn.primary:hover{filter:brightness(1.06)}",
-  ".dpd-iconbtn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--dsw-alias-border-l2,#d6d9e2);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);border-radius:7px;cursor:pointer;padding:0}",
-  ".dpd-iconbtn:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
-  ".dpd-mini{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:5px;cursor:pointer;padding:0;flex-shrink:0}",
-  ".dpd-mini:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);color:var(--dsw-alias-label-primary,#111)}",
-  ".dpd-zoom{min-width:42px;text-align:center;font-size:12px;color:var(--dsw-alias-label-secondary,#6b7280);font-variant-numeric:tabular-nums;background:transparent;border:none;cursor:pointer;padding:2px 4px;border-radius:6px}",
-  ".dpd-zoom:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4);color:var(--dsw-alias-label-primary,#111)}",
-  ".dpd-saved{font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap}",
-  ".dpd-body{flex:1;display:flex;min-height:0}",
-  ".dpd-leftcol{display:flex;min-height:0;flex-shrink:0;background:var(--dsw-alias-bg-layer-1,#fafafa);border-right:1px solid var(--dsw-alias-border-l1,#e5e6eb)}",
-  ".dpd-rail{width:44px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border-right:1px solid var(--dsw-alias-border-l1,#e5e6eb)}",
-  ".dpd-railbtn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;border-radius:8px;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;padding:0}",
-  ".dpd-railbtn:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4);color:var(--dsw-alias-label-primary,#111)}",
-  ".dpd-railbtn.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);color:var(--dsw-alias-brand-primary,#6366f1)}",
-  ".dpd-sectionwrap{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden}",
-  ".dpd-sectionBody{display:flex;flex-direction:column;min-height:0;flex:1;overflow:hidden}",
-  ".dpd-resizer{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;z-index:6}",
-  ".dpd-resizer.left{left:0;right:auto}",
-  ".dpd-resizer:hover{background:var(--dsw-alias-border-l2,#d6d9e2)}",
-  ".dpd-right{position:relative;width:242px;max-width:36%;flex-shrink:0;border-left:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);display:flex;flex-direction:column;min-height:0;overflow:auto}",
-  ".dpd-right.collapsed{width:38px;min-width:38px;max-width:none;align-items:center;padding-top:8px;overflow:hidden}",
-  ".dpd-rightToggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:8px;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;font:inherit;font-size:15px}",
-  ".dpd-rightToggle:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);color:var(--dsw-alias-label-primary,#111)}",
-  ".dpd-panelTitle{padding:10px 12px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,#6b7280);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:6px}",
-  ".dpd-hint{padding:0 12px 8px;font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280)}",
-  ".dpd-pages{display:flex;flex-direction:column;gap:1px;padding:0 8px 8px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}",
-  ".dpd-pageRow{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-primary,#111)}",
-  ".dpd-pageRow:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
-  ".dpd-pageRow.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary,#6366f1)}",
-  ".dpd-pageRow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
-  ".dpd-pageRow .sz{font-size:10px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap}",
-  ".dpd-libScroll{overflow-y:auto;overflow-x:hidden;padding:0 8px 12px;min-height:0;flex:1}",
-  ".dpd-libGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}",
-  ".dpd-libItem{border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:8px;background:var(--dsw-alias-bg-base,#fff);padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;overflow:hidden;transition:border-color .15s,box-shadow .15s}",
-  ".dpd-libItem:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);box-shadow:0 2px 8px rgba(0,0,0,.06)}",
-  ".dpd-libThumb{position:relative;width:100%;height:32px;display:flex;align-items:center;justify-content:center;overflow:hidden}",
-  ".dpd-libName{font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}",
-  ".dpd-canvas{flex:1;min-width:0;overflow:auto;background-color:var(--dsw-alias-bg-layer-2,#f0f1f4);position:relative}",
-  ".dpd-previewMode .dpd-canvas{background:#e9ebf0}",
-  ".dpd-previewMode .dpd-canvasinner{align-items:center;justify-content:center;padding:24px}",
-  ".dpd-previewExit{position:absolute;top:16px;right:16px;z-index:120;border:none;border-radius:999px;padding:7px 13px;background:rgba(17,24,39,.58);color:#fff;font:inherit;font-size:12px;cursor:pointer;opacity:.65;transition:opacity .15s,background .15s}",
-  ".dpd-previewExit:hover{opacity:1;background:rgba(17,24,39,.82)}",
-  ".dpd-canvasinner{display:flex;align-items:flex-start;justify-content:center;min-width:100%;min-height:100%;width:max-content;box-sizing:border-box;padding:32px}",
-  ".dpd-stage{position:relative;flex-shrink:0}",
-  ".dpd-world{position:absolute;top:0;left:0}",
-  ".dpd-frame{position:absolute;border-radius:18px;box-shadow:0 14px 44px rgba(17,24,39,.20),0 0 0 1px rgba(17,24,39,.06);overflow:hidden}",
-  ".dpd-pageLabel{position:absolute;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;padding:0 2px;overflow:hidden}",
-  ".dpd-pageLabel .pin{font-weight:600;color:var(--dsw-alias-label-primary,#111);overflow:hidden;text-overflow:ellipsis;max-width:60%}",
-  ".dpd-pageLabel .sz{font-variant-numeric:tabular-nums;opacity:.75}",
-  ".dpd-pageLabel.active .pin{color:var(--dsw-alias-brand-primary,#6366f1)}",
-  ".dpd-el{position:absolute;box-sizing:border-box}",
-  ".dpd-el.dpd-container{outline:1px dashed rgba(99,102,241,.30);outline-offset:-1px}",
-  ".dpd-el.dpd-group{outline:1px dashed rgba(107,114,128,.28);outline-offset:-1px}",
-  ".dpd-canvas.dpd-preview .dpd-container,.dpd-canvas.dpd-preview .dpd-group{outline:none}",
-  ".dpd-el.dpd-sel{outline:1.5px solid var(--dsw-alias-brand-primary,#6366f1)}",
-  ".dpd-selBox{position:absolute;pointer-events:none;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);z-index:40}",
-  ".dpd-selBox.multi{border-style:dashed}",
-  ".dpd-multiBox{position:absolute;pointer-events:none;border:1px dashed var(--dsw-alias-brand-primary,#6366f1);z-index:39}",
-  ".dpd-handle{position:absolute;width:8px;height:8px;background:#fff;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);border-radius:2px;pointer-events:auto}",
-  ".dpd-handle.h-nw{left:-5px;top:-5px}",
-  ".dpd-handle.h-n{left:calc(50% - 4px);top:-5px}",
-  ".dpd-handle.h-ne{right:-5px;top:-5px}",
-  ".dpd-handle.h-e{right:-5px;top:calc(50% - 4px)}",
-  ".dpd-handle.h-se{right:-5px;bottom:-5px}",
-  ".dpd-handle.h-s{left:calc(50% - 4px);bottom:-5px}",
-  ".dpd-handle.h-sw{left:-5px;bottom:-5px}",
-  ".dpd-handle.h-w{left:-5px;top:calc(50% - 4px)}",
-  ".dpd-guide{position:absolute;background:#ff3d8b;z-index:70;pointer-events:none;box-shadow:0 0 0 .5px rgba(255,61,139,.18)}",
-  ".dpd-guide.v{width:1px}",
-  ".dpd-guide.h{height:1px}",
-  ".dpd-marquee{position:absolute;border:1px solid var(--dsw-alias-brand-primary,#6366f1);background:rgba(99,102,241,.08);z-index:65;pointer-events:none}",
-  ".dpd-section{border-top:1px solid var(--dsw-alias-border-l1,#e5e6eb);padding:8px 0 10px}",
-  ".dpd-row{display:flex;align-items:center;gap:8px;padding:5px 12px}",
-  ".dpd-row>label{width:56px;flex-shrink:0;font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280)}",
-  ".dpd-input{flex:1;min-width:0;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:6px;padding:4px 7px;color:inherit;font:inherit;font-size:12px}",
-  ".dpd-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#6366f1)}",
-  ".dpd-color{width:30px;height:24px;padding:0;border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:6px;background:transparent;cursor:pointer}",
-  ".dpd-numPair{display:flex;gap:6px;flex:1;min-width:0}",
-  ".dpd-numPair .dpd-field{flex:1;display:flex;align-items:center;gap:3px;min-width:0}",
-  ".dpd-numPair .dpd-field span{font-size:10.5px;color:var(--dsw-alias-label-secondary,#6b7280)}",
-  ".dpd-chips{display:flex;flex-wrap:wrap;gap:5px;padding:2px 12px 6px}",
-  ".dpd-alignGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:2px 12px 6px}",
-  ".dpd-alignBtn{border:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:6px;padding:5px 4px;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-  ".dpd-alignBtn:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);color:var(--dsw-alias-label-primary,#111)}",
-  ".dpd-checkRow{display:flex;align-items:center;gap:7px;padding:5px 12px;font-size:12px;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer}",
-  ".dpd-chip{border:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:999px;padding:3px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap}",
-  ".dpd-chip:hover{border-color:var(--dsw-alias-brand-primary,#6366f1)}",
-  ".dpd-chip.active{background:var(--dsw-alias-brand-primary,#6366f1);color:#fff;border-color:transparent}",
-  ".dpd-actions{display:flex;gap:6px;padding:4px 12px 10px;flex-wrap:wrap}",
-  ".dpd-empty{padding:16px 14px;color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;line-height:1.6}",
-  ".dpd-layers{display:flex;flex-direction:column;gap:1px;padding:0 8px 12px;overflow:auto;flex:1;min-height:0}",
-  ".dpd-layer{display:flex;align-items:center;gap:7px;padding:6px 8px;cursor:pointer;font-size:12px;border-radius:6px;color:var(--dsw-alias-label-primary,#111)}",
-  ".dpd-layer:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
-  ".dpd-layer.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary,#6366f1)}",
-  ".dpd-layer .dot{width:14px;height:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;opacity:.85}",
-  ".dpd-layer .caret{width:10px;flex-shrink:0;font-size:10px;color:var(--dsw-alias-label-secondary,#6b7280);opacity:.8}",
-  ".dpd-layer .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
-  ".dpd-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,.9);z-index:60;text-align:center;padding:24px}",
-  ".dpd-overlayTitle{font-size:15px;font-weight:600;color:#161a22}",
-  ".dpd-overlayDesc{font-size:12.5px;color:#6b7280;max-width:240px;line-height:1.5}",
-  ".dpd-spinner{width:28px;height:28px;border:3px solid rgba(99,102,241,.22);border-top-color:#6366f1;border-radius:50%;animation:dpd-spin .8s linear infinite}",
-  "@keyframes dpd-spin{to{transform:rotate(360deg)}}"
-].join("\n");
-function StyleBlock() {
-  return h("style", { dangerouslySetInnerHTML: { __html: CSS } });
-}
-
-// src/client/overlay.js
-function PageOverlay(props) {
-  const { pageState, t } = props;
-  if (pageState === "loading") {
-    return h(
-      "div",
-      { className: "dpd-overlay" },
-      h("div", { className: "dpd-spinner" }),
-      h("div", { className: "dpd-overlayDesc" }, t("overlay.loading"))
-    );
-  }
-  if (pageState === "empty") {
-    return h(
-      "div",
-      { className: "dpd-overlay" },
-      h(
-        Svg,
-        { size: 44, strokeWidth: 1.3, style: { color: "#b8bdc9" } },
-        h("rect", { x: 2, y: 2, width: 12, height: 12, rx: 2.5 }),
-        h("path", { d: "M5 8h6M8 5v6" })
-      ),
-      h("div", { className: "dpd-overlayTitle" }, t("overlay.emptyTitle")),
-      h("div", { className: "dpd-overlayDesc" }, t("overlay.emptyDesc"))
-    );
-  }
-  if (pageState === "error") {
-    return h(
-      "div",
-      { className: "dpd-overlay" },
-      h(
-        Svg,
-        { size: 44, strokeWidth: 1.3, style: { color: "#e5484d" } },
-        h("circle", { cx: 8, cy: 8, r: 6 }),
-        h("path", { d: "M8 5v4M8 11h.01" })
-      ),
-      h("div", { className: "dpd-overlayTitle" }, t("overlay.errorTitle")),
-      h("div", { className: "dpd-overlayDesc" }, t("overlay.errorDesc"))
-    );
-  }
-  return null;
-}
 
 // src/client/color.js
 function hexToRgb(hex) {
@@ -1684,6 +1097,869 @@ function renderWidget(el, state, t, opts) {
     );
   }
   return h("div", { style: { width: "100%", height: "100%" } });
+}
+
+// src/client/cards.js
+var PRODUCT_DESIGN_META_KIND = "product-design";
+var PRODUCT_DESIGN_TURN_KEY = "product-design";
+var canvasOpener = () => {
+};
+function setCanvasOpener(fn) {
+  canvasOpener = typeof fn === "function" ? fn : () => {
+  };
+}
+function openCanvas() {
+  try {
+    canvasOpener();
+  } catch (e) {
+  }
+}
+function productDesignMetaFrom(meta) {
+  if (!meta || typeof meta !== "object" || meta.kind !== PRODUCT_DESIGN_META_KIND) return null;
+  if (!meta.page || typeof meta.page !== "object" || !meta.page.frame) return null;
+  return meta;
+}
+function resultMeta(data) {
+  return data && data.message && data.message.isError === true ? null : productDesignMetaFrom(data && data.meta);
+}
+function foldCard(cards, card) {
+  if (cards.some((existing) => existing.callId === card.callId)) return cards;
+  const index = cards.findIndex((existing) => existing.meta.pageId === card.meta.pageId);
+  if (index === -1) return [...cards, card];
+  return cards.map((existing, at) => at === index ? card : existing);
+}
+var turnCardsDefinition = {
+  kind: PRODUCT_DESIGN_TURN_KEY,
+  match: (event) => {
+    if (event.type === "turn/start") return { id: String(event.data.turn), role: "start" };
+    if (event.type !== "tool/result") return null;
+    return resultMeta(event.data) ? { id: String(event.data.turn), role: "update" } : null;
+  },
+  start: (_context, match) => {
+    if (match.event.type !== "turn/start") return null;
+    return { turn: match.event.data.turn, cards: [] };
+  },
+  update: (context, match) => {
+    if (match.event.type !== "tool/result") return context.state;
+    const data = match.event.data;
+    const meta = resultMeta(data);
+    if (!meta) return context.state;
+    const cards = foldCard(context.state.cards, {
+      callId: String(data.message.source.callId),
+      seq: match.event.seq,
+      meta
+    });
+    return cards === context.state.cards ? context.state : { ...context.state, cards };
+  },
+  buildLocationData: (context, scope, previous) => {
+    if (scope !== "turn" || context.state === void 0) return null;
+    const { turn, cards } = context.state;
+    if (previous && previous.kind === "turn" && previous.turn === turn && previous.key === PRODUCT_DESIGN_TURN_KEY && previous.value.cards === cards)
+      return previous;
+    return { kind: "turn", turn, key: PRODUCT_DESIGN_TURN_KEY, value: { cards } };
+  }
+};
+function cardsBefore(turn, seq) {
+  const cards = turn && turn.data && turn.data.get(PRODUCT_DESIGN_TURN_KEY)?.cards || [];
+  return cards.filter((card) => card.seq < seq);
+}
+function selectTurnCards(owner) {
+  if (!owner) return null;
+  const cards = cardsBefore(owner.turn, owner.seq);
+  return cards.length ? cards : null;
+}
+function renderMiniElements(elements, t) {
+  return (elements || []).map((el) => {
+    const isBox = isContainerType(el.type);
+    const style = {
+      position: "absolute",
+      left: el.x,
+      top: el.y,
+      width: el.w,
+      height: el.h,
+      boxSizing: "border-box"
+    };
+    if (isBox && el.type === "container") {
+      style.background = el.props && el.props.background || "#ffffff";
+      style.borderRadius = el.props && el.props.radius != null ? el.props.radius : 12;
+      style.overflow = el.props && el.props.clipContent === false ? "visible" : "hidden";
+    }
+    return h(
+      "div",
+      { key: el.id, style },
+      isBox ? renderMiniElements(el.children, t) : h(
+        "div",
+        { style: { width: "100%", height: "100%", pointerEvents: "none" } },
+        renderWidget(el, el.state || defaultState(el.type), t, {})
+      )
+    );
+  });
+}
+function ProductPagePreview(props) {
+  const t = useT();
+  const page = props.page;
+  const frame = page.frame || { w: 390, h: 844, background: "#ffffff" };
+  const maxW = props.maxWidth || 520;
+  const maxH = props.maxHeight || 520;
+  const scale = Math.min(maxW / Math.max(1, frame.w), maxH / Math.max(1, frame.h), 1);
+  return h(
+    "div",
+    {
+      style: {
+        width: Math.max(1, Math.round(frame.w * scale)),
+        height: Math.max(1, Math.round(frame.h * scale)),
+        overflow: "hidden",
+        borderRadius: 12,
+        background: frame.background || "#ffffff",
+        boxShadow: "0 8px 28px rgba(17,24,39,.12), 0 0 0 1px rgba(17,24,39,.05)",
+        flexShrink: 0
+      }
+    },
+    h(
+      "div",
+      {
+        style: {
+          width: frame.w,
+          height: frame.h,
+          position: "relative",
+          transform: "scale(" + scale + ")",
+          transformOrigin: "top left",
+          background: frame.background || "#ffffff"
+        }
+      },
+      renderMiniElements(page.elements || [], t)
+    )
+  );
+}
+function ProductDesignCard(props) {
+  const t = useT();
+  const meta = props.meta;
+  const page = meta.page || {};
+  const frame = page.frame || { w: 390, h: 844 };
+  const count = meta.pageCount || 1;
+  const index = meta.pageIndex != null ? meta.pageIndex + 1 : 1;
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        padding: 14,
+        borderRadius: 14,
+        border: "1px solid var(--dsw-alias-border-l1,#e5e6eb)",
+        background: "var(--dsw-alias-bg-base,#ffffff)",
+        color: "var(--dsw-alias-label-primary,#111827)",
+        boxShadow: "0 1px 3px rgba(17,24,39,.05)",
+        maxWidth: "100%",
+        boxSizing: "border-box"
+      }
+    },
+    h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12
+        }
+      },
+      h(
+        "div",
+        { style: { display: "flex", flexDirection: "column", gap: 2, minWidth: 0 } },
+        h(
+          "div",
+          {
+            style: {
+              fontSize: 13,
+              fontWeight: 600,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }
+          },
+          meta.title || page.name || t("app.title")
+        ),
+        h(
+          "div",
+          { style: { fontSize: 11, color: "var(--dsw-alias-label-secondary,#6b7280)" } },
+          `${frame.w}\xD7${frame.h}${count > 1 ? ` \xB7 ${index}/${count}` : ""}`
+        )
+      ),
+      h(
+        "button",
+        {
+          type: "button",
+          onClick: openCanvas,
+          style: {
+            border: "1px solid var(--dsw-alias-border-l2,#d6d9e2)",
+            background: "var(--dsw-alias-bg-layer-1,#fafafa)",
+            color: "inherit",
+            borderRadius: 7,
+            padding: "5px 10px",
+            fontSize: 12,
+            cursor: "pointer",
+            whiteSpace: "nowrap"
+          }
+        },
+        t("visualize.openCanvas")
+      )
+    ),
+    h(
+      "div",
+      { style: { display: "flex", justifyContent: "center", maxWidth: "100%", overflow: "auto" } },
+      h(ProductPagePreview, { page, maxWidth: 520, maxHeight: 520 })
+    )
+  );
+}
+function ProductDesignCards(props) {
+  const cards = cardsBefore(props.turn, props.seq);
+  if (!cards.length) return null;
+  return h(
+    "div",
+    {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "minmax(0,1fr)",
+        gap: 12,
+        margin: "8px 0 4px"
+      }
+    },
+    cards.map((card) => h(ProductDesignCard, { key: card.callId, meta: card.meta }))
+  );
+}
+function registerProductDesignCards(ctx) {
+  const disposers = [];
+  try {
+    if (ctx && ctx.slots && typeof ctx.slots.inject === "function") {
+      disposers.push(
+        ctx.slots.inject(
+          "conversation.chat.turnTail",
+          () => ctx.slots.register(
+            {
+              name: "conversation.chat.turnTail",
+              id: "dsh-product-design-cards",
+              order: 110,
+              priority: 110,
+              select: selectTurnCards
+            },
+            ProductDesignCards
+          )
+        )
+      );
+    }
+  } catch (e) {
+  }
+  try {
+    if (ctx && typeof ctx.inject === "function") {
+      ctx.inject(["uiConversation"], (scope) => {
+        const service = scope.get("uiConversation");
+        if (service && service.events && typeof service.events.register === "function") {
+          const dispose = service.events.register(turnCardsDefinition);
+          if (typeof dispose === "function") disposers.push(dispose);
+        }
+      });
+    }
+  } catch (e) {
+  }
+  return () => {
+    for (const dispose of disposers.splice(0)) {
+      try {
+        dispose();
+      } catch (e) {
+      }
+    }
+  };
+}
+
+// src/client/icons.js
+function Svg(props) {
+  const { size, children, ...rest } = props;
+  return h(
+    "svg",
+    Object.assign(
+      {
+        width: size || 14,
+        height: size || 14,
+        viewBox: "0 0 16 16",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: 1.5,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        "aria-hidden": true
+      },
+      rest
+    ),
+    children
+  );
+}
+var IconPlus = () => h(Svg, null, h("path", { d: "M8 3v10M3 8h10" }));
+var IconMinus = () => h(Svg, null, h("path", { d: "M3 8h10" }));
+var IconEye = () => h(
+  Svg,
+  null,
+  h("path", { d: "M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" }),
+  h("circle", { cx: 8, cy: 8, r: 1.8 })
+);
+var IconPencil = () => h(Svg, null, h("path", { d: "M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z" }));
+var IconReset = () => h(Svg, null, h("path", { d: "M3 8a5 5 0 1 0 1.6-3.7M3 3.2V6h2.8" }));
+var IconTrash = () => h(Svg, null, h("path", { d: "M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4" }));
+var IconCopy = () => h(
+  Svg,
+  null,
+  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.4 }),
+  h("path", { d: "M3 11V4a1 1 0 0 1 1-1h7" })
+);
+var IconFront = () => h(
+  Svg,
+  null,
+  h("rect", { x: 3, y: 3, width: 8, height: 8, rx: 1.2 }),
+  h("path", { d: "M8 8h5v5" })
+);
+var IconBack = () => h(
+  Svg,
+  null,
+  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.2 }),
+  h("path", { d: "M3 8V3h5" })
+);
+var IconUndo = () => h(Svg, null, h("path", { d: "M3.2 8.4a5 5 0 1 1 1.5 3.3M3 4.6V8h3.4" }));
+var IconRedo = () => h(Svg, null, h("path", { d: "M12.8 8.4a5 5 0 1 0-1.5 3.3M13 4.6V8H9.6" }));
+var IconPages = () => h(
+  Svg,
+  null,
+  h("rect", { x: 3, y: 1.8, width: 10, height: 12.4, rx: 1.6 }),
+  h("path", { d: "M3 5.2h10M5.4 8.2h5.2M5.4 10.8h3.4" })
+);
+var IconComponents = () => h(
+  Svg,
+  null,
+  h("rect", { x: 2, y: 2, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 9, y: 2, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 2, y: 9, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 9, y: 9, width: 5, height: 5, rx: 1 })
+);
+var IconLayers = () => h(
+  Svg,
+  null,
+  h("path", { d: "M8 2l6 3-6 3-6-3 6-3z" }),
+  h("path", { d: "M2 8l6 3 6-3M2 11l6 3 6-3" })
+);
+var IconMagnet = () => h(
+  Svg,
+  null,
+  h("path", { d: "M3 2v6a5 5 0 0 0 10 0V2" }),
+  h("path", { d: "M3 2H1.5M13 2h1.5M3 6h3M10 6h3" })
+);
+function libGlyph(type) {
+  const map = {
+    container: h("path", { d: "M2 3.5h12v9H2zM4.5 6h7v4h-7z" }),
+    group: h("path", { d: "M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z" }),
+    button: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 2 }),
+    input: h("rect", { x: 2, y: 4.5, width: 12, height: 7, rx: 1.6 }),
+    card: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
+    navbar: h("path", { d: "M2 4h12M2 4v8h12V4M6 7h4" }),
+    tabs: h("path", { d: "M2 5h12M5 5v6M10 5v6" }),
+    toggle: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 3 }),
+    checkbox: h("rect", { x: 3, y: 3, width: 10, height: 10, rx: 2 }),
+    avatar: h("circle", { cx: 8, cy: 8, r: 5 }),
+    text: h("path", { d: "M3 4h10M8 4v8M5.5 12h5" }),
+    image: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
+    badge: h("rect", { x: 2, y: 6, width: 12, height: 4, rx: 2 }),
+    select: h("path", { d: "M2 4.5h12v7H2zM10 8l1.5 1.5L13 8" })
+  };
+  return map[type] || map.text;
+}
+function ProductDesignIcon(props) {
+  const size = props && props.size;
+  return h(
+    "svg",
+    {
+      viewBox: "0 0 16 16",
+      width: size || 16,
+      height: size || 16,
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      "aria-hidden": true,
+      "data-dsh-panel-entry": PANEL_ID
+    },
+    h("rect", { x: 1.5, y: 2, width: 13, height: 11.5, rx: 2 }),
+    h("path", { d: "M1.5 5.4h13" }),
+    h("rect", { x: 3.6, y: 8, width: 4, height: 3.2, rx: 0.6 }),
+    h("circle", { cx: 10.6, cy: 9.6, r: 1.4 })
+  );
+}
+
+// src/shared/snapping.js
+var SNAP_THRESHOLD = 5;
+function xCandidates(targets) {
+  const out = [];
+  for (const t of targets) {
+    out.push({ pos: t.x, target: t, kind: "left" });
+    out.push({ pos: t.x + t.w / 2, target: t, kind: "centerX" });
+    out.push({ pos: t.x + t.w, target: t, kind: "right" });
+  }
+  return out;
+}
+function yCandidates(targets) {
+  const out = [];
+  for (const t of targets) {
+    out.push({ pos: t.y, target: t, kind: "top" });
+    out.push({ pos: t.y + t.h / 2, target: t, kind: "centerY" });
+    out.push({ pos: t.y + t.h, target: t, kind: "bottom" });
+  }
+  return out;
+}
+function bestSnap(movingPositions, candidates, threshold) {
+  let best = null;
+  for (const moving of movingPositions) {
+    for (const cand of candidates) {
+      const delta = cand.pos - moving.pos;
+      if (Math.abs(delta) > threshold) continue;
+      if (!best || Math.abs(delta) < Math.abs(best.delta)) {
+        best = { delta, candidate: cand, moving };
+      }
+    }
+  }
+  return best;
+}
+function span(aStart, aEnd, bStart, bEnd) {
+  return { from: Math.min(aStart, bStart), to: Math.max(aEnd, bEnd) };
+}
+function snapMoveBox(box, targets, threshold = SNAP_THRESHOLD) {
+  const xs = xCandidates(targets);
+  const ys = yCandidates(targets);
+  const movingX = [
+    { pos: box.x, edge: "left" },
+    { pos: box.x + box.w / 2, edge: "centerX" },
+    { pos: box.x + box.w, edge: "right" }
+  ];
+  const movingY = [
+    { pos: box.y, edge: "top" },
+    { pos: box.y + box.h / 2, edge: "centerY" },
+    { pos: box.y + box.h, edge: "bottom" }
+  ];
+  const sx = bestSnap(movingX, xs, threshold);
+  const sy = bestSnap(movingY, ys, threshold);
+  const dx = sx ? sx.delta : 0;
+  const dy = sy ? sy.delta : 0;
+  const guides = [];
+  if (sx) {
+    const t = sx.candidate.target;
+    const v = span(box.y + dy, box.y + box.h + dy, t.y, t.y + t.h);
+    guides.push({ axis: "x", pos: sx.candidate.pos, from: v.from, to: v.to });
+  }
+  if (sy) {
+    const t = sy.candidate.target;
+    const h2 = span(box.x + dx, box.x + box.w + dx, t.x, t.x + t.w);
+    guides.push({ axis: "y", pos: sy.candidate.pos, from: h2.from, to: h2.to });
+  }
+  return { dx, dy, guides };
+}
+function snapResizeBox(box, dir, targets, threshold = SNAP_THRESHOLD) {
+  const xCands = xCandidates(targets);
+  const yCands = yCandidates(targets);
+  const next = { ...box };
+  const guides = [];
+  const snapEdge = (value, candidates, axis, spanStart, spanEnd, targetSpan) => {
+    let best = null;
+    for (const cand of candidates) {
+      const delta = cand.pos - value;
+      if (Math.abs(delta) > threshold) continue;
+      if (!best || Math.abs(delta) < Math.abs(best.delta)) best = { delta, candidate: cand };
+    }
+    if (!best) return null;
+    const t = best.candidate.target;
+    const s = targetSpan(t);
+    const v = span(spanStart, spanEnd, s.start, s.end);
+    guides.push({ axis, pos: best.candidate.pos, from: v.from, to: v.to });
+    return best.delta;
+  };
+  if (dir.indexOf("w") !== -1) {
+    const d = snapEdge(next.x, xCands, "x", next.y, next.y + next.h, (t) => ({
+      start: t.y,
+      end: t.y + t.h
+    }));
+    if (d != null) {
+      next.x += d;
+      next.w -= d;
+    }
+  }
+  if (dir.indexOf("e") !== -1) {
+    const d = snapEdge(next.x + next.w, xCands, "x", next.y, next.y + next.h, (t) => ({
+      start: t.y,
+      end: t.y + t.h
+    }));
+    if (d != null) next.w += d;
+  }
+  if (dir.indexOf("n") !== -1) {
+    const d = snapEdge(next.y, yCands, "y", next.x, next.x + next.w, (t) => ({
+      start: t.x,
+      end: t.x + t.w
+    }));
+    if (d != null) {
+      next.y += d;
+      next.h -= d;
+    }
+  }
+  if (dir.indexOf("s") !== -1) {
+    const d = snapEdge(next.y + next.h, yCands, "y", next.x, next.x + next.w, (t) => ({
+      start: t.x,
+      end: t.x + t.w
+    }));
+    if (d != null) next.h += d;
+  }
+  if (next.w < 12) {
+    if (dir.indexOf("w") !== -1) next.x -= 12 - next.w;
+    next.w = 12;
+  }
+  if (next.h < 8) {
+    if (dir.indexOf("n") !== -1) next.y -= 8 - next.h;
+    next.h = 8;
+  }
+  return { box: next, guides };
+}
+
+// src/client/model.js
+var __seq = 1;
+function uid() {
+  return "e" + Date.now().toString(36) + (__seq++).toString(36);
+}
+function makeEl(type, x, y, w, hh, props, state) {
+  const el = {
+    id: uid(),
+    type,
+    x,
+    y,
+    w,
+    h: hh,
+    state: state || defaultState(type),
+    props: props || {}
+  };
+  if (isContainerType(type)) el.children = [];
+  return el;
+}
+function starterElements(t) {
+  return [
+    makeEl("navbar", 0, 0, 390, 56),
+    makeEl("text", 24, 84, 320, 30, { fontSize: 22, text: t ? t("sample.welcome") : "\u6B22\u8FCE\u56DE\u6765" }),
+    makeEl("text", 24, 120, 320, 22, {
+      fontSize: 13,
+      fontWeight: 400,
+      color: "#6b7280",
+      text: t ? t("sample.welcomeSub") : "\u4ECA\u5929\u60F3\u8BBE\u8BA1\u70B9\u4EC0\u4E48\uFF1F"
+    }),
+    makeEl("card", 24, 158, 342, 116),
+    makeEl("input", 24, 296, 342, 44),
+    makeEl("button", 24, 356, 150, 44),
+    makeEl("toggle", 300, 364, 50, 28),
+    makeEl("badge", 24, 420, 70, 24),
+    makeEl("tabs", 0, 470, 390, 48),
+    makeEl("image", 24, 540, 342, 160)
+  ];
+}
+function defaultDoc(t) {
+  const page = {
+    id: uid(),
+    name: t ? t("pages.default") + " 1" : "Page 1",
+    frame: { w: 390, h: 844, preset: "mobile", background: "#ffffff" },
+    elements: starterElements(t)
+  };
+  return { name: "", pages: [page], activePageId: page.id };
+}
+function normalizeElement(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const type = TYPE_INFO[raw.type] ? raw.type : "text";
+  const el = {
+    id: raw.id || uid(),
+    type,
+    x: Number.isFinite(Number(raw.x)) ? Number(raw.x) : 0,
+    y: Number.isFinite(Number(raw.y)) ? Number(raw.y) : 0,
+    w: Math.max(12, Number.isFinite(Number(raw.w)) ? Number(raw.w) : TYPE_INFO[type].size[0]),
+    h: Math.max(8, Number.isFinite(Number(raw.h)) ? Number(raw.h) : TYPE_INFO[type].size[1]),
+    state: raw.state || defaultState(type),
+    props: raw.props && typeof raw.props === "object" ? { ...raw.props } : {}
+  };
+  if (isContainerType(type)) {
+    el.children = Array.isArray(raw.children) ? raw.children.map(normalizeElement).filter(Boolean) : [];
+  }
+  return el;
+}
+function normalizeElements(list) {
+  return Array.isArray(list) ? list.map(normalizeElement).filter(Boolean) : [];
+}
+function normalizeDoc(doc) {
+  if (!doc) return null;
+  if (Array.isArray(doc.pages) && doc.pages.length) {
+    const pages = doc.pages.filter((p) => p && Array.isArray(p.elements)).map((p) => {
+      const fr = p.frame || {};
+      return {
+        id: p.id || uid(),
+        name: p.name || "Page",
+        frame: {
+          w: fr.w || 390,
+          h: fr.h || 844,
+          preset: fr.preset || "mobile",
+          background: fr.background || "#ffffff"
+        },
+        elements: normalizeElements(p.elements)
+      };
+    });
+    if (!pages.length) return null;
+    const activePageId = pages.some((p) => p.id === doc.activePageId) ? doc.activePageId : pages[0].id;
+    return { name: doc.name || "", pages, activePageId };
+  }
+  if (doc.frame && Array.isArray(doc.elements)) {
+    const fr = doc.frame;
+    const page = {
+      id: uid(),
+      name: "Page 1",
+      frame: {
+        w: fr.w || 390,
+        h: fr.h || 844,
+        preset: fr.preset || "mobile",
+        background: fr.background || "#ffffff"
+      },
+      elements: normalizeElements(doc.elements)
+    };
+    return { name: doc.name || "", pages: [page], activePageId: page.id };
+  }
+  return null;
+}
+function loadDoc() {
+  try {
+    let raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) raw = window.localStorage.getItem(LEGACY_KEY);
+    if (!raw) return null;
+    return normalizeDoc(JSON.parse(raw));
+  } catch (e) {
+    return null;
+  }
+}
+function saveDoc(doc) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
+  } catch (e) {
+  }
+}
+function loadUi() {
+  try {
+    const raw = window.localStorage.getItem(UI_KEY);
+    return raw ? JSON.parse(raw) || {} : {};
+  } catch (e) {
+    return {};
+  }
+}
+function saveUi(ui) {
+  try {
+    window.localStorage.setItem(UI_KEY, JSON.stringify(ui));
+  } catch (e) {
+  }
+}
+function apiFetch(path, init) {
+  if (typeof fetch !== "function") return Promise.resolve(null);
+  let url;
+  try {
+    url = new URL(
+      API_PREFIX + path,
+      window.location && window.location.href ? window.location.href : "http://localhost/"
+    ).toString();
+  } catch (e) {
+    return Promise.resolve(null);
+  }
+  const opts = Object.assign({}, init);
+  if (!opts.signal && typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    try {
+      opts.signal = AbortSignal.timeout(4e3);
+    } catch (e) {
+    }
+  }
+  return fetch(url, opts).then(
+    (res) => res.text().then((text) => {
+      let body = null;
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch (e) {
+          body = null;
+        }
+      }
+      return { status: res.status, body };
+    }),
+    () => null
+  );
+}
+
+// src/client/styles.js
+var CSS = [
+  ".dpd-root{position:relative;display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}",
+  ".dpd-root *{box-sizing:border-box}",
+  ".dpd-root button,.dpd-root input,.dpd-root select{font-family:inherit}",
+  ".dpd-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);flex-wrap:wrap;flex-shrink:0}",
+  ".dpd-brand{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13.5px;margin-right:2px;color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-nameInput{background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 7px;color:inherit;font:inherit;font-weight:600;width:150px;max-width:26vw}",
+  ".dpd-nameInput:hover{border-color:var(--dsw-alias-border-l1,#e5e6eb)}",
+  ".dpd-nameInput:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#6366f1);background:var(--dsw-alias-bg-base,#fff)}",
+  ".dpd-spacer{flex:1}",
+  ".dpd-select{background:var(--dsw-alias-bg-base,#fff);color:inherit;border:1px solid var(--dsw-alias-border-l2,#d6d9e2);border-radius:7px;padding:5px 8px;font:inherit;font-size:12px;cursor:pointer}",
+  ".dpd-select:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-seg{display:inline-flex;background:var(--dsw-alias-bg-layer-2,#f0f1f4);border-radius:8px;padding:2px;gap:2px}",
+  ".dpd-seg button{border:none;background:transparent;color:var(--dsw-alias-label-secondary,#6b7280);padding:4px 9px;border-radius:6px;cursor:pointer;font:inherit;font-size:12px;white-space:nowrap}",
+  ".dpd-seg button.active{background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);box-shadow:0 1px 2px rgba(0,0,0,.08);font-weight:600}",
+  ".dpd-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--dsw-alias-border-l2,#d6d9e2);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);padding:5px 10px;border-radius:7px;cursor:pointer;font:inherit;font-size:12px;white-space:nowrap}",
+  ".dpd-btn:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
+  ".dpd-btn.primary{background:var(--dsw-alias-brand-primary,#6366f1);color:#fff;border-color:transparent}",
+  ".dpd-btn.primary:hover{filter:brightness(1.06)}",
+  ".dpd-iconbtn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--dsw-alias-border-l2,#d6d9e2);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);border-radius:7px;cursor:pointer;padding:0}",
+  ".dpd-iconbtn:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
+  ".dpd-mini{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:5px;cursor:pointer;padding:0;flex-shrink:0}",
+  ".dpd-mini:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-zoom{min-width:42px;text-align:center;font-size:12px;color:var(--dsw-alias-label-secondary,#6b7280);font-variant-numeric:tabular-nums;background:transparent;border:none;cursor:pointer;padding:2px 4px;border-radius:6px}",
+  ".dpd-zoom:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4);color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-saved{font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap}",
+  ".dpd-body{flex:1;display:flex;min-height:0}",
+  ".dpd-leftcol{display:flex;min-height:0;flex-shrink:0;background:var(--dsw-alias-bg-layer-1,#fafafa);border-right:1px solid var(--dsw-alias-border-l1,#e5e6eb)}",
+  ".dpd-rail{width:44px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border-right:1px solid var(--dsw-alias-border-l1,#e5e6eb)}",
+  ".dpd-railbtn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;border-radius:8px;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;padding:0}",
+  ".dpd-railbtn:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4);color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-railbtn.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);color:var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-sectionwrap{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden}",
+  ".dpd-sectionBody{display:flex;flex-direction:column;min-height:0;flex:1;overflow:hidden}",
+  ".dpd-resizer{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;z-index:6}",
+  ".dpd-resizer.left{left:0;right:auto}",
+  ".dpd-resizer:hover{background:var(--dsw-alias-border-l2,#d6d9e2)}",
+  ".dpd-right{position:relative;width:242px;max-width:36%;flex-shrink:0;border-left:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);display:flex;flex-direction:column;min-height:0;overflow:auto}",
+  ".dpd-right.collapsed{width:38px;min-width:38px;max-width:none;align-items:center;padding-top:8px;overflow:hidden}",
+  ".dpd-rightToggle{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:8px;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;font:inherit;font-size:15px}",
+  ".dpd-rightToggle:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-panelTitle{padding:10px 12px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,#6b7280);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:6px}",
+  ".dpd-hint{padding:0 12px 8px;font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280)}",
+  ".dpd-pages{display:flex;flex-direction:column;gap:1px;padding:0 8px 8px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}",
+  ".dpd-pageRow{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-pageRow:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
+  ".dpd-pageRow.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-pageRow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+  ".dpd-pageRow .sz{font-size:10px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap}",
+  ".dpd-libScroll{overflow-y:auto;overflow-x:hidden;padding:0 8px 12px;min-height:0;flex:1}",
+  ".dpd-libGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}",
+  ".dpd-libItem{border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:8px;background:var(--dsw-alias-bg-base,#fff);padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;overflow:hidden;transition:border-color .15s,box-shadow .15s}",
+  ".dpd-libItem:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);box-shadow:0 2px 8px rgba(0,0,0,.06)}",
+  ".dpd-libThumb{position:relative;width:100%;height:32px;display:flex;align-items:center;justify-content:center;overflow:hidden}",
+  ".dpd-libName{font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}",
+  ".dpd-canvas{flex:1;min-width:0;overflow:auto;background-color:var(--dsw-alias-bg-layer-2,#f0f1f4);position:relative}",
+  ".dpd-previewMode .dpd-canvas{background:#e9ebf0}",
+  ".dpd-previewMode .dpd-canvasinner{align-items:center;justify-content:center;padding:24px}",
+  ".dpd-previewExit{position:absolute;top:16px;right:16px;z-index:120;border:none;border-radius:999px;padding:7px 13px;background:rgba(17,24,39,.58);color:#fff;font:inherit;font-size:12px;cursor:pointer;opacity:.65;transition:opacity .15s,background .15s}",
+  ".dpd-previewExit:hover{opacity:1;background:rgba(17,24,39,.82)}",
+  ".dpd-canvasinner{display:flex;align-items:flex-start;justify-content:center;min-width:100%;min-height:100%;width:max-content;box-sizing:border-box;padding:32px}",
+  ".dpd-stage{position:relative;flex-shrink:0}",
+  ".dpd-world{position:absolute;top:0;left:0}",
+  ".dpd-frame{position:absolute;border-radius:18px;box-shadow:0 14px 44px rgba(17,24,39,.20),0 0 0 1px rgba(17,24,39,.06);overflow:hidden}",
+  ".dpd-pageLabel{position:absolute;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;padding:0 2px;overflow:hidden}",
+  ".dpd-pageLabel .pin{font-weight:600;color:var(--dsw-alias-label-primary,#111);overflow:hidden;text-overflow:ellipsis;max-width:60%}",
+  ".dpd-pageLabel .sz{font-variant-numeric:tabular-nums;opacity:.75}",
+  ".dpd-pageLabel.active .pin{color:var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-el{position:absolute;box-sizing:border-box}",
+  ".dpd-el.dpd-container{outline:1px dashed rgba(99,102,241,.30);outline-offset:-1px}",
+  ".dpd-el.dpd-group{outline:1px dashed rgba(107,114,128,.28);outline-offset:-1px}",
+  ".dpd-canvas.dpd-preview .dpd-container,.dpd-canvas.dpd-preview .dpd-group{outline:none}",
+  ".dpd-el.dpd-sel{outline:1.5px solid var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-selBox{position:absolute;pointer-events:none;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);z-index:40}",
+  ".dpd-selBox.multi{border-style:dashed}",
+  ".dpd-multiBox{position:absolute;pointer-events:none;border:1px dashed var(--dsw-alias-brand-primary,#6366f1);z-index:39}",
+  ".dpd-handle{position:absolute;width:8px;height:8px;background:#fff;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);border-radius:2px;pointer-events:auto}",
+  ".dpd-handle.h-nw{left:-5px;top:-5px}",
+  ".dpd-handle.h-n{left:calc(50% - 4px);top:-5px}",
+  ".dpd-handle.h-ne{right:-5px;top:-5px}",
+  ".dpd-handle.h-e{right:-5px;top:calc(50% - 4px)}",
+  ".dpd-handle.h-se{right:-5px;bottom:-5px}",
+  ".dpd-handle.h-s{left:calc(50% - 4px);bottom:-5px}",
+  ".dpd-handle.h-sw{left:-5px;bottom:-5px}",
+  ".dpd-handle.h-w{left:-5px;top:calc(50% - 4px)}",
+  ".dpd-guide{position:absolute;background:#ff3d8b;z-index:70;pointer-events:none;box-shadow:0 0 0 .5px rgba(255,61,139,.18)}",
+  ".dpd-guide.v{width:1px}",
+  ".dpd-guide.h{height:1px}",
+  ".dpd-marquee{position:absolute;border:1px solid var(--dsw-alias-brand-primary,#6366f1);background:rgba(99,102,241,.08);z-index:65;pointer-events:none}",
+  ".dpd-section{border-top:1px solid var(--dsw-alias-border-l1,#e5e6eb);padding:8px 0 10px}",
+  ".dpd-row{display:flex;align-items:center;gap:8px;padding:5px 12px}",
+  ".dpd-row>label{width:56px;flex-shrink:0;font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280)}",
+  ".dpd-input{flex:1;min-width:0;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:6px;padding:4px 7px;color:inherit;font:inherit;font-size:12px}",
+  ".dpd-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-color{width:30px;height:24px;padding:0;border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:6px;background:transparent;cursor:pointer}",
+  ".dpd-numPair{display:flex;gap:6px;flex:1;min-width:0}",
+  ".dpd-numPair .dpd-field{flex:1;display:flex;align-items:center;gap:3px;min-width:0}",
+  ".dpd-numPair .dpd-field span{font-size:10.5px;color:var(--dsw-alias-label-secondary,#6b7280)}",
+  ".dpd-chips{display:flex;flex-wrap:wrap;gap:5px;padding:2px 12px 6px}",
+  ".dpd-alignGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:2px 12px 6px}",
+  ".dpd-alignBtn{border:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:6px;padding:5px 4px;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+  ".dpd-alignBtn:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-checkRow{display:flex;align-items:center;gap:7px;padding:5px 12px;font-size:12px;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer}",
+  ".dpd-chip{border:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:999px;padding:3px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap}",
+  ".dpd-chip:hover{border-color:var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-chip.active{background:var(--dsw-alias-brand-primary,#6366f1);color:#fff;border-color:transparent}",
+  ".dpd-actions{display:flex;gap:6px;padding:4px 12px 10px;flex-wrap:wrap}",
+  ".dpd-empty{padding:16px 14px;color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;line-height:1.6}",
+  ".dpd-layers{display:flex;flex-direction:column;gap:1px;padding:0 8px 12px;overflow:auto;flex:1;min-height:0}",
+  ".dpd-layer{display:flex;align-items:center;gap:7px;padding:6px 8px;cursor:pointer;font-size:12px;border-radius:6px;color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-layer:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
+  ".dpd-layer.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-layer .dot{width:14px;height:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;opacity:.85}",
+  ".dpd-layer .caret{width:10px;flex-shrink:0;font-size:10px;color:var(--dsw-alias-label-secondary,#6b7280);opacity:.8}",
+  ".dpd-layer .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+  ".dpd-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,.9);z-index:60;text-align:center;padding:24px}",
+  ".dpd-overlayTitle{font-size:15px;font-weight:600;color:#161a22}",
+  ".dpd-overlayDesc{font-size:12.5px;color:#6b7280;max-width:240px;line-height:1.5}",
+  ".dpd-spinner{width:28px;height:28px;border:3px solid rgba(99,102,241,.22);border-top-color:#6366f1;border-radius:50%;animation:dpd-spin .8s linear infinite}",
+  "@keyframes dpd-spin{to{transform:rotate(360deg)}}"
+].join("\n");
+function StyleBlock() {
+  return h("style", { dangerouslySetInnerHTML: { __html: CSS } });
+}
+
+// src/client/overlay.js
+function PageOverlay(props) {
+  const { pageState, t } = props;
+  if (pageState === "loading") {
+    return h(
+      "div",
+      { className: "dpd-overlay" },
+      h("div", { className: "dpd-spinner" }),
+      h("div", { className: "dpd-overlayDesc" }, t("overlay.loading"))
+    );
+  }
+  if (pageState === "empty") {
+    return h(
+      "div",
+      { className: "dpd-overlay" },
+      h(
+        Svg,
+        { size: 44, strokeWidth: 1.3, style: { color: "#b8bdc9" } },
+        h("rect", { x: 2, y: 2, width: 12, height: 12, rx: 2.5 }),
+        h("path", { d: "M5 8h6M8 5v6" })
+      ),
+      h("div", { className: "dpd-overlayTitle" }, t("overlay.emptyTitle")),
+      h("div", { className: "dpd-overlayDesc" }, t("overlay.emptyDesc"))
+    );
+  }
+  if (pageState === "error") {
+    return h(
+      "div",
+      { className: "dpd-overlay" },
+      h(
+        Svg,
+        { size: 44, strokeWidth: 1.3, style: { color: "#e5484d" } },
+        h("circle", { cx: 8, cy: 8, r: 6 }),
+        h("path", { d: "M8 5v4M8 11h.01" })
+      ),
+      h("div", { className: "dpd-overlayTitle" }, t("overlay.errorTitle")),
+      h("div", { className: "dpd-overlayDesc" }, t("overlay.errorDesc"))
+    );
+  }
+  return null;
 }
 
 // src/client/ui/canvas.js
@@ -4091,6 +4367,13 @@ function ProductDesignPanel() {
 var inject = ["slots", "layout"];
 function apply(ctx) {
   setAppCtx(ctx);
+  setCanvasOpener(() => {
+    try {
+      const layout = ctx.get("layout");
+      if (layout && typeof layout.selectPanel === "function") layout.selectPanel(PANEL_ID);
+    } catch (e) {
+    }
+  });
   let loc = null;
   try {
     loc = ctx.get("locale");
@@ -4120,6 +4403,7 @@ function apply(ctx) {
   }
   const slots = ctx.slots;
   const disposers = [];
+  disposers.push(registerProductDesignCards(ctx));
   disposers.push(
     slots.inject(
       "sidebar.panellist",
