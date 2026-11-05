@@ -9,6 +9,9 @@
 ### Added
 - README 增加画板截图：编辑器多画板、组件库、纯净预览。
 
+### Changed
+- `package.json` 的 `description` 改为中英文双语，与 GitHub About 保持一致。
+
 ## [1.1.0] - 2026-11-05
 
 ### Added

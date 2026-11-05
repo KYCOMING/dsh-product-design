@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "A simplified Figma-style product design canvas in the sidebar: compose interactive prototypes and preview component and page states.",
+  "description": "侧边栏里的「简化版 Figma」产品设计画布：多画板、可交互组件、AI 可编程文档与会话内预览。｜A simplified Figma-style product design canvas for DeepSeek Harness: multi-artboard canvas, interactive components, AI-programmable document, and in-chat previews.",
   "license": "MIT",
   "author": "KYCOMING",
   "repository": {
