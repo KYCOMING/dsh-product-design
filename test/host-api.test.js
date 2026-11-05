@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -292,6 +292,29 @@ describe('host API + tools', () => {
     const readB = await call('GET', `/dsh-product-design/api/doc?sessionId=${b}`);
     expect(readA.json.doc.name).toBe('Session A');
     expect(readB.json.doc.name).toBe('Session B');
+  });
+
+  it('sessionId 不能通过 .. 逃出 sessions 目录', async () => {
+    const before = await call('GET', '/dsh-product-design/api/doc?sessionId=..');
+    const res = await call('POST', '/dsh-product-design/api/doc?sessionId=..', {
+      baseRevision: before.json.revision,
+      doc: { name: 'traversal', pages: [] },
+    });
+    expect(res.status).toBe(200);
+    const safeFile = join(
+      home,
+      'storages',
+      'dsh-product-design',
+      'sessions',
+      'default',
+      'doc.json',
+    );
+    expect(existsSync(safeFile)).toBe(true);
+    expect(JSON.parse(readFileSync(safeFile, 'utf8')).doc.name).toBe('traversal');
+    const escapedFile = join(home, 'storages', 'dsh-product-design', 'doc.json');
+    if (existsSync(escapedFile)) {
+      expect(JSON.parse(readFileSync(escapedFile, 'utf8')).doc.name).not.toBe('traversal');
+    }
   });
 
   it('工具按执行会话读写各自的画布', async () => {

@@ -65,7 +65,10 @@ function safeSessionId(sessionId) {
   const value = String(sessionId || '')
     .replace(/[^a-zA-Z0-9._-]/g, '_')
     .slice(0, 120);
-  return value || 'default';
+  // `.` and `..` survive the character filter but are path segments, not names;
+  // letting them through would write outside the sessions directory.
+  if (!value || /^\.+$/.test(value)) return 'default';
+  return value;
 }
 
 function sessionDocFile(sessionId) {

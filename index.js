@@ -556,7 +556,8 @@ function docFile() {
 }
 function safeSessionId(sessionId) {
   const value = String(sessionId || "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
-  return value || "default";
+  if (!value || /^\.+$/.test(value)) return "default";
+  return value;
 }
 function sessionDocFile(sessionId) {
   return join(
