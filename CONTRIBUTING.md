@@ -35,8 +35,11 @@ pnpm install
 - 行为测试位于 `test/`，使用 vitest + jsdom / node；客户端测试加载构建后的 `client.js` 并挂载 React 组件验证真实交互，Host 测试直接导入 `src/host/index.js`。
 - 新增交互或修复 bug 时，应补充对应用例。
 
-## 发布（可选）
+## 发布
+
+当前只通过 GitHub 分发，不发布 npm；`package.json` 保留 `private: true` 是故意的。
 
 1. 更新 `CHANGELOG.md` 与 `package.json` 版本号（semver）。
-2. 打 tag：`git tag v1.x.x && git push --tags`。
-3. 如需发布 npm：将 `private` 改为 `false`，补齐 `repository` 后 `pnpm publish`。
+2. `pnpm run check`，确保 `client.js` / `index.js` 与 `src/` 同步。
+3. 提交后打 annotated tag：`git tag -a v1.x.x -m "v1.x.x"`，再 `git push origin v1.x.x`。
+4. 在 GitHub 创建 Release，说明安装命令与变更摘要。

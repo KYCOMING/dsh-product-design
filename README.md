@@ -4,6 +4,43 @@
 
 > DSH 插件（DeepSeek Harness）。客户端半由 `src/client` 构建为单文件模块，通过 `window.__ModuleLoader__` 挂载侧边栏入口与主页面。
 
+## 安装
+
+> 目前只通过 GitHub 分发，**未发布 npm**。`package.json` 保留 `private: true` 是故意的，避免误发布；GitHub 安装使用仓库里已提交的构建产物，不需要在本地构建，也不需要批准依赖构建脚本。
+
+```bash
+# Desktop
+dsh plugin --profile desktop add github:KYCOMING/dsh-product-design
+
+# Web
+dsh plugin --profile web add github:KYCOMING/dsh-product-design
+```
+
+没有 `dsh` 命令时：打开 **插件 → 添加插件**，输入 `github:KYCOMING/dsh-product-design`。
+
+安装后在「插件」页确认 `dsh-product-design` 已启用，然后重启 DSH（Host 半不会热加载）。侧边栏出现「产品设计」图标。
+
+卸载：
+
+```bash
+dsh plugin --profile desktop remove dsh-product-design
+```
+
+### 兼容性
+
+| DSH 版本 | 状态 |
+| --- | --- |
+| 0.2.2-rc.1 | ✅ 实测 |
+| 0.2.0-rc.1 – 0.2.x | ⚠️ `engines.dsh` 允许，未逐一实测 |
+| < 0.2.0 / >= 0.3.0 | ❌ 未声明支持 |
+
+### 权限与数据
+
+- 在 Host 进程内注册同源 HTTP 路由 `/dsh-product-design/api`，提供文档读写与 SSE 变更推送。
+- 设计稿写入 `<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`；浏览器端另用 `localStorage` 做缓存/离线兜底。
+- 注册两个 agent 工具（`product_design_get_document` / `product_design_apply`）、一段系统提示和 `/design` 命令。
+- 不发起外部网络请求，不收集遥测。
+
 ## 功能
 
 - **多画板并排**：所有页面横向排在可平移 / 缩放的画布上，每页独立尺寸（手机 390×844 / 平板 768×1024 / 桌面 1280×800）、背景与组件。
@@ -119,7 +156,7 @@ pnpm run check      # build + syntax + lint + test 一次跑完
 
 > `client.js`、`index.js` 是构建产物，**不要手改**；改 `src/**` 后 `pnpm run build`，刷新页面即可。改了 Host 半（`index.js`）需要重启 Harness 让宿主重新加载。
 
-插件通过 DSH profile 软链安装（`~/.dsh/profiles/desktop/node_modules/dsh-product-design -> 本目录`）。
+开发时可以把本目录链接进 profile（`dsh plugin --profile desktop add /absolute/path/to/dsh-product-design`）；公开安装方式见上文「安装」。
 
 ## 数据存储
 
@@ -131,8 +168,9 @@ pnpm run check      # build + syntax + lint + test 一次跑完
 ## 版本与发布
 
 - 语义化版本，变更记录见 [CHANGELOG.md](CHANGELOG.md)。
-- 当前 `private: true`，仅本地 profile 安装；如需发布 npm，改 `private: false` 并补充 `repository`。
-- 兼容性通过 `engines.dsh` 与 `peerDependencies.react` 约束。
+- 当前只通过 GitHub 分发，不发布 npm；`private: true` 是故意保留的。
+- 发布流程：更新 `CHANGELOG.md` 与 `package.json` → `pnpm run build` → 提交 → 打 annotated tag `vX.Y.Z` → `git push origin vX.Y.Z` → 创建 GitHub Release。
+- 兼容性通过 `engines.dsh` 约束；`peerDependencies.react` 由 DSH 客户端注入。
 
 ## 许可
 

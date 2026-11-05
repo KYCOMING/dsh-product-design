@@ -4,7 +4,7 @@
 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [1.1.0] - 2026-11-05
 
 ### Added
 - **多会话独立设计稿**：Host 按 `sessions/<sessionId>/doc.json` 存储；客户端跟随当前会话加载/保存，切换会话不会覆盖其他会话的设计稿。旧版全局 `doc.json` 自动迁移到首个打开画布的会话。
@@ -27,6 +27,11 @@
 
 ### Changed
 - **工程化重构**：源码迁入 `src/`（`src/client/*` 职责模块 + `src/client/ui/{toolbar,left,canvas,inspector}.js` 展示层 + `src/shared/*` 共用几何 + `src/host/{index,model}.js`），用 esbuild（`scripts/build.mjs`）打包回单文件 `client.js` / `index.js`；新增 `pnpm run build`，`pretest` 自动构建；Host 的 `host-model.js` 迁至 `src/host/model.js`。
+- **分发方式改为 GitHub 直装**：本版本不发布 npm，`package.json` 保留 `private: true`；README 补充 GitHub 安装、兼容性、权限与数据说明。
+- **兼容范围收窄**：`engines.dsh` 从 `>=0.1.6` 调整为 `>=0.2.0-rc.1 <0.3.0-0`，与实测的 DSH 0.2.2-rc.1 对齐。
+
+### Fixed
+- 修复 `sessionId` 路径穿越：`.` / `..` 不再能作为会话目录名，避免请求把文档写到 `sessions` 目录之外。
 
 ## [1.0.0] - 2026-11-04
 
