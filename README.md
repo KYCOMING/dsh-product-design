@@ -53,6 +53,10 @@ dsh plugin --profile desktop remove dsh-product-design
 
 ![组件库](docs/screenshots/editor-components.png)
 
+### 导出：PNG / 单文件 HTML / React + Tailwind
+
+![导出](docs/screenshots/editor-export.png)
+
 ### 纯净预览：隐藏编辑器 UI，只保留产品画板
 
 ![预览模式](docs/screenshots/preview.png)

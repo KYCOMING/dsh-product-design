@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-05
+
+首个「会话标签页」版本。文档格式升到 v3，旧稿不再读取；同时补齐编辑手感、原型交互、约束 / Auto Layout 与三种导出。
+
 ### Added
 - **产品设计改为会话视图标签**：注册 `conversation.view`（id `dsh-product-design`，order 20），与 Chat / Trajectory 并列在会话顶部；移除 `sidebar.panellist` 入口，不再出现「选中会话→点侧边栏→跳走」的割裂感。视图内提供「全屏」进入独立画布，全屏提供「返回会话」。
 - **导出 PNG**：当前页按 1× / 2× 光栅化，使用模型渲染 → SVG `foreignObject` → canvas，无第三方依赖。
