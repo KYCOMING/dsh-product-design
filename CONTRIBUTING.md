@@ -21,7 +21,7 @@ pnpm install
    - `feat: 新增页面拖拽排序`
    - `fix: 修复窄侧栏组件库溢出`
    - `docs:` / `refactor:` / `test:` / `chore:`
-4. 提交 PR（`client.js` / `index.js` 是构建产物，需一并提交），CI 必须通过。
+4. 提交 PR（`dist/client.js` / `dist/index.js` 是构建产物，需一并提交），CI 必须通过。
 
 ## 代码约定
 

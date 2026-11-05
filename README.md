@@ -130,7 +130,7 @@ dsh plugin --profile desktop remove dsh-product-design
 
 ## 架构
 
-双半插件：`src/` 是源码，根目录 `client.js` / `index.js` 是 esbuild 产出的**可加载单文件**（DSH 客户端只接受单文件模块，git 安装也不会在本地构建）。这两个文件文件头带 `AUTO-GENERATED` 横幅，**不要手改**；改 `src/` 后跑 `pnpm run build`。
+双半插件：`src/` 是源码，`dist/client.js` / `dist/index.js` 是 esbuild 产出的**可加载单文件**（DSH 客户端只接受单文件模块，git 安装也不会在本地构建）。这两个文件文件头带 `AUTO-GENERATED` 横幅，**不要手改**；改 `src/` 后跑 `pnpm run build`。
 
 ```text
 dsh-product-design/
@@ -187,8 +187,8 @@ dsh-product-design/
 │     ├─ prompt.js            # 模型提示
 │     ├─ command.js           # /design 命令
 │     └─ model.js             # 文档 reducer（纯函数）
-├─ scripts/build.mjs          # esbuild：src → client.js + index.js
-├─ client.js   index.js       # 构建产物（提交入库，loader 直接读；勿手改）
+├─ scripts/build.mjs          # esbuild：src → dist/client.js + dist/index.js
+├─ dist/client.js  dist/index.js  # 构建产物（提交入库，loader 直接读；勿手改）
 ├─ cordis.patch.yml
 ├─ locale/{zh,en}.json
 ├─ icon.svg
@@ -196,8 +196,8 @@ dsh-product-design/
 └─ package.json
 ```
 
-- `client.js`：esbuild `format=cjs` 打包后，用 `window.__ModuleLoader__.load({ id, factory })` 包装；`react` 保持 external，由 loader 的 `require('react')` 注入。
-- `index.js`：esbuild 打 Node ESM（内联 `src/host/model.js`）。
+- `dist/client.js`：esbuild `format=cjs` 打包后，用 `window.__ModuleLoader__.load({ id, factory })` 包装；`react` 保持 external，由 loader 的 `require('react')` 注入。
+- `dist/index.js`：esbuild 打 Node ESM（内联 `src/host/model.js`）。
 - 分层约定：
   - **domain/**：纯函数，输入输出都是文档对象，不依赖 React / DOM / 存储。改文档语义只改这里。
   - **editor/**：React hooks，持有状态与副作用（历史、Host 同步、手势、预览），调用 domain。
@@ -229,13 +229,13 @@ dsh-product-design/
 
 ```bash
 pnpm install
-pnpm run build      # src/ → client.js + index.js（改完 src 必须重新构建）
+pnpm run build      # src/ → dist/client.js + dist/index.js（改完 src 必须重新构建）
 pnpm run test       # vitest（pretest 会自动 build）
 pnpm run lint       # biome 检查 src / scripts / test
 pnpm run check      # build + syntax + lint + test 一次跑完
 ```
 
-> `client.js`、`index.js` 是构建产物，**不要手改**；改 `src/**` 后 `pnpm run build`，刷新页面即可。改了 Host 半（`index.js`）需要重启 Harness 让宿主重新加载。
+> `dist/client.js`、`dist/index.js` 是构建产物，**不要手改**；改 `src/**` 后 `pnpm run build`，刷新页面即可。改了 Host 半（`dist/index.js`）需要重启 Harness 让宿主重新加载。
 
 开发时可以把本目录链接进 profile（`dsh plugin --profile desktop add /absolute/path/to/dsh-product-design`）；公开安装方式见上文「安装」。
 

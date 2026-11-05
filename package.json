@@ -24,15 +24,14 @@
     "prototype"
   ],
   "exports": {
-    ".": "./index.js",
-    "./client": "./client.js",
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
-    "index.js",
-    "client.js",
     "cordis.patch.yml",
+    "dist",
     "locale/*.json",
     "icon.svg",
     "src",
@@ -53,10 +52,10 @@
     "pretest": "node scripts/build.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "syntax": "node --check client.js && node --check index.js",
+    "syntax": "node --check dist/client.js && node --check dist/index.js",
     "lint": "biome check src scripts test vitest.config.mjs",
     "format": "biome format --write src scripts test vitest.config.mjs",
-    "check": "node scripts/build.mjs && node --check client.js && node --check index.js && biome check src scripts test vitest.config.mjs && vitest run",
+    "check": "node scripts/build.mjs && node --check dist/client.js && node --check dist/index.js && biome check src scripts test vitest.config.mjs && vitest run",
     "screenshots": "node scripts/screenshots.mjs",
     "prepack": "node scripts/build.mjs"
   },
@@ -80,5 +79,6 @@
         "@deepseek-ai/dsh-client-locale"
       ]
     }
-  }
+  },
+  "main": "./dist/index.js"
 }

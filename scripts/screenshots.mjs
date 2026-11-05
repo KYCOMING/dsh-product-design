@@ -227,7 +227,7 @@ fs.writeFileSync(
       '__REACT_DOM__',
       pathToFileURL(path.join(root, 'node_modules/react-dom/umd/react-dom.production.min.js')).href,
     )
-    .replace('__CLIENT__', pathToFileURL(path.join(root, 'client.js')).href),
+    .replace('__CLIENT__', pathToFileURL(path.join(root, 'dist/client.js')).href),
   'utf8',
 );
 const harnessUrl = pathToFileURL(harnessFile).href;

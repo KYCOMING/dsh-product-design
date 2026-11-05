@@ -9,9 +9,8 @@ node_modules/
 .data/
 .state/
 
-# stray build output (the plugin bundles are committed as client.js / index.js)
+# stray build output (the plugin bundles are committed under dist/)
 lib/
-dist/
 
 # test / tooling caches
 coverage/

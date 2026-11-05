@@ -54,7 +54,7 @@ function call(method, url, body) {
 beforeAll(async () => {
   home = mkdtempSync(join(tmpdir(), 'dpd-host-'));
   process.env.DSH_HOME = home;
-  const mod = await import('../index.js');
+  const mod = await import('../dist/index.js');
   apply = mod.apply;
   const scopeTools = {
     register(tool) {

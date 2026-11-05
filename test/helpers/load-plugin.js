@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import React from 'react';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const CLIENT_PATH = path.resolve(here, '../../client.js');
+const CLIENT_PATH = path.resolve(here, '../../dist/client.js');
 
 /**
  * Load the browser half of the plugin the same way the DSH client loader does:

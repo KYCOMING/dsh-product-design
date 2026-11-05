@@ -27,7 +27,7 @@ jobs:
         run: pnpm run build
 
       - name: Verify committed bundles are current
-        run: git diff --exit-code -- client.js index.js
+        run: git diff --exit-code -- dist/client.js dist/index.js
 
       - name: Syntax check
         run: pnpm run syntax

@@ -1,4 +1,4 @@
 # Build artifacts: generated from src/ by scripts/build.mjs.
 # GitHub collapses these in diffs and labels them as generated.
-client.js linguist-generated=true
-index.js linguist-generated=true
+dist/client.js linguist-generated=true
+dist/index.js linguist-generated=true
