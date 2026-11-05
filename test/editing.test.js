@@ -186,6 +186,32 @@ describe('编辑行为', () => {
     expect(Math.abs(doc().pages[0].elements[0].h - beforeH)).toBeLessThanOrEqual(2);
   });
 
+  it('「缩放内容以适配画板」把内容拉回铺满', async () => {
+    // 先关掉自动缩放并切到桌面，模拟「内容卡在左上角」的状态
+    const checkbox = Array.from(container.querySelectorAll('.dpd-checkRow input')).find(
+      (input) => input.type === 'checkbox',
+    );
+    await act(async () => {
+      checkbox.click();
+    });
+    const select = container.querySelector('select.dpd-select');
+    await act(async () => {
+      const desc = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+      if (desc?.set) desc.set.call(select, 'desktop');
+      else select.value = 'desktop';
+      select.dispatchEvent(new window.Event('change', { bubbles: true }));
+    });
+    const before = doc().pages[0].elements[0];
+    expect(doc().pages[0].frame.w).toBe(1280);
+    expect(before.w).toBeLessThan(500);
+
+    await click(btnText('缩放内容以适配画板'));
+    const page = doc().pages[0];
+    const maxX = Math.max(...page.elements.map((e) => e.x + e.w));
+    expect(Math.abs(maxX - page.frame.w)).toBeLessThanOrEqual(2);
+    expect(doc().pages[0].elements[0].w).toBeGreaterThan(before.w);
+  });
+
   it('关闭「缩放内容」后切画板尺寸不改变元素', async () => {
     const select = container.querySelector('select.dpd-select');
     const checkbox = Array.from(container.querySelectorAll('.dpd-checkRow input')).find(

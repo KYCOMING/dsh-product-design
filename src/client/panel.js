@@ -1008,6 +1008,33 @@ function ProductDesignPanel() {
       }),
     }));
   }
+  function fitContentToFrame() {
+    const page = docRef.current.pages.find((p) => p.id === docRef.current.activePageId);
+    if (!page || !page.elements.length) return;
+    const bounds = boundsOfEntries(collectElementEntries(page.elements));
+    if (!bounds || bounds.w <= 0 || bounds.h <= 0) return;
+    const sx = page.frame.w / bounds.w;
+    const sy = page.frame.h / bounds.h;
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) =>
+        p.id === page.id
+          ? {
+              ...p,
+              elements: scaleElementsInTree(
+                p.elements,
+                sx,
+                sy,
+                Math.min(sx, sy),
+                bounds.x,
+                bounds.y,
+              ),
+            }
+          : p,
+      ),
+    }));
+  }
+
   function patchActiveFrame(patch) {
     setDoc(
       (d) => ({
@@ -1769,6 +1796,7 @@ function ProductDesignPanel() {
             pageState,
             scaleOnResize,
             setScaleOnResize,
+            fitContentToFrame,
             setEl,
             applyAttrs,
             applyProps,

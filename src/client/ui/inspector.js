@@ -18,6 +18,7 @@ export function InspectorView(props) {
     pageState,
     scaleOnResize,
     setScaleOnResize,
+    fitContentToFrame,
     setPreset,
     renameActivePage,
     patchActiveFrame,
@@ -577,6 +578,15 @@ export function InspectorView(props) {
             onChange: (e) => setScaleOnResize(e.target.checked),
           }),
           t('inspector.scaleOnResize'),
+        ),
+        h(
+          'div',
+          { className: 'dpd-actions' },
+          h(
+            'button',
+            { className: 'dpd-btn', type: 'button', onClick: fitContentToFrame },
+            t('inspector.fitContent'),
+          ),
         ),
       ),
       stateKeys

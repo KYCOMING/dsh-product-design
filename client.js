@@ -545,6 +545,7 @@ var DICT = {
     "inspector.stateDesc": "\u8BF4\u660E",
     "inspector.stateAction": "\u6309\u94AE\u6587\u6848",
     "inspector.scaleOnResize": "\u5207\u6362\u753B\u677F\u5C3A\u5BF8\u65F6\u7F29\u653E\u5185\u5BB9",
+    "inspector.fitContent": "\u7F29\u653E\u5185\u5BB9\u4EE5\u9002\u914D\u753B\u677F",
     "inspector.multiHint": "\u4FEE\u6539\u4F1A\u5E94\u7528\u5230\u5168\u90E8\u9009\u4E2D\u56FE\u5C42",
     "textEdit.hint": "Enter \u6362\u884C \xB7 Esc \u53D6\u6D88",
     "preview.back": "\u8FD4\u56DE",
@@ -704,6 +705,7 @@ var DICT = {
     "inspector.stateDesc": "Description",
     "inspector.stateAction": "Button label",
     "inspector.scaleOnResize": "Scale content when the frame resizes",
+    "inspector.fitContent": "Fit content to frame",
     "inspector.multiHint": "Changes apply to every selected layer",
     "textEdit.hint": "Enter for newline \xB7 Esc to cancel",
     "preview.back": "Back",
@@ -2769,6 +2771,7 @@ function InspectorView(props) {
     pageState,
     scaleOnResize,
     setScaleOnResize,
+    fitContentToFrame,
     setPreset,
     renameActivePage,
     patchActiveFrame,
@@ -3302,6 +3305,15 @@ function InspectorView(props) {
             onChange: (e) => setScaleOnResize(e.target.checked)
           }),
           t("inspector.scaleOnResize")
+        ),
+        h(
+          "div",
+          { className: "dpd-actions" },
+          h(
+            "button",
+            { className: "dpd-btn", type: "button", onClick: fitContentToFrame },
+            t("inspector.fitContent")
+          )
         )
       ),
       stateKeys ? h(
@@ -4772,6 +4784,30 @@ function ProductDesignPanel() {
       })
     }));
   }
+  function fitContentToFrame() {
+    const page = docRef.current.pages.find((p) => p.id === docRef.current.activePageId);
+    if (!page || !page.elements.length) return;
+    const bounds = boundsOfEntries(collectElementEntries(page.elements));
+    if (!bounds || bounds.w <= 0 || bounds.h <= 0) return;
+    const sx = page.frame.w / bounds.w;
+    const sy = page.frame.h / bounds.h;
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map(
+        (p) => p.id === page.id ? {
+          ...p,
+          elements: scaleElementsInTree(
+            p.elements,
+            sx,
+            sy,
+            Math.min(sx, sy),
+            bounds.x,
+            bounds.y
+          )
+        } : p
+      )
+    }));
+  }
   function patchActiveFrame(patch) {
     setDoc(
       (d) => ({
@@ -5477,6 +5513,7 @@ function ProductDesignPanel() {
         pageState,
         scaleOnResize,
         setScaleOnResize,
+        fitContentToFrame,
         setEl,
         applyAttrs,
         applyProps,
