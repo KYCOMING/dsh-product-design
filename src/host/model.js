@@ -25,7 +25,7 @@ import {
 } from '../shared/elements.js';
 import { normalizeConstraints, normalizeLayout, reflowPage, resizePage } from '../shared/layout.js';
 
-export const ELEMENT_TYPES = {
+const ELEMENT_TYPES = {
   container: [320, 240],
   group: [200, 120],
   button: [132, 44],
@@ -42,7 +42,7 @@ export const ELEMENT_TYPES = {
   select: [220, 44],
 };
 
-export const ELEMENT_STATES = {
+const ELEMENT_STATES = {
   container: ['default'],
   group: ['default'],
   button: ['default', 'hover', 'active', 'disabled'],
@@ -58,9 +58,6 @@ export const ELEMENT_STATES = {
   badge: ['default'],
   select: ['default', 'open', 'disabled'],
 };
-
-/** Page-level preview states. Each one carries its own editable copy. */
-export const PAGE_STATES = ['normal', 'loading', 'empty', 'error'];
 
 const PRESETS = {
   mobile: [390, 844],
@@ -121,7 +118,7 @@ export function emptyDoc() {
   return { name: '', pages: [], activePageId: null };
 }
 
-export function defaultStateFor(type) {
+function defaultStateFor(type) {
   if (type === 'toggle') return 'on';
   if (type === 'checkbox') return 'unchecked';
   return 'default';

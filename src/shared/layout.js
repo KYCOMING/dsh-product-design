@@ -14,10 +14,9 @@ import { isContainer, scaleElementsInTree } from './elements.js';
 
 export const H_MODES = ['left', 'right', 'leftRight', 'center', 'scale'];
 export const V_MODES = ['top', 'bottom', 'topBottom', 'center', 'scale'];
-export const RESIZE_MODES = ['constraints', 'scale', 'none'];
-export const ALIGN_MODES = ['start', 'center', 'end', 'stretch'];
-export const JUSTIFY_MODES = ['start', 'center', 'end', 'between'];
-export const DIRECTIONS = ['row', 'column'];
+const ALIGN_MODES = ['start', 'center', 'end', 'stretch'];
+const JUSTIFY_MODES = ['start', 'center', 'end', 'between'];
+const DIRECTIONS = ['row', 'column'];
 
 /** Types that span the frame width by default, so they stretch with it. */
 const STRETCH_TYPES = ['navbar', 'tabs', 'card', 'image', 'input', 'container', 'group'];
@@ -99,10 +98,6 @@ export function resizeElement(el, oldW, oldH, newW, newH) {
   return { ...out, children: kids };
 }
 
-function sameBox(a, b) {
-  return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
-}
-
 /** Stack children inside a container according to its layout. */
 function layoutChildren(container) {
   const l = normalizeLayout(container.layout);
@@ -155,7 +150,7 @@ function layoutChildren(container) {
 }
 
 /** Reflow one element subtree (children first, then this container). */
-export function reflowElement(el) {
+function reflowElement(el) {
   if (!isContainer(el) || !Array.isArray(el.children)) return el;
   const kids = el.children.map(reflowElement);
   const kidsChanged = kids.some((kid, i) => kid !== el.children[i]);
@@ -165,7 +160,7 @@ export function reflowElement(el) {
   return { ...base, children: laid };
 }
 
-export function reflowElements(elements) {
+function reflowElements(elements) {
   const out = elements.map(reflowElement);
   return out.some((el, i) => el !== elements[i]) ? out : elements;
 }

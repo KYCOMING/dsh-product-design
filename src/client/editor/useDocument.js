@@ -18,7 +18,7 @@ function sameDoc(a, b) {
   if (a === b) return true;
   try {
     return JSON.stringify(a) === JSON.stringify(b);
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -233,7 +233,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
           let data = null;
           try {
             data = JSON.parse(evt.data);
-          } catch (e) {
+          } catch {
             data = null;
           }
           if (
@@ -250,7 +250,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
             adoptRemoteDoc(nd);
           });
         };
-      } catch (e) {
+      } catch {
         /* EventSource unavailable */
       }
     })();
@@ -259,7 +259,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
       if (source) {
         try {
           source.close();
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       }

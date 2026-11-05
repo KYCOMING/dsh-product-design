@@ -22,6 +22,8 @@
 - 新增回归测试：就地编辑、图层显隐、剪贴板、右键删除、原型跳转/弹层、AI 改动撤销。
 
 ### Changed
+- **清理死代码**：删除 `childrenOf`、`stackParentOf`、`PAGE_STATES`、`RESIZE_MODES`、`sameBox` 等未被引用的声明；把 26 个仅内部使用的导出收口为非导出；清理 30+ 处未使用的 `catch` 绑定、未使用导入/变量与未使用的默认导出。审计结果：无未被引用的文件、i18n key、CSS 选择器或图标。
+- **构建产物标记**：`index.js` / `client.js` 文件头加 `AUTO-GENERATED` 横幅，新增 `.gitattributes` 标记为 generated，避免被误认为手写源码。
 - **工程结构重构（无行为变化）**：客户端按 `domain/`（纯文档变换，无 React/DOM）→ `editor/`（状态与行为 hooks，一个关注点一个文件）→ `ui/`（纯展示）→ `panel.js`（组合根，1964 → 448 行）分层；Host 拆为 `paths / store / http / tools / preview / prompt / command / model` 八个模块，`index.js` 只做装配。新增的编辑命令按「domain 纯变换 → editor 命令 → ui 调用」添加。
 - **文档格式升到 v3（破坏性，不做兼容）**：元素新增 `name / hidden / locked / opacity / interactions`，页面新增 `states`；localStorage 键改为 `dsh-product-design:doc:v3`。移除 v1→v2 迁移、半宽文档自愈 `repairDoc`、旧全局 `doc.json` 迁移等全部兼容代码。
 - **「缩放内容以适配画板」**：右侧「画布设置」新增按钮，把内容按包围盒缩放并平移回铺满画板，用于修复已经卡在角落的设计稿。

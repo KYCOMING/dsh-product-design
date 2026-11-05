@@ -11,7 +11,6 @@ import {
   cloneElementDeep,
   collectElementEntries,
   findElementEntry,
-  isContainerType,
   moveElementInTree,
   reorderInTree,
   scaleElementsInTree,
@@ -24,11 +23,11 @@ export function activePageOf(doc) {
   return doc.pages.find((page) => page.id === doc.activePageId) || doc.pages[0] || null;
 }
 
-export function mapPage(doc, pageId, fn) {
+function mapPage(doc, pageId, fn) {
   return { ...doc, pages: doc.pages.map((page) => (page.id === pageId ? fn(page) : page)) };
 }
 
-export function mapElements(doc, pageId, fn) {
+function mapElements(doc, pageId, fn) {
   return mapPage(doc, pageId, (page) => ({ ...page, elements: fn(page.elements) }));
 }
 
@@ -310,12 +309,3 @@ export function distributeEntries(doc, pageId, entries, axis) {
 export function reflow(doc) {
   return { ...doc, pages: doc.pages.map(reflowPage) };
 }
-
-/** Is the element nested inside a container with auto layout? */
-export function stackParentOf(elements, id) {
-  const entry = findElementEntry(elements, id);
-  if (!entry || !entry.parent) return null;
-  return entry.parent.layout && entry.parent.layout.mode === 'stack' ? entry : null;
-}
-
-export { isContainerType };

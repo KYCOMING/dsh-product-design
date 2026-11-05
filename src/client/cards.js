@@ -14,8 +14,8 @@ import { useT } from './i18n.js';
 import { h } from './react.js';
 import { renderWidget } from './widgets.js';
 
-export const PRODUCT_DESIGN_META_KIND = 'product-design';
-export const PRODUCT_DESIGN_TURN_KEY = 'product-design';
+const PRODUCT_DESIGN_META_KIND = 'product-design';
+const PRODUCT_DESIGN_TURN_KEY = 'product-design';
 
 let canvasOpener = () => {};
 
@@ -27,7 +27,7 @@ export function setCanvasOpener(fn) {
 function openCanvas() {
   try {
     canvasOpener();
-  } catch (e) {
+  } catch {
     /* the layout service may be absent in a non-Web host */
   }
 }
@@ -93,13 +93,13 @@ export const turnCardsDefinition = {
 };
 
 /** Cards accumulated before the closing assistant message of a turn. */
-export function cardsBefore(turn, seq) {
+function cardsBefore(turn, seq) {
   const cards = (turn && turn.data && turn.data.get(PRODUCT_DESIGN_TURN_KEY)?.cards) || [];
   return cards.filter((card) => card.seq < seq);
 }
 
 /** Chain selector compatible with the turn-tail slot's older shape. */
-export function selectTurnCards(owner) {
+function selectTurnCards(owner) {
   if (!owner) return null;
   const cards = cardsBefore(owner.turn, owner.seq);
   return cards.length ? cards : null;
@@ -260,7 +260,7 @@ export function ProductDesignCard(props) {
 }
 
 /** Turn-tail list of product cards. */
-export function ProductDesignCards(props) {
+function ProductDesignCards(props) {
   const cards = cardsBefore(props.turn, props.seq);
   if (!cards.length) return null;
   return h(
@@ -301,7 +301,7 @@ export function registerProductDesignCards(ctx) {
         ),
       );
     }
-  } catch (e) {
+  } catch {
     /* slot not declared in this host */
   }
   try {
@@ -314,14 +314,14 @@ export function registerProductDesignCards(ctx) {
         }
       });
     }
-  } catch (e) {
+  } catch {
     /* conversation event registry not available */
   }
   return () => {
     for (const dispose of disposers.splice(0)) {
       try {
         dispose();
-      } catch (e) {
+      } catch {
         /* ignore */
       }
     }

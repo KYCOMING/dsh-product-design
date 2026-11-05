@@ -174,7 +174,7 @@ function loadDoc(sessionId) {
     const raw = window.localStorage.getItem(docStorageKey(sessionId));
     if (!raw) return null;
     return normalizeDoc(JSON.parse(raw));
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -182,7 +182,7 @@ function loadDoc(sessionId) {
 function saveDoc(doc, sessionId) {
   try {
     window.localStorage.setItem(docStorageKey(sessionId), JSON.stringify(doc));
-  } catch (e) {
+  } catch {
     /* quota / private mode: ignore */
   }
 }
@@ -191,7 +191,7 @@ function loadUi() {
   try {
     const raw = window.localStorage.getItem(UI_KEY);
     return raw ? JSON.parse(raw) || {} : {};
-  } catch (e) {
+  } catch {
     return {};
   }
 }
@@ -199,7 +199,7 @@ function loadUi() {
 function saveUi(ui) {
   try {
     window.localStorage.setItem(UI_KEY, JSON.stringify(ui));
-  } catch (e) {
+  } catch {
     /* ignore */
   }
 }
@@ -220,7 +220,7 @@ function apiFetch(path, init, sessionId) {
       target,
       window.location && window.location.href ? window.location.href : 'http://localhost/',
     ).toString();
-  } catch (e) {
+  } catch {
     return Promise.resolve(null);
   }
   const opts = Object.assign({}, init);
@@ -231,7 +231,7 @@ function apiFetch(path, init, sessionId) {
   ) {
     try {
       opts.signal = AbortSignal.timeout(4000);
-    } catch (e) {
+    } catch {
       /* ignore */
     }
   }
@@ -242,7 +242,7 @@ function apiFetch(path, init, sessionId) {
         if (text) {
           try {
             body = JSON.parse(text);
-          } catch (e) {
+          } catch {
             body = null;
           }
         }
@@ -260,11 +260,7 @@ export {
   loadUi,
   makeEl,
   normalizeDoc,
-  normalizeElement,
-  normalizeElements,
-  normalizeStates,
   saveDoc,
   saveUi,
-  starterElements,
   uid,
 };

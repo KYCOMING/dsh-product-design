@@ -40,4 +40,4 @@ function sessionDocFile(sessionId) {
   );
 }
 
-export { dshHome, safeSessionId, sessionDocFile };
+export { safeSessionId, sessionDocFile };

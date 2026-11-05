@@ -164,4 +164,4 @@ function StyleBlock() {
   return h('style', { dangerouslySetInnerHTML: { __html: CSS } });
 }
 
-export { CSS, StyleBlock };
+export { StyleBlock };

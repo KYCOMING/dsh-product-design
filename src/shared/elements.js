@@ -16,10 +16,6 @@ export function isContainer(el) {
   return !!el && isContainerType(el.type);
 }
 
-export function childrenOf(el) {
-  return isContainer(el) && Array.isArray(el.children) ? el.children : [];
-}
-
 /**
  * Flatten a page element tree into entries carrying the parent context.
  * @returns {Array<{el:object,parent:object|null,ancestors:string[],list:object[],index:number,depth:number,absX:number,absY:number,w:number,h:number}>}
@@ -224,7 +220,7 @@ export function extractFromTree(elements, id) {
  * Insert `node` relative to `targetId`: before / after it, or as its last child.
  * @returns {object[]} the new root list (unchanged when the target is missing)
  */
-export function insertIntoTree(elements, targetId, node, position) {
+function insertIntoTree(elements, targetId, node, position) {
   let inserted = false;
   const walk = (list) => {
     const out = [];

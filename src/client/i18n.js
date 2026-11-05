@@ -412,7 +412,7 @@ function activeLocale() {
   try {
     const loc = APP_CTX && APP_CTX.get('locale');
     return loc ? loc.getLocale().active : 'zh';
-  } catch (e) {
+  } catch {
     return 'zh';
   }
 }
@@ -423,7 +423,7 @@ function useT() {
     let loc = null;
     try {
       loc = APP_CTX && APP_CTX.get('locale');
-    } catch (e) {
+    } catch {
       loc = null;
     }
     if (!loc || typeof loc.subscribe !== 'function') return undefined;
@@ -434,7 +434,7 @@ function useT() {
   try {
     const loc = APP_CTX && APP_CTX.get('locale');
     if (loc) bound = loc.bind(NS);
-  } catch (e) {
+  } catch {
     bound = null;
   }
   return useCallback(
@@ -443,7 +443,7 @@ function useT() {
         try {
           const out = bound(key);
           if (out && out !== key) return out;
-        } catch (e) {
+        } catch {
           /* fall through */
         }
       }
@@ -453,4 +453,4 @@ function useT() {
   );
 }
 
-export { activeLocale, DICT, isZh, pickDict, useT };
+export { activeLocale, DICT, pickDict, useT };

@@ -34,4 +34,4 @@ function registerPrompt(ctx) {
   });
 }
 
-export { GUIDANCE, registerPrompt };
+export { registerPrompt };

@@ -109,7 +109,7 @@ dsh plugin --profile desktop remove dsh-product-design
 
 ## 架构
 
-双半插件：`src/` 是源码，`client.js` / `index.js` 是 esbuild 产出的**可加载单文件**（DSH 客户端只接受单文件模块）。
+双半插件：`src/` 是源码，根目录 `client.js` / `index.js` 是 esbuild 产出的**可加载单文件**（DSH 客户端只接受单文件模块，git 安装也不会在本地构建）。这两个文件文件头带 `AUTO-GENERATED` 横幅，**不要手改**；改 `src/` 后跑 `pnpm run build`。
 
 ```text
 dsh-product-design/

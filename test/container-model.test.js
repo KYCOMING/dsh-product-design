@@ -134,7 +134,6 @@ describe('host 容器 / 编组', () => {
     ]).doc;
     const box = scaled.pages[0].elements[0];
     const sx = 390 / 1280;
-    const sy = 844 / 800;
     expect(box.w).toBe(Math.max(12, Math.round(200 * sx)));
     expect(box.children[0].w).toBe(Math.max(12, Math.round(50 * sx)));
   });

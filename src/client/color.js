@@ -22,4 +22,4 @@ function rgba(hex, a) {
   return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
 }
 
-export { hexToRgb, rgba, shade };
+export { rgba, shade };

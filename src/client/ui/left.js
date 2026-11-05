@@ -279,7 +279,7 @@ export function LeftView(props) {
                   try {
                     e.dataTransfer.effectAllowed = 'move';
                     e.dataTransfer.setData('text/plain', el.id);
-                  } catch (err) {
+                  } catch {
                     /* ignore */
                   }
                 },

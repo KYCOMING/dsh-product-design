@@ -13,19 +13,19 @@ export function setSessionSource(next) {
   for (const listener of adapterListeners) {
     try {
       listener();
-    } catch (e) {
+    } catch {
       /* one broken listener must not block the rest */
     }
   }
 }
 
-export function currentSessionId() {
+function currentSessionId() {
   try {
     const current = adapter && adapter.current;
     const snapshot =
       current && typeof current.getSnapshot === 'function' ? current.getSnapshot() : null;
     return snapshot && typeof snapshot.key === 'string' ? snapshot.key : '';
-  } catch (e) {
+  } catch {
     return '';
   }
 }
@@ -38,7 +38,7 @@ export function useSessionId() {
       if (typeof unsubscribe === 'function') {
         try {
           unsubscribe();
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       }
@@ -49,7 +49,7 @@ export function useSessionId() {
         if (current && typeof current.subscribe === 'function') {
           unsubscribe = current.subscribe(() => setId(currentSessionId()));
         }
-      } catch (e) {
+      } catch {
         /* uiSession unavailable */
       }
     };
@@ -60,7 +60,7 @@ export function useSessionId() {
       if (typeof unsubscribe === 'function') {
         try {
           unsubscribe();
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       }

@@ -9,7 +9,7 @@ node_modules/
 .data/
 .state/
 
-# build output (reserved for a future bundler step)
+# stray build output (the plugin bundles are committed as client.js / index.js)
 lib/
 dist/
 

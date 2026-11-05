@@ -13,7 +13,7 @@ export function apply(ctx) {
     try {
       const service = (scope && scope.get && scope.get('uiSession')) || ctx.get('uiSession');
       if (service && service.adapter) setSessionSource(service.adapter);
-    } catch (e) {
+    } catch {
       /* uiSession unavailable */
     }
   };
@@ -23,7 +23,7 @@ export function apply(ctx) {
     try {
       const layout = ctx.get('layout');
       if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID);
-    } catch (e) {
+    } catch {
       /* layout service unavailable */
     }
   });
@@ -31,7 +31,7 @@ export function apply(ctx) {
   let loc = null;
   try {
     loc = ctx.get('locale');
-  } catch (e) {
+  } catch {
     loc = null;
   }
   if (loc && typeof loc.register === 'function') {
@@ -39,19 +39,19 @@ export function apply(ctx) {
       const disposes = [];
       try {
         disposes.push(loc.register(NS, 'zh', DICT.zh));
-      } catch (e) {
+      } catch {
         /* occupied */
       }
       try {
         disposes.push(loc.register(NS, 'en', DICT.en));
-      } catch (e) {
+      } catch {
         /* occupied */
       }
       return () => {
         for (const d of disposes) {
           try {
             d();
-          } catch (e) {
+          } catch {
             /* ignore */
           }
         }
@@ -93,7 +93,7 @@ export function apply(ctx) {
     for (const d of disposers.splice(0)) {
       try {
         d();
-      } catch (e) {
+      } catch {
         /* ignore */
       }
     }
