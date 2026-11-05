@@ -3510,7 +3510,10 @@ async function renderPagePng(page, ctx, scale = 2) {
   if (typeof document === "undefined") throw new Error("png export requires a browser");
   if (document.fonts && document.fonts.ready) {
     try {
-      await document.fonts.ready;
+      await Promise.race([
+        document.fonts.ready,
+        new Promise((resolve) => setTimeout(resolve, 500))
+      ]);
     } catch {
     }
   }
@@ -3519,37 +3522,39 @@ async function renderPagePng(page, ctx, scale = 2) {
   const h2 = Math.max(1, Math.round(frame.h));
   const factor = Math.max(1, Math.min(4, Number(scale) || 1));
   const svg = buildSvg(page, ctx, factor);
-  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-  try {
-    let image;
+  const dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  const image = await loadImage(dataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = w * factor;
+  canvas.height = h2 * factor;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("canvas unavailable");
+  context.fillStyle = frame.background || "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return await new Promise((resolve, reject) => {
     try {
-      image = await loadImage(url);
-    } catch {
-      image = await loadImage("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg));
-    }
-    const canvas = document.createElement("canvas");
-    canvas.width = w * factor;
-    canvas.height = h2 * factor;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("canvas unavailable");
-    context.fillStyle = frame.background || "#ffffff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve, reject) => {
       canvas.toBlob(
         (blob) => blob ? resolve(blob) : reject(new Error("png encode failed")),
         "image/png"
       );
-    });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 function loadImage(url) {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("png render failed"));
+    const timer = setTimeout(() => reject(new Error("png render timed out")), 1e4);
+    image.onload = () => {
+      clearTimeout(timer);
+      resolve(image);
+    };
+    image.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error("png render failed"));
+    };
     image.src = url;
   });
 }
@@ -5099,7 +5104,7 @@ var CSS2 = [
   ".dpd-exportPop{position:absolute;right:0;top:calc(100% + 6px);z-index:300;min-width:190px;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:9px;box-shadow:0 10px 30px rgba(17,24,39,.16);padding:4px;display:flex;flex-direction:column}",
   ".dpd-exportPop button{border:none;background:transparent;color:var(--dsw-alias-label-primary,#111);font:inherit;font-size:12px;text-align:left;padding:7px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}",
   ".dpd-exportPop button:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
-  ".dpd-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:500;background:rgba(17,24,39,.88);color:#fff;font-size:12px;padding:8px 14px;border-radius:999px;box-shadow:0 8px 24px rgba(17,24,39,.25);pointer-events:none}",
+  ".dpd-toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);z-index:500;background:rgba(17,24,39,.88);color:#fff;font-size:12px;padding:8px 14px;border-radius:999px;box-shadow:0 8px 24px rgba(17,24,39,.25);pointer-events:none}",
   ".dpd-toast.err{background:rgba(229,72,77,.94)}"
 ].join("\n");
 function StyleBlock() {

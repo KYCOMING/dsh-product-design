@@ -25,7 +25,11 @@
 - 新增回归测试：就地编辑、图层显隐、剪贴板、右键删除、原型跳转/弹层、AI 改动撤销。
 
 ### Fixed
-- 修复导出 PNG 无反应：`font-family` 里的双引号破坏了 SVG `style` 属性，导致生成的 SVG 不是合法 XML、图片加载失败且异常被静默吞掉。改为单引号 + 属性转义，补充 SVG XML 合法性回归测试；导出成功/失败现在会显示提示。
+- 修复导出 PNG 无反应：
+  - `font-family` 里的双引号破坏了 SVG `style` 属性，生成的 SVG 不是合法 XML；改为单引号 + 属性转义。
+  - Chromium 会把 `blob:` URL 的 SVG（含 `foreignObject`）标记为跨源，导致 canvas 被污染、`toBlob()` 抛 SecurityError；改用 `data:` URL。
+  - 图片加载增加 10s 超时，`document.fonts.ready` 最多等待 500ms，避免无限挂起。
+  - 导出成功/失败显示 toast；新增 SVG XML 合法性与 data URL 管线回归测试。
 
 ### Changed
 - **清理死代码**：删除 `childrenOf`、`stackParentOf`、`PAGE_STATES`、`RESIZE_MODES`、`sameBox` 等未被引用的声明；把 26 个仅内部使用的导出收口为非导出；清理 30+ 处未使用的 `catch` 绑定、未使用导入/变量与未使用的默认导出。审计结果：无未被引用的文件、i18n key、CSS 选择器或图标。

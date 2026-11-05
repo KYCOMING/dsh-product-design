@@ -162,7 +162,7 @@ const CSS = [
   '.dpd-exportPop{position:absolute;right:0;top:calc(100% + 6px);z-index:300;min-width:190px;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:9px;box-shadow:0 10px 30px rgba(17,24,39,.16);padding:4px;display:flex;flex-direction:column}',
   '.dpd-exportPop button{border:none;background:transparent;color:var(--dsw-alias-label-primary,#111);font:inherit;font-size:12px;text-align:left;padding:7px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}',
   '.dpd-exportPop button:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}',
-  '.dpd-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:500;background:rgba(17,24,39,.88);color:#fff;font-size:12px;padding:8px 14px;border-radius:999px;box-shadow:0 8px 24px rgba(17,24,39,.25);pointer-events:none}',
+  '.dpd-toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);z-index:500;background:rgba(17,24,39,.88);color:#fff;font-size:12px;padding:8px 14px;border-radius:999px;box-shadow:0 8px 24px rgba(17,24,39,.25);pointer-events:none}',
   '.dpd-toast.err{background:rgba(229,72,77,.94)}',
 ].join('\n');
 
