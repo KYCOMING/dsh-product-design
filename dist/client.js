@@ -400,7 +400,14 @@ var DICT = {
     "toolbar.preview": "\u9884\u89C8",
     "toolbar.edit": "\u7F16\u8F91",
     "toolbar.exitPreview": "\u9000\u51FA\u9884\u89C8 (Esc)",
-    "toolbar.saved": "\u5DF2\u81EA\u52A8\u4FDD\u5B58",
+    "toolbar.saved": "\u5DF2\u4FDD\u5B58",
+    "toolbar.saving": "\u4FDD\u5B58\u4E2D\u2026",
+    "toolbar.localOnly": "\u4EC5\u672C\u5730",
+    "toolbar.offline": "\u540C\u6B65\u5931\u8D25",
+    "toolbar.conflict": "\u6709\u51B2\u7A81",
+    "sync.conflictMessage": "\u68C0\u6D4B\u5230\u4FDD\u5B58\u51B2\u7A81\uFF1AAI \u6216\u5176\u4ED6\u4F1A\u8BDD\u521A\u6539\u8FC7\u8FD9\u4EFD\u8BBE\u8BA1\u7A3F\uFF0C\u4F60\u7684\u672C\u5730\u6539\u52A8\u8FD8\u6CA1\u6709\u4FDD\u5B58\u3002",
+    "sync.keepMine": "\u4FDD\u7559\u6211\u7684\u6539\u52A8",
+    "sync.useRemote": "\u4F7F\u7528\u8FDC\u7AEF\u7248\u672C",
     "toolbar.undo": "\u64A4\u9500 (\u2318Z)",
     "toolbar.redo": "\u91CD\u505A (\u21E7\u2318Z)",
     "toolbar.panHint": "\u7A7A\u683C / \u4E2D\u952E\u62D6\u62FD\u5E73\u79FB\u753B\u5E03",
@@ -626,7 +633,14 @@ var DICT = {
     "toolbar.preview": "Preview",
     "toolbar.edit": "Edit",
     "toolbar.exitPreview": "Exit preview (Esc)",
-    "toolbar.saved": "Auto-saved",
+    "toolbar.saved": "Saved",
+    "toolbar.saving": "Saving\u2026",
+    "toolbar.localOnly": "Local only",
+    "toolbar.offline": "Sync failed",
+    "toolbar.conflict": "Conflict",
+    "sync.conflictMessage": "Save conflict: the AI or another session just changed this design, and your local edits are not saved yet.",
+    "sync.keepMine": "Keep mine",
+    "sync.useRemote": "Use remote",
     "toolbar.undo": "Undo (\u2318Z)",
     "toolbar.redo": "Redo (\u21E7\u2318Z)",
     "toolbar.panHint": "Hold Space / middle-drag to pan the canvas",
@@ -3978,6 +3992,8 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
   const lastEditRef = useRef(0);
   const [, bumpHist] = useState2(0);
   const hostRef = useRef({ on: false, revision: 0, docId: "", suppressSave: false });
+  const [syncState, setSyncState] = useState2("local");
+  const conflictRef = useRef(null);
   function pushPastSnapshot(snapshot) {
     const h2 = histRef.current;
     h2.past.push(snapshot);
@@ -4009,6 +4025,8 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     }
     docRef.current = next;
     setDocState(next);
+    if (hostRef.current.on) setSyncState(conflictRef.current ? "conflict" : "saving");
+    else setSyncState("local");
   }, []);
   const mapEl = useCallback2(
     (elId, fn, mode) => {
@@ -4042,6 +4060,8 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     setDocState(prev);
     lastKeyRef.current = { key: null, time: 0 };
     bumpHist((v) => v + 1);
+    if (hostRef.current.on) setSyncState(conflictRef.current ? "conflict" : "saving");
+    else setSyncState("local");
   }
   function redo() {
     const h2 = histRef.current;
@@ -4053,11 +4073,14 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     setDocState(next);
     lastKeyRef.current = { key: null, time: 0 };
     bumpHist((v) => v + 1);
+    if (hostRef.current.on) setSyncState(conflictRef.current ? "conflict" : "saving");
+    else setSyncState("local");
   }
   function applySnapshot(snap, { resetHistory } = {}) {
     if (!snap || !snap.doc) return false;
     const nd = normalizeDoc(snap.doc);
     if (!nd) return false;
+    conflictRef.current = null;
     hostRef.current.on = true;
     hostRef.current.revision = Number(snap.revision) || 0;
     hostRef.current.docId = snap.docId || hostRef.current.docId;
@@ -4070,9 +4093,20 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     docRef.current = nd;
     setDocState(nd);
     onAdopt(nd);
+    setSyncState("saved");
     return true;
   }
   function adoptRemoteDoc(nd, nextDocId) {
+    if (conflictRef.current) {
+      conflictRef.current = {
+        ...conflictRef.current,
+        remoteDoc: nd,
+        remoteRevision: hostRef.current.revision,
+        remoteDocId: nextDocId || hostRef.current.docId
+      };
+      setSyncState("conflict");
+      return;
+    }
     const prev = docRef.current;
     if (prev && sameDoc(prev, nd)) return;
     if (prev && Date.now() - lastEditRef.current > 800) pushPastSnapshot(prev);
@@ -4082,6 +4116,7 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     docRef.current = nd;
     setDocState(nd);
     onAdopt(nd);
+    setSyncState("saved");
   }
   async function refreshFromHost(sid) {
     const got = await apiFetch("/doc", void 0, sid);
@@ -4094,15 +4129,19 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     if (body.doc && Array.isArray(body.doc.pages) && body.doc.pages.length > 0) {
       const nd = normalizeDoc(body.doc);
       if (nd) {
+        conflictRef.current = null;
         hostRef.current.suppressSave = true;
         docRef.current = nd;
         setDocState(nd);
         onAdopt(nd);
+        setSyncState("saved");
       }
       return body;
     }
     const seeded = defaultDoc(t);
     hostRef.current.suppressSave = true;
+    conflictRef.current = null;
+    setSyncState("saving");
     docRef.current = seeded;
     setDocState(seeded);
     const res = await apiFetch(
@@ -4121,6 +4160,9 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     );
     if (res && res.status === 200 && res.body) {
       hostRef.current.revision = res.body.revision;
+      setSyncState("saved");
+    } else {
+      setSyncState(res ? "offline" : "local");
     }
     return body;
   }
@@ -4139,7 +4181,62 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     if (!res || res.status !== 200 || !res.body) return false;
     const ok = applySnapshot(res.body, { resetHistory: true });
     if (ok) resetTransient();
+    if (!ok) setSyncState("offline");
     return ok;
+  }
+  function resolveConflict(choice) {
+    const conflict = conflictRef.current;
+    if (!conflict) return;
+    conflictRef.current = null;
+    hostRef.current.revision = Number(conflict.remoteRevision) || 0;
+    if (conflict.remoteDocId) hostRef.current.docId = conflict.remoteDocId;
+    if (choice === "theirs") {
+      if (conflict.remoteDoc) {
+        applySnapshot(
+          {
+            revision: conflict.remoteRevision,
+            docId: conflict.remoteDocId,
+            doc: conflict.remoteDoc
+          },
+          { resetHistory: true }
+        );
+      }
+      setSyncState("saved");
+      return;
+    }
+    setSyncState("saving");
+    const sid = sessionIdRef.current;
+    apiFetch(
+      "/doc",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          baseRevision: hostRef.current.revision,
+          docId: hostRef.current.docId,
+          doc: docRef.current,
+          sessionId: sid
+        })
+      },
+      sid
+    ).then((res) => {
+      if (res && res.status === 200 && res.body) {
+        hostRef.current.revision = res.body.revision;
+        setSyncState("saved");
+        return;
+      }
+      if (res && res.status === 409 && res.body && res.body.doc) {
+        conflictRef.current = {
+          remoteDoc: normalizeDoc(res.body.doc),
+          remoteRevision: res.body.revision,
+          remoteDocId: res.body.docId
+        };
+        hostRef.current.revision = res.body.revision;
+        setSyncState("conflict");
+        return;
+      }
+      setSyncState(res ? "offline" : "local");
+    });
   }
   useEffect2(() => {
     const sid = sessionIdRef.current;
@@ -4148,7 +4245,15 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
       hostRef.current.suppressSave = false;
       return void 0;
     }
-    if (!hostRef.current.on) return void 0;
+    if (!hostRef.current.on) {
+      setSyncState("local");
+      return void 0;
+    }
+    if (conflictRef.current) {
+      setSyncState("conflict");
+      return void 0;
+    }
+    setSyncState("saving");
     const timer = setTimeout(() => {
       apiFetch(
         "/doc",
@@ -4164,15 +4269,23 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
         },
         sid
       ).then((res) => {
-        if (!res) return;
+        if (!res) {
+          setSyncState("offline");
+          return;
+        }
         if (res.status === 200 && res.body) {
           hostRef.current.revision = res.body.revision;
+          setSyncState("saved");
         } else if (res.status === 409 && res.body && res.body.doc) {
-          const nd = normalizeDoc(res.body.doc);
-          if (nd) {
-            hostRef.current.revision = res.body.revision;
-            adoptRemoteDoc(nd, res.body.docId);
-          }
+          conflictRef.current = {
+            remoteDoc: normalizeDoc(res.body.doc),
+            remoteRevision: res.body.revision,
+            remoteDocId: res.body.docId
+          };
+          hostRef.current.revision = res.body.revision;
+          setSyncState("conflict");
+        } else {
+          setSyncState("offline");
         }
       });
     }, 400);
@@ -4184,6 +4297,8 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     const sid = sessionId;
     const localDoc = loadDoc(sid) || defaultDoc(t);
     hostRef.current = { on: false, revision: 0, docId: "", suppressSave: true };
+    conflictRef.current = null;
+    setSyncState("local");
     setDocId("");
     docRef.current = localDoc;
     setDocState(localDoc);
@@ -4258,7 +4373,9 @@ function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     pushPastSnapshot,
     adoptRemoteDoc,
     switchDoc,
-    refreshFromHost
+    refreshFromHost,
+    syncState,
+    resolveConflict
   };
 }
 
@@ -5505,6 +5622,11 @@ var CSS2 = [
   ".dpd-zoom{min-width:42px;text-align:center;font-size:12px;color:var(--dsw-alias-label-secondary,#6b7280);font-variant-numeric:tabular-nums;background:transparent;border:none;cursor:pointer;padding:2px 4px;border-radius:6px}",
   ".dpd-zoom:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4);color:var(--dsw-alias-label-primary,#111)}",
   ".dpd-saved{font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap}",
+  ".dpd-saved.err{color:#b42318;font-weight:600}",
+  ".dpd-syncBar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff4e5;border-bottom:1px solid #f5d7a3;color:#8a4b00;font-size:12px;flex-shrink:0}",
+  ".dpd-syncMsg{flex:1;min-width:0;line-height:1.4}",
+  ".dpd-syncBtn{border:1px solid #e2b56b;background:#fff;color:#8a4b00;border-radius:6px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}",
+  ".dpd-syncBtn.primary{background:#b45309;border-color:transparent;color:#fff}",
   ".dpd-body{flex:1;display:flex;min-height:0}",
   ".dpd-leftcol{display:flex;min-height:0;flex-shrink:0;background:var(--dsw-alias-bg-layer-1,#fafafa);border-right:1px solid var(--dsw-alias-border-l1,#e5e6eb)}",
   ".dpd-rail{width:44px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border-right:1px solid var(--dsw-alias-border-l1,#e5e6eb)}",
@@ -7687,6 +7809,13 @@ var stateLabels = {
   empty: "state.empty",
   error: "state.error"
 };
+var syncLabels = {
+  local: "toolbar.localOnly",
+  saving: "toolbar.saving",
+  saved: "toolbar.saved",
+  offline: "toolbar.offline",
+  conflict: "toolbar.conflict"
+};
 function ToolbarView(props) {
   const {
     t,
@@ -7704,6 +7833,7 @@ function ToolbarView(props) {
     redo,
     canUndo,
     canRedo,
+    syncState,
     setSelId,
     snapEnabled,
     toggleSnap,
@@ -7864,7 +7994,14 @@ function ToolbarView(props) {
       h(preview ? IconPencil : IconEye),
       preview ? t("toolbar.edit") : t("toolbar.preview")
     ),
-    h("span", { className: "dpd-saved" }, t("toolbar.saved"))
+    h(
+      "span",
+      {
+        className: "dpd-saved" + (syncState === "conflict" ? " err" : ""),
+        title: t(syncLabels[syncState] || "toolbar.saved")
+      },
+      t(syncLabels[syncState] || "toolbar.saved")
+    )
   );
   return toolbar;
 }
@@ -7895,7 +8032,9 @@ function ProductDesignPanel(props = {}) {
     canUndo,
     canRedo,
     pushPastSnapshot,
-    switchDoc
+    switchDoc,
+    syncState,
+    resolveConflict
   } = useDocument({
     sessionId,
     t,
@@ -8195,6 +8334,29 @@ function ProductDesignPanel(props = {}) {
       "data-dsh-plugin": "product-design"
     },
     h(StyleBlock),
+    syncState === "conflict" ? h(
+      "div",
+      { className: "dpd-syncBar" },
+      h("span", { className: "dpd-syncMsg" }, t("sync.conflictMessage")),
+      h(
+        "button",
+        {
+          className: "dpd-syncBtn primary",
+          type: "button",
+          onClick: () => resolveConflict("mine")
+        },
+        t("sync.keepMine")
+      ),
+      h(
+        "button",
+        {
+          className: "dpd-syncBtn",
+          type: "button",
+          onClick: () => resolveConflict("theirs")
+        },
+        t("sync.useRemote")
+      )
+    ) : null,
     preview ? null : h(ToolbarView, {
       t,
       doc,
@@ -8211,6 +8373,7 @@ function ProductDesignPanel(props = {}) {
       redo,
       canUndo,
       canRedo,
+      syncState,
       setSelId: selection.selectOnly,
       snapEnabled: prefs.snapEnabled,
       toggleSnap,

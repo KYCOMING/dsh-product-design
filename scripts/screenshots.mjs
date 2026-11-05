@@ -151,7 +151,7 @@ const detail = page('p-detail', '详情', [
     },
   ),
   el('select', 24, 660, 342, 48, { text: '选择环境' }),
-  el('badge', 24, 728, 84, 24, { text: 'v1.3.0' }),
+  el('badge', 24, 728, 84, 24, { text: 'v1.4.0' }),
 ]);
 
 const doc = { name: 'Nimbus', activePageId: 'p-home', pages: [login, home, detail] };
@@ -166,7 +166,13 @@ const harness = `<!doctype html>
 <script src="__REACT__"></script>
 <script src="__REACT_DOM__"></script>
 <script>
-  window.fetch = function(){ return new Promise(function(){}); };
+  var SAMPLE_DOC = ${JSON.stringify(doc)};
+  window.fetch = function(url){
+    var u = String(url);
+    if (u.indexOf('/api/doc') >= 0) return Promise.resolve({ status: 200, text: function(){ return Promise.resolve(JSON.stringify({ docId: 'shot', revision: 1, doc: SAMPLE_DOC })); } });
+    if (u.indexOf('/api/docs') >= 0) return Promise.resolve({ status: 200, text: function(){ return Promise.resolve(JSON.stringify({ docs: [{ id: 'shot', name: 'Nimbus', pages: 3, elements: 12, updatedAt: Date.now() }], activeDocId: 'shot' })); } });
+    return new Promise(function(){});
+  };
   window.__ModuleLoader__ = { load: function(definition){ window.__dpd = definition; } };
   localStorage.setItem('dsh-product-design:doc:v3', ${JSON.stringify(JSON.stringify(doc))});
   localStorage.setItem('dsh-product-design:ui:v1', JSON.stringify({ section: 'pages', snapEnabled: true }));

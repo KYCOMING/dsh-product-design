@@ -17,6 +17,14 @@ const stateLabels = {
   error: 'state.error',
 };
 
+const syncLabels = {
+  local: 'toolbar.localOnly',
+  saving: 'toolbar.saving',
+  saved: 'toolbar.saved',
+  offline: 'toolbar.offline',
+  conflict: 'toolbar.conflict',
+};
+
 export function ToolbarView(props) {
   const {
     t,
@@ -34,6 +42,7 @@ export function ToolbarView(props) {
     redo,
     canUndo,
     canRedo,
+    syncState,
     setSelId,
     snapEnabled,
     toggleSnap,
@@ -199,7 +208,14 @@ export function ToolbarView(props) {
       h(preview ? IconPencil : IconEye),
       preview ? t('toolbar.edit') : t('toolbar.preview'),
     ),
-    h('span', { className: 'dpd-saved' }, t('toolbar.saved')),
+    h(
+      'span',
+      {
+        className: 'dpd-saved' + (syncState === 'conflict' ? ' err' : ''),
+        title: t(syncLabels[syncState] || 'toolbar.saved'),
+      },
+      t(syncLabels[syncState] || 'toolbar.saved'),
+    ),
   );
 
   return toolbar;

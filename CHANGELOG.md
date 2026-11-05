@@ -6,11 +6,14 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-05
+
 ### Added
 - **设计稿库**：设计稿从「会话附件」变成独立对象（`docs/<docId>.json`），会话只绑定当前稿（`sessions/<sessionId>/active.json`）。左侧新增「设计稿」面板：新建、重命名（双击）、复制、删除、导出 JSON、导入 JSON；删除正在使用的稿子会自动给会话分配一份新的空白稿。
 - **图片组件**：支持 URL 或本地文件（2MB 内转 data URL）、`cover / contain / fill` 三种填充方式；编辑器、HTML、React、PNG 导出都渲染真实图片。
 - **页面状态变体**：加载 / 空 / 错误不再是文案蒙层，而是真实变体页（`variantOf` + `stateKey`）。顶部状态切换直接切换/创建变体，变体可以像普通页面一样增删元素；复制基础页会带上变体，删除基础页会一起删除变体，改画板尺寸会同步整个状态家族；预览里可切换状态；HTML / React 导出带上状态切换条；AI 用 `add_page_state` / `delete_page_state`。
 - **空会话入口**：注册 `conversation.hero.options`，空白会话在输入框旁显示「打开产品设计」，直接进入全屏画布。
+- **保存状态与冲突处理**：工具栏实时显示「已保存 / 保存中… / 仅本地 / 同步失败 / 有冲突」；409 不再静默采纳远端，而是保留本地文档并弹出冲突条，可「保留我的改动」或「使用远端版本」。
 
 ### Changed
 - **HTTP API**：新增 `GET/POST /docs`、`POST /docs/rename|duplicate|delete|import`、`GET /docs/export`、`POST /session/doc`；`GET /doc` 返回 `docId`，`POST /doc` 携带 `docId`，写错稿返回 409。

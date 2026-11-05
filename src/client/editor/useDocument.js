@@ -39,6 +39,10 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
   const [, bumpHist] = useState(0);
   // Host sync state: when reachable the Host owns the document.
   const hostRef = useRef({ on: false, revision: 0, docId: '', suppressSave: false });
+  // local = Host unreachable; saving/saved = Host round-trip; conflict = a
+  // different writer changed the document while we had unsaved local edits.
+  const [syncState, setSyncState] = useState('local');
+  const conflictRef = useRef(null);
 
   function pushPastSnapshot(snapshot) {
     const h = histRef.current;
@@ -74,6 +78,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     }
     docRef.current = next;
     setDocState(next);
+    if (hostRef.current.on) setSyncState(conflictRef.current ? 'conflict' : 'saving');
+    else setSyncState('local');
   }, []);
 
   const mapEl = useCallback(
@@ -109,6 +115,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     setDocState(prev);
     lastKeyRef.current = { key: null, time: 0 };
     bumpHist((v) => v + 1);
+    if (hostRef.current.on) setSyncState(conflictRef.current ? 'conflict' : 'saving');
+    else setSyncState('local');
   }
   function redo() {
     const h = histRef.current;
@@ -120,6 +128,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     setDocState(next);
     lastKeyRef.current = { key: null, time: 0 };
     bumpHist((v) => v + 1);
+    if (hostRef.current.on) setSyncState(conflictRef.current ? 'conflict' : 'saving');
+    else setSyncState('local');
   }
 
   /** Render a Host snapshot without treating it as a local edit. */
@@ -127,6 +137,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     if (!snap || !snap.doc) return false;
     const nd = normalizeDoc(snap.doc);
     if (!nd) return false;
+    conflictRef.current = null;
     hostRef.current.on = true;
     hostRef.current.revision = Number(snap.revision) || 0;
     hostRef.current.docId = snap.docId || hostRef.current.docId;
@@ -139,10 +150,23 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     docRef.current = nd;
     setDocState(nd);
     onAdopt(nd);
+    setSyncState('saved');
     return true;
   }
 
   function adoptRemoteDoc(nd, nextDocId) {
+    // While a conflict is unresolved, keep the local document and only record
+    // the newer remote version so the conflict banner can still resolve it.
+    if (conflictRef.current) {
+      conflictRef.current = {
+        ...conflictRef.current,
+        remoteDoc: nd,
+        remoteRevision: hostRef.current.revision,
+        remoteDocId: nextDocId || hostRef.current.docId,
+      };
+      setSyncState('conflict');
+      return;
+    }
     const prev = docRef.current;
     // Ignore the echo of our own save: SSE can beat the POST response, and the
     // re-fetched document is then byte-for-byte what we already render.
@@ -155,6 +179,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     docRef.current = nd;
     setDocState(nd);
     onAdopt(nd);
+    setSyncState('saved');
   }
 
   /** Fetch the Session's current document from the Host. */
@@ -169,10 +194,12 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     if (body.doc && Array.isArray(body.doc.pages) && body.doc.pages.length > 0) {
       const nd = normalizeDoc(body.doc);
       if (nd) {
+        conflictRef.current = null;
         hostRef.current.suppressSave = true;
         docRef.current = nd;
         setDocState(nd);
         onAdopt(nd);
+        setSyncState('saved');
       }
       return body;
     }
@@ -180,6 +207,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     // never empty on first open.
     const seeded = defaultDoc(t);
     hostRef.current.suppressSave = true;
+    conflictRef.current = null;
+    setSyncState('saving');
     docRef.current = seeded;
     setDocState(seeded);
     const res = await apiFetch(
@@ -198,6 +227,9 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     );
     if (res && res.status === 200 && res.body) {
       hostRef.current.revision = res.body.revision;
+      setSyncState('saved');
+    } else {
+      setSyncState(res ? 'offline' : 'local');
     }
     return body;
   }
@@ -218,7 +250,64 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     if (!res || res.status !== 200 || !res.body) return false;
     const ok = applySnapshot(res.body, { resetHistory: true });
     if (ok) resetTransient();
+    if (!ok) setSyncState('offline');
     return ok;
+  }
+
+  /** Resolve a 409: keep the local document or take the remote one. */
+  function resolveConflict(choice) {
+    const conflict = conflictRef.current;
+    if (!conflict) return;
+    conflictRef.current = null;
+    hostRef.current.revision = Number(conflict.remoteRevision) || 0;
+    if (conflict.remoteDocId) hostRef.current.docId = conflict.remoteDocId;
+    if (choice === 'theirs') {
+      if (conflict.remoteDoc) {
+        applySnapshot(
+          {
+            revision: conflict.remoteRevision,
+            docId: conflict.remoteDocId,
+            doc: conflict.remoteDoc,
+          },
+          { resetHistory: true },
+        );
+      }
+      setSyncState('saved');
+      return;
+    }
+    setSyncState('saving');
+    const sid = sessionIdRef.current;
+    apiFetch(
+      '/doc',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          baseRevision: hostRef.current.revision,
+          docId: hostRef.current.docId,
+          doc: docRef.current,
+          sessionId: sid,
+        }),
+      },
+      sid,
+    ).then((res) => {
+      if (res && res.status === 200 && res.body) {
+        hostRef.current.revision = res.body.revision;
+        setSyncState('saved');
+        return;
+      }
+      if (res && res.status === 409 && res.body && res.body.doc) {
+        conflictRef.current = {
+          remoteDoc: normalizeDoc(res.body.doc),
+          remoteRevision: res.body.revision,
+          remoteDocId: res.body.docId,
+        };
+        hostRef.current.revision = res.body.revision;
+        setSyncState('conflict');
+        return;
+      }
+      setSyncState(res ? 'offline' : 'local');
+    });
   }
 
   // Host sync: when the Host half is reachable the document is authoritative
@@ -232,7 +321,15 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
       hostRef.current.suppressSave = false;
       return undefined;
     }
-    if (!hostRef.current.on) return undefined;
+    if (!hostRef.current.on) {
+      setSyncState('local');
+      return undefined;
+    }
+    if (conflictRef.current) {
+      setSyncState('conflict');
+      return undefined;
+    }
+    setSyncState('saving');
     const timer = setTimeout(() => {
       apiFetch(
         '/doc',
@@ -248,15 +345,23 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
         },
         sid,
       ).then((res) => {
-        if (!res) return;
+        if (!res) {
+          setSyncState('offline');
+          return;
+        }
         if (res.status === 200 && res.body) {
           hostRef.current.revision = res.body.revision;
+          setSyncState('saved');
         } else if (res.status === 409 && res.body && res.body.doc) {
-          const nd = normalizeDoc(res.body.doc);
-          if (nd) {
-            hostRef.current.revision = res.body.revision;
-            adoptRemoteDoc(nd, res.body.docId);
-          }
+          conflictRef.current = {
+            remoteDoc: normalizeDoc(res.body.doc),
+            remoteRevision: res.body.revision,
+            remoteDocId: res.body.docId,
+          };
+          hostRef.current.revision = res.body.revision;
+          setSyncState('conflict');
+        } else {
+          setSyncState('offline');
         }
       });
     }, 400);
@@ -272,6 +377,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     const sid = sessionId;
     const localDoc = loadDoc(sid) || defaultDoc(t);
     hostRef.current = { on: false, revision: 0, docId: '', suppressSave: true };
+    conflictRef.current = null;
+    setSyncState('local');
     setDocId('');
     docRef.current = localDoc;
     setDocState(localDoc);
@@ -350,5 +457,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     adoptRemoteDoc,
     switchDoc,
     refreshFromHost,
+    syncState,
+    resolveConflict,
   };
 }

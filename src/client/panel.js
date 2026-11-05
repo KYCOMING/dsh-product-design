@@ -63,6 +63,8 @@ function ProductDesignPanel(props = {}) {
     canRedo,
     pushPastSnapshot,
     switchDoc,
+    syncState,
+    resolveConflict,
   } = useDocument({
     sessionId,
     t,
@@ -412,6 +414,31 @@ function ProductDesignPanel(props = {}) {
       'data-dsh-plugin': 'product-design',
     },
     h(StyleBlock),
+    syncState === 'conflict'
+      ? h(
+          'div',
+          { className: 'dpd-syncBar' },
+          h('span', { className: 'dpd-syncMsg' }, t('sync.conflictMessage')),
+          h(
+            'button',
+            {
+              className: 'dpd-syncBtn primary',
+              type: 'button',
+              onClick: () => resolveConflict('mine'),
+            },
+            t('sync.keepMine'),
+          ),
+          h(
+            'button',
+            {
+              className: 'dpd-syncBtn',
+              type: 'button',
+              onClick: () => resolveConflict('theirs'),
+            },
+            t('sync.useRemote'),
+          ),
+        )
+      : null,
     preview
       ? null
       : h(ToolbarView, {
@@ -430,6 +457,7 @@ function ProductDesignPanel(props = {}) {
           redo,
           canUndo,
           canRedo,
+          syncState,
           setSelId: selection.selectOnly,
           snapEnabled: prefs.snapEnabled,
           toggleSnap,
