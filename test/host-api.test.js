@@ -258,6 +258,62 @@ describe('host API + tools', () => {
     expect(meta.page.elements[0].children).toHaveLength(1);
   });
 
+  it('按 sessionId 隔离设计稿', async () => {
+    const a = 'session-a-isolation';
+    const b = 'session-b-isolation';
+    const docFor = (id, name) => ({
+      name,
+      activePageId: id,
+      pages: [
+        {
+          id,
+          name,
+          frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
+          elements: [],
+        },
+      ],
+    });
+    const firstA = await call('GET', `/dsh-product-design/api/doc?sessionId=${a}`);
+    expect(firstA.status).toBe(200);
+    const writeA = await call('POST', `/dsh-product-design/api/doc?sessionId=${a}`, {
+      baseRevision: firstA.json.revision,
+      doc: docFor('pa', 'Session A'),
+    });
+    expect(writeA.status).toBe(200);
+
+    const firstB = await call('GET', `/dsh-product-design/api/doc?sessionId=${b}`);
+    expect(firstB.status).toBe(200);
+    await call('POST', `/dsh-product-design/api/doc?sessionId=${b}`, {
+      baseRevision: firstB.json.revision,
+      doc: docFor('pb', 'Session B'),
+    });
+
+    const readA = await call('GET', `/dsh-product-design/api/doc?sessionId=${a}`);
+    const readB = await call('GET', `/dsh-product-design/api/doc?sessionId=${b}`);
+    expect(readA.json.doc.name).toBe('Session A');
+    expect(readB.json.doc.name).toBe('Session B');
+  });
+
+  it('工具按执行会话读写各自的画布', async () => {
+    const applyToolDef = tools.find((t) => t.name === 'product_design_apply');
+    const getToolDef = tools.find((t) => t.name === 'product_design_get_document');
+    const exec = (id) => ({ agent: { session: { header: { id } } } });
+
+    await applyToolDef.execute(
+      { operations: [{ kind: 'add_page', name: 'Tool A' }] },
+      exec('session-tool-a'),
+    );
+    await applyToolDef.execute(
+      { operations: [{ kind: 'add_page', name: 'Tool B' }] },
+      exec('session-tool-b'),
+    );
+    const gotA = await getToolDef.execute({}, exec('session-tool-a'));
+    const gotB = await getToolDef.execute({}, exec('session-tool-b'));
+    expect(gotA.doc.pages.map((p) => p.name)).toContain('Tool A');
+    expect(gotA.doc.pages.map((p) => p.name)).not.toContain('Tool B');
+    expect(gotB.doc.pages.map((p) => p.name)).toContain('Tool B');
+  });
+
   it('POST /apply 与非法操作', async () => {
     const ok = await call('POST', '/dsh-product-design/api/apply', {
       operations: [{ kind: 'add_element', type: 'card' }],

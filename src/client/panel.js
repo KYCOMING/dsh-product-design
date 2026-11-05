@@ -24,6 +24,7 @@ import {
   uid,
 } from './model.js';
 import { h, useCallback, useEffect, useRef, useState } from './react.js';
+import { useSessionId } from './session.js';
 import { StyleBlock } from './styles.js';
 import { CanvasView } from './ui/canvas.js';
 import { InspectorView } from './ui/inspector.js';
@@ -202,7 +203,10 @@ function scaleTree(elements, sx, sy, sf, ox, oy, isRoot) {
 // ------------------------------------------------------------------
 function ProductDesignPanel() {
   const t = useT();
-  const [doc, setDocState] = useState(() => loadDoc() || defaultDoc(t));
+  const sessionId = useSessionId();
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+  const [doc, setDocState] = useState(() => loadDoc(sessionId) || defaultDoc(t));
   // Latest doc mirrored in a ref so imperative handlers (drag, keyboard,
   // history) always read the current value instead of a stale closure.
   const docRef = useRef(doc);
@@ -273,18 +277,27 @@ function ProductDesignPanel() {
   const hostRef = useRef({ on: false, revision: 0, suppressSave: false });
 
   useEffect(() => {
-    saveDoc(doc);
+    const sid = sessionIdRef.current;
+    saveDoc(doc, sid);
     if (hostRef.current.suppressSave) {
       hostRef.current.suppressSave = false;
       return undefined;
     }
     if (!hostRef.current.on) return undefined;
     const timer = setTimeout(() => {
-      apiFetch('/doc', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ baseRevision: hostRef.current.revision, doc: doc }),
-      }).then((res) => {
+      apiFetch(
+        '/doc',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            baseRevision: hostRef.current.revision,
+            doc: doc,
+            sessionId: sid,
+          }),
+        },
+        sid,
+      ).then((res) => {
         if (!res) return;
         if (res.status === 200 && res.body) {
           hostRef.current.revision = res.body.revision;
@@ -302,17 +315,26 @@ function ProductDesignPanel() {
     return () => clearTimeout(timer);
   }, [doc]);
 
-  // Load the Host document on mount and follow its change stream. The panel
-  // seeds the Host from the current (localStorage) doc when it is empty.
+  // Load the Host document for the active Session and follow its change
+  // stream. Switching Sessions swaps the whole document; the panel never
+  // leaks one Session's canvas into another.
   useEffect(() => {
     let cancelled = false;
     let source = null;
+    const sid = sessionId;
+    const localDoc = loadDoc(sid) || defaultDoc(t);
+    hostRef.current = { on: false, revision: 0, suppressSave: true };
+    docRef.current = localDoc;
+    setDocState(localDoc);
+    setSelIds([]);
+    setPreview(false);
+    histRef.current = { past: [], future: [] };
     (async () => {
       const canStream = typeof window.EventSource === 'function';
       const attempts = canStream ? 6 : 1;
       let got = null;
       for (let i = 0; i < attempts && !cancelled; i += 1) {
-        got = await apiFetch('/doc');
+        got = await apiFetch('/doc', undefined, sid);
         if (got && got.status === 200 && got.body) break;
         if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500));
       }
@@ -327,19 +349,27 @@ function ProductDesignPanel() {
           setDocState(nd);
         }
       } else {
-        const seeded = await apiFetch('/doc', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ baseRevision: hostRef.current.revision, doc: docRef.current }),
-        });
+        const seeded = await apiFetch(
+          '/doc',
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              baseRevision: hostRef.current.revision,
+              doc: docRef.current,
+              sessionId: sid,
+            }),
+          },
+          sid,
+        );
         if (seeded && seeded.status === 200 && seeded.body)
           hostRef.current.revision = seeded.body.revision;
       }
       if (cancelled || typeof window.EventSource !== 'function') return;
       try {
-        source = new window.EventSource(
-          new URL(API_PREFIX + '/events', window.location.href).toString(),
-        );
+        const eventsUrl = new URL(API_PREFIX + '/events', window.location.href);
+        if (sid) eventsUrl.searchParams.set('sessionId', sid);
+        source = new window.EventSource(eventsUrl.toString());
         source.onmessage = (evt) => {
           let data = null;
           try {
@@ -353,7 +383,7 @@ function ProductDesignPanel() {
             data.revision === hostRef.current.revision
           )
             return;
-          apiFetch('/doc').then((snap) => {
+          apiFetch('/doc', undefined, sid).then((snap) => {
             if (!snap || snap.status !== 200 || !snap.body || !snap.body.doc) return;
             const nd = normalizeDoc(snap.body.doc);
             if (!nd) return;
@@ -377,7 +407,7 @@ function ProductDesignPanel() {
         }
       }
     };
-  }, []);
+  }, [sessionId]);
 
   useEffect(() => {
     saveUi({

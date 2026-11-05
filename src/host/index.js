@@ -5,11 +5,15 @@
  * under the DSH home, serves it over same-origin HTTP routes (doc + SSE change
  * stream), and exposes agent tools so the model can read and edit the canvas.
  *
- * Routes (prefix `/dsh-product-design/api`):
+ * Routes (prefix `/dsh-product-design/api`, optional `?sessionId=`):
  *   GET  /doc     → { revision, doc }
  *   POST /doc     → { baseRevision, doc }  (optimistic; 409 + current on conflict)
  *   POST /apply   → { operations: [...] }  (server-side reducer)
  *   GET  /events  → text/event-stream, one `{ revision }` per change
+ *
+ * Each conversation owns one document under
+ * `storages/dsh-product-design/sessions/<sessionId>/doc.json`. Requests and
+ * tool calls without a session id use the legacy global document.
  *
  * Tools (registered globally when the deployment serves a tool registry):
  *   product_design_get_document
@@ -29,7 +33,7 @@ const HEARTBEAT_MS = 15000;
 const GUIDANCE = [
   '本机已安装 dsh-product-design 插件：一个「简化版 Figma」产品设计画布，宿主权威。',
   '打开方式：侧边栏「产品设计」图标；或直接用 /design <需求> 让 AI 绘制。',
-  '你可以直接用工具读写画布，不需要用户先打开面板：',
+  '每个会话拥有独立设计稿；你可以直接用工具读写当前会话的画布，不需要用户先打开面板：',
   '  product_design_get_document：读取页面/元素/状态。',
   '  product_design_apply：按操作增删改（add_page / add_container / add_element / update_element / delete_element / group_elements / ungroup_elements / set_page_frame / clear_page / set_document_name 等）。',
   '画布坐标原点在每页左上角；默认手机页 390×844。元素类型：container, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select。',
@@ -54,6 +58,74 @@ function dshHome() {
 
 function docFile() {
   return join(dshHome(), 'storages', 'dsh-product-design', 'doc.json');
+}
+
+/** Keep session ids usable as one path segment without losing uniqueness. */
+function safeSessionId(sessionId) {
+  const value = String(sessionId || '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .slice(0, 120);
+  return value || 'default';
+}
+
+function sessionDocFile(sessionId) {
+  return join(
+    dshHome(),
+    'storages',
+    'dsh-product-design',
+    'sessions',
+    safeSessionId(sessionId),
+    'doc.json',
+  );
+}
+
+/**
+ * The pre-session single document is migrated once into the first session that
+ * asks for a document. Later sessions start empty instead of inheriting it.
+ */
+function migrateLegacyDoc(file) {
+  if (file === docFile()) return;
+  try {
+    readFileSync(file, 'utf8');
+    return;
+  } catch {
+    /* no session document yet */
+  }
+  const legacy = docFile();
+  let raw;
+  try {
+    raw = readFileSync(legacy, 'utf8');
+  } catch {
+    return;
+  }
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, raw, 'utf8');
+    renameSync(legacy, `${legacy}.migrated`);
+  } catch {
+    /* migration is best-effort; an empty session document is still usable */
+  }
+}
+
+/** Lazily create one store per session; no session id keeps the legacy document. */
+function createStores() {
+  const stores = new Map();
+  let legacy = null;
+  return {
+    forSession(sessionId) {
+      if (!sessionId) {
+        if (!legacy) legacy = createStore(docFile());
+        return legacy;
+      }
+      const key = safeSessionId(sessionId);
+      if (!stores.has(key)) {
+        const file = sessionDocFile(key);
+        migrateLegacyDoc(file);
+        stores.set(key, createStore(file));
+      }
+      return stores.get(key);
+    },
+  };
 }
 
 function createStore(file) {
@@ -169,7 +241,7 @@ function readJson(req) {
   });
 }
 
-function makeHandler(ctx, store) {
+function makeHandler(ctx, stores) {
   return async function handle(req, res) {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
@@ -196,14 +268,16 @@ function makeHandler(ctx, store) {
       }
 
       const sub = pathname.slice(API_PREFIX.length) || '/';
+      const querySessionId = url.searchParams.get('sessionId') || '';
 
       if (sub === '/doc' && req.method === 'GET') {
-        writeJson(res, 200, store.snapshot());
+        writeJson(res, 200, stores.forSession(querySessionId).snapshot());
         return;
       }
 
       if (sub === '/doc' && req.method === 'POST') {
         const body = await readJson(req);
+        const store = stores.forSession(body?.sessionId || querySessionId);
         const result = store.setDoc(body?.doc, body?.baseRevision);
         writeJson(res, result.conflict ? 409 : 200, result);
         return;
@@ -211,12 +285,14 @@ function makeHandler(ctx, store) {
 
       if (sub === '/apply' && req.method === 'POST') {
         const body = await readJson(req);
+        const store = stores.forSession(body?.sessionId || querySessionId);
         const result = store.apply(body?.operations);
         writeJson(res, 200, result);
         return;
       }
 
       if (sub === '/events' && req.method === 'GET') {
+        const store = stores.forSession(querySessionId);
         res.writeHead(200, {
           'content-type': 'text/event-stream; charset=utf-8',
           'cache-control': 'no-cache',
@@ -276,11 +352,27 @@ function productPreviewMeta(store, results) {
   };
 }
 
-function renderJson(_args, value) {
-  return [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }];
+/** Resolve the session whose canvas this tool call edits. */
+function sessionIdOf(exec) {
+  return (
+    exec?.agent?.session?.header?.id ||
+    exec?.agent?.session?.id ||
+    exec?.agent?.id ||
+    exec?.sessionId ||
+    ''
+  );
 }
 
-function getDocumentTool(store) {
+function renderJson(_args, value) {
+  let payload = value;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const { preview, ...rest } = value;
+    payload = rest;
+  }
+  return [{ type: 'text', text: typeof payload === 'string' ? payload : JSON.stringify(payload) }];
+}
+
+function getDocumentTool(stores) {
   return {
     name: 'product_design_get_document',
     description: [
@@ -291,17 +383,24 @@ function getDocumentTool(store) {
     output: {
       schema: {},
       render: renderJson,
-      presentationMeta: () => productPreviewMeta(store, []),
+      presentationMeta: (_args, value) => (value && value.preview) || null,
     },
     isConcurrencySafe: () => true,
-    async execute() {
+    async execute(_args, exec) {
+      const store = stores.forSession(sessionIdOf(exec));
       const snap = store.snapshot();
-      return { ok: true, revision: snap.revision, doc: snap.doc, summary: summarizeDoc(snap.doc) };
+      return {
+        ok: true,
+        revision: snap.revision,
+        doc: snap.doc,
+        summary: summarizeDoc(snap.doc),
+        preview: productPreviewMeta(store, []),
+      };
     },
   };
 }
 
-function applyTool(store) {
+function applyTool(stores) {
   return {
     name: 'product_design_apply',
     description: [
@@ -333,16 +432,18 @@ function applyTool(store) {
     output: {
       schema: {},
       render: renderJson,
-      presentationMeta: (_args, value) => productPreviewMeta(store, value && value.results),
+      presentationMeta: (_args, value) => (value && value.preview) || null,
     },
     isConcurrencySafe: () => false,
-    async execute(args) {
+    async execute(args, exec) {
+      const store = stores.forSession(sessionIdOf(exec));
       const result = store.apply(args?.operations);
       return {
         ok: result.ok,
         revision: result.revision,
         results: result.results,
         summary: summarizeDoc(result.doc),
+        preview: productPreviewMeta(store, result.results),
       };
     },
   };
@@ -396,12 +497,15 @@ function registerDesignCommand(ctx) {
   else install(ctx);
 }
 
-function registerTools(ctx, store) {
+function registerTools(ctx, stores) {
   const install = (scope) => {
     const tools = (scope && scope.tools) || ctx.get('tools');
     if (!tools || typeof tools.register !== 'function') return;
     scope.effect(() => {
-      const disposers = [tools.register(getDocumentTool(store)), tools.register(applyTool(store))];
+      const disposers = [
+        tools.register(getDocumentTool(stores)),
+        tools.register(applyTool(stores)),
+      ];
       return () => {
         for (const dispose of disposers) {
           try {
@@ -433,19 +537,19 @@ function registerPrompt(ctx) {
 }
 
 export function apply(ctx) {
-  const store = createStore(docFile());
+  const stores = createStores();
 
   ctx.effect(
     () =>
       ctx.webServer.register({
         kind: 'prefix',
         path: API_PREFIX,
-        handler: makeHandler(ctx, store),
+        handler: makeHandler(ctx, stores),
       }),
     'dsh-product-design: host api',
   );
 
-  registerTools(ctx, store);
+  registerTools(ctx, stores);
   registerDesignCommand(ctx);
   registerPrompt(ctx);
 }

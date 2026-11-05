@@ -531,7 +531,7 @@ var HEARTBEAT_MS = 15e3;
 var GUIDANCE = [
   "\u672C\u673A\u5DF2\u5B89\u88C5 dsh-product-design \u63D2\u4EF6\uFF1A\u4E00\u4E2A\u300C\u7B80\u5316\u7248 Figma\u300D\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\uFF0C\u5BBF\u4E3B\u6743\u5A01\u3002",
   "\u6253\u5F00\u65B9\u5F0F\uFF1A\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u56FE\u6807\uFF1B\u6216\u76F4\u63A5\u7528 /design <\u9700\u6C42> \u8BA9 AI \u7ED8\u5236\u3002",
-  "\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528\u5DE5\u5177\u8BFB\u5199\u753B\u5E03\uFF0C\u4E0D\u9700\u8981\u7528\u6237\u5148\u6253\u5F00\u9762\u677F\uFF1A",
+  "\u6BCF\u4E2A\u4F1A\u8BDD\u62E5\u6709\u72EC\u7ACB\u8BBE\u8BA1\u7A3F\uFF1B\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528\u5DE5\u5177\u8BFB\u5199\u5F53\u524D\u4F1A\u8BDD\u7684\u753B\u5E03\uFF0C\u4E0D\u9700\u8981\u7528\u6237\u5148\u6253\u5F00\u9762\u677F\uFF1A",
   "  product_design_get_document\uFF1A\u8BFB\u53D6\u9875\u9762/\u5143\u7D20/\u72B6\u6001\u3002",
   "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / add_container / add_element / update_element / delete_element / group_elements / ungroup_elements / set_page_frame / clear_page / set_document_name \u7B49\uFF09\u3002",
   "\u753B\u5E03\u5750\u6807\u539F\u70B9\u5728\u6BCF\u9875\u5DE6\u4E0A\u89D2\uFF1B\u9ED8\u8BA4\u624B\u673A\u9875 390\xD7844\u3002\u5143\u7D20\u7C7B\u578B\uFF1Acontainer, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select\u3002",
@@ -553,6 +553,60 @@ function dshHome() {
 }
 function docFile() {
   return join(dshHome(), "storages", "dsh-product-design", "doc.json");
+}
+function safeSessionId(sessionId) {
+  const value = String(sessionId || "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  return value || "default";
+}
+function sessionDocFile(sessionId) {
+  return join(
+    dshHome(),
+    "storages",
+    "dsh-product-design",
+    "sessions",
+    safeSessionId(sessionId),
+    "doc.json"
+  );
+}
+function migrateLegacyDoc(file) {
+  if (file === docFile()) return;
+  try {
+    readFileSync(file, "utf8");
+    return;
+  } catch {
+  }
+  const legacy = docFile();
+  let raw;
+  try {
+    raw = readFileSync(legacy, "utf8");
+  } catch {
+    return;
+  }
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, raw, "utf8");
+    renameSync(legacy, `${legacy}.migrated`);
+  } catch {
+  }
+}
+function createStores() {
+  const stores = /* @__PURE__ */ new Map();
+  let legacy = null;
+  return {
+    forSession(sessionId) {
+      if (!sessionId) {
+        if (!legacy) legacy = createStore(docFile());
+        return legacy;
+      }
+      const key = safeSessionId(sessionId);
+      if (!stores.has(key)) {
+        const file = sessionDocFile(key);
+        migrateLegacyDoc(file);
+        stores.set(key, createStore(file));
+      }
+      return stores.get(key);
+    }
+  };
 }
 function createStore(file) {
   let revision = 0;
@@ -655,7 +709,7 @@ function readJson(req) {
     req.on("error", reject);
   });
 }
-function makeHandler(ctx, store) {
+function makeHandler(ctx, stores) {
   return async function handle(req, res) {
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
@@ -677,23 +731,27 @@ function makeHandler(ctx, store) {
       } catch {
       }
       const sub = pathname.slice(API_PREFIX.length) || "/";
+      const querySessionId = url.searchParams.get("sessionId") || "";
       if (sub === "/doc" && req.method === "GET") {
-        writeJson(res, 200, store.snapshot());
+        writeJson(res, 200, stores.forSession(querySessionId).snapshot());
         return;
       }
       if (sub === "/doc" && req.method === "POST") {
         const body = await readJson(req);
+        const store = stores.forSession(body?.sessionId || querySessionId);
         const result = store.setDoc(body?.doc, body?.baseRevision);
         writeJson(res, result.conflict ? 409 : 200, result);
         return;
       }
       if (sub === "/apply" && req.method === "POST") {
         const body = await readJson(req);
+        const store = stores.forSession(body?.sessionId || querySessionId);
         const result = store.apply(body?.operations);
         writeJson(res, 200, result);
         return;
       }
       if (sub === "/events" && req.method === "GET") {
+        const store = stores.forSession(querySessionId);
         res.writeHead(200, {
           "content-type": "text/event-stream; charset=utf-8",
           "cache-control": "no-cache",
@@ -747,10 +805,18 @@ function productPreviewMeta(store, results) {
     revision: snapshot.revision
   };
 }
-function renderJson(_args, value) {
-  return [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value) }];
+function sessionIdOf(exec) {
+  return exec?.agent?.session?.header?.id || exec?.agent?.session?.id || exec?.agent?.id || exec?.sessionId || "";
 }
-function getDocumentTool(store) {
+function renderJson(_args, value) {
+  let payload = value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const { preview, ...rest } = value;
+    payload = rest;
+  }
+  return [{ type: "text", text: typeof payload === "string" ? payload : JSON.stringify(payload) }];
+}
+function getDocumentTool(stores) {
   return {
     name: "product_design_get_document",
     description: [
@@ -761,16 +827,23 @@ function getDocumentTool(store) {
     output: {
       schema: {},
       render: renderJson,
-      presentationMeta: () => productPreviewMeta(store, [])
+      presentationMeta: (_args, value) => value && value.preview || null
     },
     isConcurrencySafe: () => true,
-    async execute() {
+    async execute(_args, exec) {
+      const store = stores.forSession(sessionIdOf(exec));
       const snap = store.snapshot();
-      return { ok: true, revision: snap.revision, doc: snap.doc, summary: summarizeDoc(snap.doc) };
+      return {
+        ok: true,
+        revision: snap.revision,
+        doc: snap.doc,
+        summary: summarizeDoc(snap.doc),
+        preview: productPreviewMeta(store, [])
+      };
     }
   };
 }
-function applyTool(store) {
+function applyTool(stores) {
   return {
     name: "product_design_apply",
     description: [
@@ -802,16 +875,18 @@ function applyTool(store) {
     output: {
       schema: {},
       render: renderJson,
-      presentationMeta: (_args, value) => productPreviewMeta(store, value && value.results)
+      presentationMeta: (_args, value) => value && value.preview || null
     },
     isConcurrencySafe: () => false,
-    async execute(args) {
+    async execute(args, exec) {
+      const store = stores.forSession(sessionIdOf(exec));
       const result = store.apply(args?.operations);
       return {
         ok: result.ok,
         revision: result.revision,
         results: result.results,
-        summary: summarizeDoc(result.doc)
+        summary: summarizeDoc(result.doc),
+        preview: productPreviewMeta(store, result.results)
       };
     }
   };
@@ -856,12 +931,15 @@ function registerDesignCommand(ctx) {
   if (typeof ctx.inject === "function") ctx.inject(["commands"], install);
   else install(ctx);
 }
-function registerTools(ctx, store) {
+function registerTools(ctx, stores) {
   const install = (scope) => {
     const tools = scope && scope.tools || ctx.get("tools");
     if (!tools || typeof tools.register !== "function") return;
     scope.effect(() => {
-      const disposers = [tools.register(getDocumentTool(store)), tools.register(applyTool(store))];
+      const disposers = [
+        tools.register(getDocumentTool(stores)),
+        tools.register(applyTool(stores))
+      ];
       return () => {
         for (const dispose of disposers) {
           try {
@@ -890,16 +968,16 @@ function registerPrompt(ctx) {
   });
 }
 function apply(ctx) {
-  const store = createStore(docFile());
+  const stores = createStores();
   ctx.effect(
     () => ctx.webServer.register({
       kind: "prefix",
       path: API_PREFIX,
-      handler: makeHandler(ctx, store)
+      handler: makeHandler(ctx, stores)
     }),
     "dsh-product-design: host api"
   );
-  registerTools(ctx, store);
+  registerTools(ctx, stores);
   registerDesignCommand(ctx);
   registerPrompt(ctx);
 }

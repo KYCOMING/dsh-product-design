@@ -1726,19 +1726,22 @@ function normalizeDoc(doc) {
   }
   return null;
 }
-function loadDoc() {
+function docStorageKey(sessionId) {
+  return sessionId ? `${STORAGE_KEY}:${sessionId}` : STORAGE_KEY;
+}
+function loadDoc(sessionId) {
   try {
-    let raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) raw = window.localStorage.getItem(LEGACY_KEY);
+    let raw = window.localStorage.getItem(docStorageKey(sessionId));
+    if (!raw && !sessionId) raw = window.localStorage.getItem(LEGACY_KEY);
     if (!raw) return null;
     return normalizeDoc(JSON.parse(raw));
   } catch (e) {
     return null;
   }
 }
-function saveDoc(doc) {
+function saveDoc(doc, sessionId) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
+    window.localStorage.setItem(docStorageKey(sessionId), JSON.stringify(doc));
   } catch (e) {
   }
 }
@@ -1756,12 +1759,16 @@ function saveUi(ui) {
   } catch (e) {
   }
 }
-function apiFetch(path, init) {
+function apiFetch(path, init, sessionId) {
   if (typeof fetch !== "function") return Promise.resolve(null);
+  let target = API_PREFIX + path;
+  if (sessionId) {
+    target += (target.includes("?") ? "&" : "?") + "sessionId=" + encodeURIComponent(sessionId);
+  }
   let url;
   try {
     url = new URL(
-      API_PREFIX + path,
+      target,
       window.location && window.location.href ? window.location.href : "http://localhost/"
     ).toString();
   } catch (e) {
@@ -1788,6 +1795,63 @@ function apiFetch(path, init) {
     }),
     () => null
   );
+}
+
+// src/client/session.js
+var adapter = null;
+var adapterListeners = /* @__PURE__ */ new Set();
+function setSessionSource(next) {
+  adapter = next && typeof next === "object" ? next : null;
+  for (const listener of adapterListeners) {
+    try {
+      listener();
+    } catch (e) {
+    }
+  }
+}
+function currentSessionId() {
+  try {
+    const current = adapter && adapter.current;
+    const snapshot = current && typeof current.getSnapshot === "function" ? current.getSnapshot() : null;
+    return snapshot && typeof snapshot.key === "string" ? snapshot.key : "";
+  } catch (e) {
+    return "";
+  }
+}
+function useSessionId() {
+  const [id, setId] = useState2(currentSessionId);
+  useEffect2(() => {
+    let unsubscribe = null;
+    const attach = () => {
+      if (typeof unsubscribe === "function") {
+        try {
+          unsubscribe();
+        } catch (e) {
+        }
+      }
+      unsubscribe = null;
+      setId(currentSessionId());
+      try {
+        const current = adapter && adapter.current;
+        if (current && typeof current.subscribe === "function") {
+          unsubscribe = current.subscribe(() => setId(currentSessionId()));
+        }
+      } catch (e) {
+      }
+    };
+    adapterListeners.add(attach);
+    attach();
+    return () => {
+      adapterListeners.delete(attach);
+      if (typeof unsubscribe === "function") {
+        try {
+          unsubscribe();
+        } catch (e) {
+        }
+      }
+    };
+  }, []);
+  return id;
 }
 
 // src/client/styles.js
@@ -3175,7 +3239,10 @@ function scaleTree(elements, sx, sy, sf, ox, oy, isRoot) {
 }
 function ProductDesignPanel() {
   const t = useT();
-  const [doc, setDocState] = useState2(() => loadDoc() || defaultDoc(t));
+  const sessionId = useSessionId();
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+  const [doc, setDocState] = useState2(() => loadDoc(sessionId) || defaultDoc(t));
   const docRef = useRef(doc);
   const histRef = useRef({ past: [], future: [] });
   const lastKeyRef = useRef({ key: null, time: 0 });
@@ -3233,18 +3300,27 @@ function ProductDesignPanel() {
   });
   const hostRef = useRef({ on: false, revision: 0, suppressSave: false });
   useEffect2(() => {
-    saveDoc(doc);
+    const sid = sessionIdRef.current;
+    saveDoc(doc, sid);
     if (hostRef.current.suppressSave) {
       hostRef.current.suppressSave = false;
       return void 0;
     }
     if (!hostRef.current.on) return void 0;
     const timer = setTimeout(() => {
-      apiFetch("/doc", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ baseRevision: hostRef.current.revision, doc })
-      }).then((res) => {
+      apiFetch(
+        "/doc",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            baseRevision: hostRef.current.revision,
+            doc,
+            sessionId: sid
+          })
+        },
+        sid
+      ).then((res) => {
         if (!res) return;
         if (res.status === 200 && res.body) {
           hostRef.current.revision = res.body.revision;
@@ -3264,12 +3340,20 @@ function ProductDesignPanel() {
   useEffect2(() => {
     let cancelled = false;
     let source = null;
+    const sid = sessionId;
+    const localDoc = loadDoc(sid) || defaultDoc(t);
+    hostRef.current = { on: false, revision: 0, suppressSave: true };
+    docRef.current = localDoc;
+    setDocState(localDoc);
+    setSelIds([]);
+    setPreview(false);
+    histRef.current = { past: [], future: [] };
     (async () => {
       const canStream = typeof window.EventSource === "function";
       const attempts = canStream ? 6 : 1;
       let got = null;
       for (let i = 0; i < attempts && !cancelled; i += 1) {
-        got = await apiFetch("/doc");
+        got = await apiFetch("/doc", void 0, sid);
         if (got && got.status === 200 && got.body) break;
         if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500));
       }
@@ -3284,19 +3368,27 @@ function ProductDesignPanel() {
           setDocState(nd);
         }
       } else {
-        const seeded = await apiFetch("/doc", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ baseRevision: hostRef.current.revision, doc: docRef.current })
-        });
+        const seeded = await apiFetch(
+          "/doc",
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              baseRevision: hostRef.current.revision,
+              doc: docRef.current,
+              sessionId: sid
+            })
+          },
+          sid
+        );
         if (seeded && seeded.status === 200 && seeded.body)
           hostRef.current.revision = seeded.body.revision;
       }
       if (cancelled || typeof window.EventSource !== "function") return;
       try {
-        source = new window.EventSource(
-          new URL(API_PREFIX + "/events", window.location.href).toString()
-        );
+        const eventsUrl = new URL(API_PREFIX + "/events", window.location.href);
+        if (sid) eventsUrl.searchParams.set("sessionId", sid);
+        source = new window.EventSource(eventsUrl.toString());
         source.onmessage = (evt) => {
           let data = null;
           try {
@@ -3306,7 +3398,7 @@ function ProductDesignPanel() {
           }
           if (!data || typeof data.revision !== "number" || data.revision === hostRef.current.revision)
             return;
-          apiFetch("/doc").then((snap) => {
+          apiFetch("/doc", void 0, sid).then((snap) => {
             if (!snap || snap.status !== 200 || !snap.body || !snap.body.doc) return;
             const nd = normalizeDoc(snap.body.doc);
             if (!nd) return;
@@ -3328,7 +3420,7 @@ function ProductDesignPanel() {
         }
       }
     };
-  }, []);
+  }, [sessionId]);
   useEffect2(() => {
     saveUi({
       leftWidth,
@@ -4363,6 +4455,15 @@ function ProductDesignPanel() {
 var inject = ["slots", "layout"];
 function apply(ctx) {
   setAppCtx(ctx);
+  const bindSession = (scope) => {
+    try {
+      const service = scope && scope.get && scope.get("uiSession") || ctx.get("uiSession");
+      if (service && service.adapter) setSessionSource(service.adapter);
+    } catch (e) {
+    }
+  };
+  bindSession(ctx);
+  if (typeof ctx.inject === "function") ctx.inject(["uiSession"], bindSession);
   setCanvasOpener(() => {
     try {
       const layout = ctx.get("layout");

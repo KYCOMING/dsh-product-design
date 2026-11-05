@@ -19,7 +19,8 @@
 - **网格 + 缩放**：画布小方格网格随缩放变化；`Ctrl/⌘ + 滚轮` 缩放，普通滚轮滚动。
 - **编辑体验**：撤销 / 重做、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
 - **对话内产品预览（Visualize 风格）**：AI 调用 `product_design_apply` 后，聊天回合末尾会出现当前页面的产品缩略卡片，可一键「打开画布」；无需先手动打开画布。
-- **自动保存**：设计稿持久化到 `localStorage`（`doc:v2`，旧 `doc:v1` 自动迁移为第 1 页）。
+- **多会话独立设计稿**：每个会话拥有自己的设计稿；切换会话时画布自动切换，互不覆盖。旧版单稿会自动迁移到首个打开画布的会话。
+- **自动保存**：设计稿持久化到 Host（按会话分目录）和 `localStorage`（`doc:v2:<sessionId>`，旧 `doc:v1` 自动迁移为第 1 页）。
 
 ## 快捷键
 
@@ -64,6 +65,7 @@ dsh-product-design/
 │  │  ├─ overlay.js           # 页面状态浮层
 │  │  ├─ panel.js             # 编辑器容器：状态 / 撤销历史 / 事件处理
 │  │  ├─ cards.js             # 对话内产品预览卡片（Visualize 风格）
+│  │  ├─ session.js           # 跟随当前会话的 active-session 订阅
 │  │  └─ ui/                  # 展示层子组件（纯渲染 + 回调）
 │  │     ├─ toolbar.js        #   顶部工具栏
 │  │     ├─ left.js           #   活动栏 + 页面/组件库/图层分区
@@ -92,7 +94,7 @@ dsh-product-design/
 
 设计稿的所有权在 **Host**，浏览器只是视图，因此模型可以通过工具直接读写画布：
 
-- **数据**：`<DSH_HOME>/storages/dsh-product-design/doc.json`（默认 `~/.dsh/...`），含 `revision` 与 `doc`。
+- **数据**：`<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`（默认 `~/.dsh/...`），每个会话一份，含 `revision` 与 `doc`；旧版全局 `doc.json` 会迁移到首个打开画布的会话。
 - **HTTP 路由**（同源，前缀 `/dsh-product-design/api`）：
   - `GET /doc` → `{ revision, doc }`
   - `POST /doc` → `{ baseRevision, doc }`（乐观并发，版本不匹配返回 409 + 当前文档）
@@ -121,8 +123,8 @@ pnpm run check      # build + syntax + lint + test 一次跑完
 
 ## 数据存储
 
-- **Host 权威**：`<DSH_HOME>/storages/dsh-product-design/doc.json`（`{ revision, doc }`），跨会话持久、供 AI 工具读写。
-- `dsh-product-design:doc:v2`：浏览器端 **缓存/离线兜底**（Host 不可达时使用；首次连接时若 Host 为空则作为种子上报）。
+- **Host 权威**：`<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`（`{ revision, doc }`），按会话隔离、供 AI 工具读写；无会话上下文时退回旧版全局 `doc.json`。
+- `dsh-product-design:doc:v2:<sessionId>`：浏览器端 **按会话缓存/离线兜底**（Host 不可达时使用；首次连接时若 Host 为空则作为种子上报）。
 - `dsh-product-design:ui:v1`：界面偏好（左右侧栏宽度、当前分区、磁吸开关）。
 - 旧 `dsh-product-design:doc:v1`（单画板）在加载时自动迁移为 `doc:v2` 的第 1 页。
 

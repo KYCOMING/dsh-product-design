@@ -123,19 +123,22 @@ function normalizeDoc(doc) {
   }
   return null;
 }
-function loadDoc() {
+function docStorageKey(sessionId) {
+  return sessionId ? `${STORAGE_KEY}:${sessionId}` : STORAGE_KEY;
+}
+function loadDoc(sessionId) {
   try {
-    let raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) raw = window.localStorage.getItem(LEGACY_KEY);
+    let raw = window.localStorage.getItem(docStorageKey(sessionId));
+    if (!raw && !sessionId) raw = window.localStorage.getItem(LEGACY_KEY);
     if (!raw) return null;
     return normalizeDoc(JSON.parse(raw));
   } catch (e) {
     return null;
   }
 }
-function saveDoc(doc) {
+function saveDoc(doc, sessionId) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
+    window.localStorage.setItem(docStorageKey(sessionId), JSON.stringify(doc));
   } catch (e) {
     /* quota / private mode: ignore */
   }
@@ -160,12 +163,16 @@ function saveUi(ui) {
  * Call the Host document API. Returns `{ status, body }`, or `null` when the
  * Host half is not reachable (standalone/localStorage-only mode).
  */
-function apiFetch(path, init) {
+function apiFetch(path, init, sessionId) {
   if (typeof fetch !== 'function') return Promise.resolve(null);
+  let target = API_PREFIX + path;
+  if (sessionId) {
+    target += (target.includes('?') ? '&' : '?') + 'sessionId=' + encodeURIComponent(sessionId);
+  }
   let url;
   try {
     url = new URL(
-      API_PREFIX + path,
+      target,
       window.location && window.location.href ? window.location.href : 'http://localhost/',
     ).toString();
   } catch (e) {

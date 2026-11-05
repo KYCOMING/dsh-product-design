@@ -3,11 +3,22 @@ import { NS, PANEL_ID } from './constants.js';
 import { activeLocale, DICT, pickDict, setAppCtx } from './i18n.js';
 import { ProductDesignIcon } from './icons.js';
 import { ProductDesignPanel } from './panel.js';
+import { setSessionSource } from './session.js';
 
 export const inject = ['slots', 'layout'];
 
 export function apply(ctx) {
   setAppCtx(ctx);
+  const bindSession = (scope) => {
+    try {
+      const service = (scope && scope.get && scope.get('uiSession')) || ctx.get('uiSession');
+      if (service && service.adapter) setSessionSource(service.adapter);
+    } catch (e) {
+      /* uiSession unavailable */
+    }
+  };
+  bindSession(ctx);
+  if (typeof ctx.inject === 'function') ctx.inject(['uiSession'], bindSession);
   setCanvasOpener(() => {
     try {
       const layout = ctx.get('layout');

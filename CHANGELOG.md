@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **多会话独立设计稿**：Host 按 `sessions/<sessionId>/doc.json` 存储；客户端跟随当前会话加载/保存，切换会话不会覆盖其他会话的设计稿。旧版全局 `doc.json` 自动迁移到首个打开画布的会话。
 - **`/design <需求>` 命令**：Host 命令接收产品设计需求并通过 `agent.followup()` 提交为普通用户消息，由 AI 调用 `product_design_apply` 绘制。
 - **对话内产品预览（Codex Visualize 风格）**：`product_design_apply` / `product_design_get_document` 的结果附带 `presentationMeta`，客户端在聊天回合末尾渲染当前页面的产品缩略卡片，支持「打开画布」。AI 收到需求并修改文档后，用户无需手动跳转就能看到结果。
 - **右侧属性栏可拖拽调宽 + 收起**：宽度会记忆到 `dsh-product-design:ui:v1`，并限制最大占可用宽度的 36%；标题栏「»」可收起为窄条、「«」展开，避免遮挡画布。

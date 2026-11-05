@@ -13,9 +13,10 @@ const CLIENT_PATH = path.resolve(here, '../../client.js');
  * module through its factory, then `apply()` it against a minimal fake client
  * context so the registered slot components can be rendered in a test.
  *
- * @param {{ commandUi?: object|null, layout?: object }} [options]
+ * @param {{ commandUi?: object|null, layout?: object, uiSession?: object }} [options]
  *   - `commandUi`: fake service; pass `null` to simulate the service being absent.
  *   - `layout`: fake layout service (defaults to one that records selectPanel calls).
+ *   - `uiSession`: fake session service for active-session tests.
  */
 export function loadPlugin(options = {}) {
   let definition = null;
@@ -58,6 +59,7 @@ export function loadPlugin(options = {}) {
 
   const services = { layout };
   if (hasCommandUi) services.commandUi = commandUi;
+  if (options.uiSession) services.uiSession = options.uiSession;
 
   const get = (name) => services[name] ?? null;
   const effect = (fn) => (fn ? fn() : () => {});
