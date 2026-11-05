@@ -18,6 +18,9 @@ dsh plugin --profile web add github:KYCOMING/dsh-product-design
 
 没有 `dsh` 命令时：打开 **插件 → 添加插件**，输入 `github:KYCOMING/dsh-product-design`。
 
+> 包根 `package.json` 的顶层 `install` 字段以机器可读方式声明了同一条规范安装命令，供插件市场在 L3「安装规范」检查中直接解析：
+> `"install": "dsh plugin --profile web add github:KYCOMING/dsh-product-design"`。
+
 安装后在「插件」页确认 `dsh-product-design` 已启用，然后重启 DSH（Host 半不会热加载）。打开一个已有消息的会话，顶部标签栏会出现「产品设计」，点击即可在该会话里编辑设计稿；也可以在画布内点「全屏」进入独立画布。
 
 卸载：

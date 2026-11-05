@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Added
+- **机器可读的 `install` 字段**：`package.json` 顶层新增 `install`，值为规范安装命令 `dsh plugin --profile web add github:KYCOMING/dsh-product-design`，供插件市场 L3「安装规范」检查直接从 manifest 解析安装路径（`engines.dsh` 已声明 DSH 版本要求）。
+
 ## [1.5.0] - 2026-11-05
 
 ### Changed
