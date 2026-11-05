@@ -10,6 +10,7 @@ import {
   moveElementInTree,
   pointInBox,
   reorderInTree,
+  scaleElementsInTree,
 } from '../shared/elements.js';
 import { SNAP_THRESHOLD, snapMoveBox, snapResizeBox } from '../shared/snapping.js';
 import { API_PREFIX, defaultState, TYPE_INFO } from './constants.js';
@@ -232,6 +233,7 @@ function ProductDesignPanel() {
   const [guides, setGuides] = useState([]);
   const [marquee, setMarquee] = useState(null);
   const [snapEnabled, setSnapEnabled] = useState(() => loadUi().snapEnabled !== false);
+  const [scaleOnResize, setScaleOnResize] = useState(() => loadUi().scaleOnResize !== false);
   const snapRef = useRef(snapEnabled);
   snapRef.current = snapEnabled;
   const zoomRef = useRef(zoom);
@@ -394,8 +396,9 @@ function ProductDesignPanel() {
       rightCollapsed: rightCollapsed,
       section: section,
       snapEnabled: snapEnabled,
+      scaleOnResize: scaleOnResize,
     });
-  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled]);
+  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled, scaleOnResize]);
 
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -989,15 +992,20 @@ function ProductDesignPanel() {
     const map = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
     const sz = map[key];
     if (!sz) return;
-    // Resizing a frame never rescales its content: layout stays exactly where
-    // the user put it, like every other canvas tool.
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) =>
-        p.id === d.activePageId
-          ? { ...p, frame: { ...p.frame, w: sz[0], h: sz[1], preset: key } }
-          : p,
-      ),
+      pages: d.pages.map((p) => {
+        if (p.id !== d.activePageId) return p;
+        const ow = p.frame.w || sz[0];
+        const oh = p.frame.h || sz[1];
+        const nw = sz[0];
+        const nh = sz[1];
+        const elements =
+          scaleOnResize && (ow !== nw || oh !== nh)
+            ? scaleElementsInTree(p.elements, nw / ow, nh / oh, Math.min(nw / ow, nh / oh))
+            : p.elements;
+        return { ...p, frame: { ...p.frame, w: nw, h: nh, preset: key }, elements };
+      }),
     }));
   }
   function patchActiveFrame(patch) {
@@ -1759,6 +1767,8 @@ function ProductDesignPanel() {
             selCount: selEntries.length,
             activePage,
             pageState,
+            scaleOnResize,
+            setScaleOnResize,
             setEl,
             applyAttrs,
             applyProps,

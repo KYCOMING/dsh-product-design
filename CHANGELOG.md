@@ -21,7 +21,7 @@
 
 ### Changed
 - **文档格式升到 v3（破坏性，不做兼容）**：元素新增 `name / hidden / locked / opacity / interactions`，页面新增 `states`；localStorage 键改为 `dsh-product-design:doc:v3`。移除 v1→v2 迁移、半宽文档自愈 `repairDoc`、旧全局 `doc.json` 迁移等全部兼容代码。
-- **切画板尺寸不再缩放内容**：`set_page_frame` 与画板预设只改 frame，元素几何保持不变（原来的按比例缩放有损且不可逆）。
+- **切画板尺寸默认缩放内容，可关闭**：`set_page_frame` 与画板预设默认按宽高比例缩放当前页元素（`scaleElements:false` 可保持原位）；右侧「画布设置」新增「切换画板尺寸时缩放内容」开关，记忆到 UI 偏好。
 - **AI 改动可撤销**：Host 通过 SSE 推来的文档变更会作为独立历史步骤记录，`⌘Z` 可回退；自己保存的回声不会产生多余步骤。
 - **图层面板默认行为**：容器子元素按层级缩进，隐藏元素仍可在图层树里选中与恢复。
 - `package.json` 的 `description` 改为中英文双语，与 GitHub About 保持一致。

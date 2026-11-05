@@ -84,7 +84,7 @@ describe('host 容器 / 编组', () => {
     ]);
   });
 
-  it('set_page_frame 不改变容器与子元素的几何', () => {
+  it('set_page_frame 同步缩放容器与子元素', () => {
     const first = applyOps(emptyDoc(), [
       { kind: 'add_page', preset: 'desktop' },
       { kind: 'add_container', x: 100, y: 100, w: 200, h: 100 },
@@ -94,13 +94,15 @@ describe('host 容器 / 编组', () => {
     const second = applyOps(first.doc, [
       { kind: 'add_element', pageId, containerId, type: 'text', x: 10, y: 10, w: 50, h: 20 },
     ]);
-    const resized = applyOps(second.doc, [
-      { kind: 'set_page_frame', pageId, preset: 'mobile' },
-    ]).doc;
-    expect(resized.pages[0].frame).toMatchObject({ w: 390, h: 844 });
-    const box = resized.pages[0].elements[0];
-    expect(box).toMatchObject({ x: 100, y: 100, w: 200, h: 100 });
-    expect(box.children[0]).toMatchObject({ x: 10, y: 10, w: 50, h: 20 });
+    const scaled = applyOps(second.doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
+    const box = scaled.pages[0].elements[0];
+    const child = box.children[0];
+    const sx = 390 / 1280;
+    const sy = 844 / 800;
+    expect(box.w).toBe(Math.max(12, Math.round(200 * sx)));
+    expect(box.h).toBe(Math.max(8, Math.round(100 * sy)));
+    expect(child.w).toBe(Math.max(12, Math.round(50 * sx)));
+    expect(child.h).toBe(Math.max(8, Math.round(20 * sy)));
   });
 
   it('删除容器会连同子元素一起删除', () => {

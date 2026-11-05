@@ -23,6 +23,7 @@ import {
   isContainerType,
   moveElementInTree,
   reorderInTree,
+  scaleElementsInTree,
 } from '../shared/elements.js';
 
 export const ELEMENT_TYPES = {
@@ -302,15 +303,22 @@ function applyOne(doc, op, index, state) {
     const page = findPage(doc, op, index);
     const preset = PRESETS[op.preset] ? op.preset : page.frame.preset;
     const size = PRESETS[preset] || [page.frame.w, page.frame.h];
-    // Resizing a frame never touches element geometry: layout is owned by the
-    // designer/model, not by a lossy rescale.
+    const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
+    const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
+    const ow = page.frame.w;
+    const oh = page.frame.h;
+    if (op.scaleElements !== false && (ow !== nw || oh !== nh)) {
+      const sx = nw / ow;
+      const sy = nh / oh;
+      page.elements = scaleElementsInTree(page.elements, sx, sy, Math.min(sx, sy));
+    }
     page.frame = {
       preset,
-      w: Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w)),
-      h: Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h)),
+      w: nw,
+      h: nh,
       background: str(op.background, page.frame.background),
     };
-    return { op: index, kind, pageId: page.id };
+    return { op: index, kind, pageId: page.id, scaled: op.scaleElements !== false };
   }
 
   if (kind === 'set_page_states') {

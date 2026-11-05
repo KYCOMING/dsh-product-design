@@ -299,3 +299,32 @@ export function reorderInTree(elements, id, mode) {
   next.splice(to, 0, el);
   return replaceList(elements, list, next);
 }
+
+/**
+ * Scale a page's element tree when its frame changes size.
+ *
+ * Coordinates and sizes follow their own axis ratio (so a page keeps filling
+ * the frame), while font size / radius follow the smaller ratio so type never
+ * gets stretched out of proportion. Root coordinates are offset by ox/oy first;
+ * children are already relative to their parent.
+ */
+export function scaleElementsInTree(elements, sx, sy, sf, ox = 0, oy = 0, isRoot = true) {
+  return elements.map((el) => {
+    const props = { ...(el.props || {}) };
+    if (typeof props.fontSize === 'number')
+      props.fontSize = Math.max(8, Math.round(props.fontSize * sf));
+    if (typeof props.radius === 'number') props.radius = Math.max(0, Math.round(props.radius * sf));
+    const out = {
+      ...el,
+      x: Math.round((isRoot ? el.x - ox : el.x) * sx),
+      y: Math.round((isRoot ? el.y - oy : el.y) * sy),
+      w: Math.max(12, Math.round(el.w * sx)),
+      h: Math.max(8, Math.round(el.h * sy)),
+      props,
+    };
+    if (isContainer(el) && Array.isArray(el.children)) {
+      out.children = scaleElementsInTree(el.children, sx, sy, sf, 0, 0, false);
+    }
+    return out;
+  });
+}

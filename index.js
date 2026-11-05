@@ -130,6 +130,26 @@ function reorderInTree(elements, id, mode) {
   next.splice(to, 0, el);
   return replaceList(elements, list, next);
 }
+function scaleElementsInTree(elements, sx, sy, sf, ox = 0, oy = 0, isRoot = true) {
+  return elements.map((el) => {
+    const props = { ...el.props || {} };
+    if (typeof props.fontSize === "number")
+      props.fontSize = Math.max(8, Math.round(props.fontSize * sf));
+    if (typeof props.radius === "number") props.radius = Math.max(0, Math.round(props.radius * sf));
+    const out = {
+      ...el,
+      x: Math.round((isRoot ? el.x - ox : el.x) * sx),
+      y: Math.round((isRoot ? el.y - oy : el.y) * sy),
+      w: Math.max(12, Math.round(el.w * sx)),
+      h: Math.max(8, Math.round(el.h * sy)),
+      props
+    };
+    if (isContainer(el) && Array.isArray(el.children)) {
+      out.children = scaleElementsInTree(el.children, sx, sy, sf, 0, 0, false);
+    }
+    return out;
+  });
+}
 
 // src/host/model.js
 var ELEMENT_TYPES = {
@@ -372,13 +392,22 @@ function applyOne(doc, op, index, state) {
     const page = findPage(doc, op, index);
     const preset = PRESETS[op.preset] ? op.preset : page.frame.preset;
     const size = PRESETS[preset] || [page.frame.w, page.frame.h];
+    const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
+    const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
+    const ow = page.frame.w;
+    const oh = page.frame.h;
+    if (op.scaleElements !== false && (ow !== nw || oh !== nh)) {
+      const sx = nw / ow;
+      const sy = nh / oh;
+      page.elements = scaleElementsInTree(page.elements, sx, sy, Math.min(sx, sy));
+    }
     page.frame = {
       preset,
-      w: Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w)),
-      h: Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h)),
+      w: nw,
+      h: nh,
       background: str(op.background, page.frame.background)
     };
-    return { op: index, kind, pageId: page.id };
+    return { op: index, kind, pageId: page.id, scaled: op.scaleElements !== false };
   }
   if (kind === "set_page_states") {
     const page = findPage(doc, op, index);
@@ -924,7 +953,7 @@ function applyTool(stores) {
       "add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} \u2192 pageId",
       "duplicate_page {pageId, name?} \u2192 pageId (copies the whole page with fresh element ids)",
       "delete_page {pageId}; rename_page {pageId, name}; set_active_page {pageId}",
-      "set_page_frame {pageId, preset?|width?, height?, background?} (never rescales elements); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}",
+      "set_page_frame {pageId, preset?|width?, height?, background?, scaleElements?} (scales the page content to the new size by default; pass scaleElements:false to keep element geometry); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}",
       "clear_page {pageId}",
       'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?} \u2192 elementId (a frame-like container; pass containerId (or "@last") to nest it)',
       'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius}, interactions?} \u2192 elementId (containerId also accepts "@last")',

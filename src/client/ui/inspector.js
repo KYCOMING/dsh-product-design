@@ -16,6 +16,8 @@ export function InspectorView(props) {
     selCount,
     activePage,
     pageState,
+    scaleOnResize,
+    setScaleOnResize,
     setPreset,
     renameActivePage,
     patchActiveFrame,
@@ -565,6 +567,16 @@ export function InspectorView(props) {
             value: (activePage && activePage.frame.background) || '#ffffff',
             onChange: (e) => patchActiveFrame({ background: e.target.value }),
           }),
+        ),
+        h(
+          'label',
+          { className: 'dpd-checkRow' },
+          h('input', {
+            type: 'checkbox',
+            checked: scaleOnResize !== false,
+            onChange: (e) => setScaleOnResize(e.target.checked),
+          }),
+          t('inspector.scaleOnResize'),
         ),
       ),
       stateKeys

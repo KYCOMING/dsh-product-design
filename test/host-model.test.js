@@ -87,16 +87,36 @@ describe('host 文档 reducer', () => {
     expect(results[3].pageId).toBe(doc.pages[1].id);
   });
 
-  it('set_page_frame 只改画板尺寸，不动元素几何', () => {
+  it('set_page_frame 按宽高比例缩放内容，可用 scaleElements 关闭', () => {
     const { doc } = applyOps(emptyDoc(), [
       { kind: 'add_page', preset: 'desktop' },
-      { kind: 'add_element', type: 'button', x: 200, y: 100, w: 200, h: 60 },
+      {
+        kind: 'add_element',
+        type: 'button',
+        x: 200,
+        y: 100,
+        w: 200,
+        h: 60,
+        props: { fontSize: 20 },
+      },
     ]);
     const pageId = doc.pages[0].id;
     const before = doc.pages[0].elements[0];
-    const out = applyOps(doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
-    expect(out.pages[0].frame).toMatchObject({ w: 390, h: 844, preset: 'mobile' });
-    expect(out.pages[0].elements[0]).toMatchObject({
+    const shrunk = applyOps(doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
+    const after = shrunk.pages[0].elements[0];
+    const sx = 390 / 1280;
+    const sy = 844 / 800;
+    expect(shrunk.pages[0].frame).toMatchObject({ w: 390, h: 844, preset: 'mobile' });
+    expect(after.w).toBe(Math.max(12, Math.round(before.w * sx)));
+    expect(after.h).toBe(Math.max(8, Math.round(before.h * sy)));
+    expect(after.x).toBe(Math.round(before.x * sx));
+    expect(after.y).toBe(Math.round(before.y * sy));
+    expect(after.props.fontSize).toBe(Math.max(8, Math.round(20 * Math.min(sx, sy))));
+
+    const kept = applyOps(doc, [
+      { kind: 'set_page_frame', pageId, preset: 'mobile', scaleElements: false },
+    ]).doc;
+    expect(kept.pages[0].elements[0]).toMatchObject({
       x: before.x,
       y: before.y,
       w: before.w,

@@ -163,7 +163,7 @@ describe('编辑行为', () => {
     expect(doc().pages[0].elements[6].state).not.toBe(before);
   });
 
-  it('切换画布尺寸只改画板，元素位置尺寸不变', async () => {
+  it('切换画布尺寸按宽高分别缩放，切回可还原', async () => {
     const select = container.querySelector('select.dpd-select');
     const setSelect = async (el, value) => {
       await act(async () => {
@@ -174,14 +174,35 @@ describe('编辑行为', () => {
       });
     };
 
-    const before = doc().pages[0].elements[0];
+    const beforeW = doc().pages[0].elements[0].w;
+    const beforeH = doc().pages[0].elements[0].h;
     await setSelect(select, 'desktop');
     expect(doc().pages[0].frame.w).toBe(1280);
-    expect(doc().pages[0].elements[0].w).toBe(before.w);
-    expect(doc().pages[0].elements[0].x).toBe(before.x);
+    expect(doc().pages[0].elements[0].w).toBeGreaterThan(beforeW * 2);
 
     await setSelect(select, 'mobile');
     expect(doc().pages[0].frame.w).toBe(390);
+    expect(Math.abs(doc().pages[0].elements[0].w - beforeW)).toBeLessThanOrEqual(2);
+    expect(Math.abs(doc().pages[0].elements[0].h - beforeH)).toBeLessThanOrEqual(2);
+  });
+
+  it('关闭「缩放内容」后切画板尺寸不改变元素', async () => {
+    const select = container.querySelector('select.dpd-select');
+    const checkbox = Array.from(container.querySelectorAll('.dpd-checkRow input')).find(
+      (input) => input.type === 'checkbox',
+    );
+    expect(checkbox).toBeTruthy();
+    await act(async () => {
+      checkbox.click();
+    });
+    const before = doc().pages[0].elements[0];
+    await act(async () => {
+      const desc = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+      if (desc?.set) desc.set.call(select, 'desktop');
+      else select.value = 'desktop';
+      select.dispatchEvent(new window.Event('change', { bubbles: true }));
+    });
+    expect(doc().pages[0].frame.w).toBe(1280);
     expect(doc().pages[0].elements[0].w).toBe(before.w);
   });
 });

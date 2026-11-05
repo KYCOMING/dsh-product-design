@@ -359,7 +359,7 @@ function applyTool(stores) {
       'add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} → pageId',
       'duplicate_page {pageId, name?} → pageId (copies the whole page with fresh element ids)',
       'delete_page {pageId}; rename_page {pageId, name}; set_active_page {pageId}',
-      'set_page_frame {pageId, preset?|width?, height?, background?} (never rescales elements); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}',
+      'set_page_frame {pageId, preset?|width?, height?, background?, scaleElements?} (scales the page content to the new size by default; pass scaleElements:false to keep element geometry); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}',
       'clear_page {pageId}',
       'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?} → elementId (a frame-like container; pass containerId (or "@last") to nest it)',
       'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius}, interactions?} → elementId (containerId also accepts "@last")',

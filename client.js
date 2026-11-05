@@ -260,6 +260,26 @@ function reorderInTree(elements, id, mode) {
   next.splice(to, 0, el);
   return replaceList(elements, list, next);
 }
+function scaleElementsInTree(elements, sx, sy, sf, ox = 0, oy = 0, isRoot = true) {
+  return elements.map((el) => {
+    const props = { ...el.props || {} };
+    if (typeof props.fontSize === "number")
+      props.fontSize = Math.max(8, Math.round(props.fontSize * sf));
+    if (typeof props.radius === "number") props.radius = Math.max(0, Math.round(props.radius * sf));
+    const out = {
+      ...el,
+      x: Math.round((isRoot ? el.x - ox : el.x) * sx),
+      y: Math.round((isRoot ? el.y - oy : el.y) * sy),
+      w: Math.max(12, Math.round(el.w * sx)),
+      h: Math.max(8, Math.round(el.h * sy)),
+      props
+    };
+    if (isContainer(el) && Array.isArray(el.children)) {
+      out.children = scaleElementsInTree(el.children, sx, sy, sf, 0, 0, false);
+    }
+    return out;
+  });
+}
 
 // src/client/constants.js
 var NS = "dsh-product-design";
@@ -524,6 +544,7 @@ var DICT = {
     "inspector.stateTitle": "\u6807\u9898",
     "inspector.stateDesc": "\u8BF4\u660E",
     "inspector.stateAction": "\u6309\u94AE\u6587\u6848",
+    "inspector.scaleOnResize": "\u5207\u6362\u753B\u677F\u5C3A\u5BF8\u65F6\u7F29\u653E\u5185\u5BB9",
     "inspector.multiHint": "\u4FEE\u6539\u4F1A\u5E94\u7528\u5230\u5168\u90E8\u9009\u4E2D\u56FE\u5C42",
     "textEdit.hint": "Enter \u6362\u884C \xB7 Esc \u53D6\u6D88",
     "preview.back": "\u8FD4\u56DE",
@@ -682,6 +703,7 @@ var DICT = {
     "inspector.stateTitle": "Title",
     "inspector.stateDesc": "Description",
     "inspector.stateAction": "Button label",
+    "inspector.scaleOnResize": "Scale content when the frame resizes",
     "inspector.multiHint": "Changes apply to every selected layer",
     "textEdit.hint": "Enter for newline \xB7 Esc to cancel",
     "preview.back": "Back",
@@ -2745,6 +2767,8 @@ function InspectorView(props) {
     selCount,
     activePage,
     pageState,
+    scaleOnResize,
+    setScaleOnResize,
     setPreset,
     renameActivePage,
     patchActiveFrame,
@@ -3268,6 +3292,16 @@ function InspectorView(props) {
             value: activePage && activePage.frame.background || "#ffffff",
             onChange: (e) => patchActiveFrame({ background: e.target.value })
           })
+        ),
+        h(
+          "label",
+          { className: "dpd-checkRow" },
+          h("input", {
+            type: "checkbox",
+            checked: scaleOnResize !== false,
+            onChange: (e) => setScaleOnResize(e.target.checked)
+          }),
+          t("inspector.scaleOnResize")
         )
       ),
       stateKeys ? h(
@@ -4023,6 +4057,7 @@ function ProductDesignPanel() {
   const [guides, setGuides] = useState2([]);
   const [marquee, setMarquee] = useState2(null);
   const [snapEnabled, setSnapEnabled] = useState2(() => loadUi().snapEnabled !== false);
+  const [scaleOnResize, setScaleOnResize] = useState2(() => loadUi().scaleOnResize !== false);
   const snapRef = useRef(snapEnabled);
   snapRef.current = snapEnabled;
   const zoomRef = useRef(zoom);
@@ -4168,9 +4203,10 @@ function ProductDesignPanel() {
       rightWidth,
       rightCollapsed,
       section,
-      snapEnabled
+      snapEnabled,
+      scaleOnResize
     });
-  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled]);
+  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled, scaleOnResize]);
   const canvasRef = useRef(null);
   useEffect2(() => {
     const el = canvasRef.current;
@@ -4725,9 +4761,15 @@ function ProductDesignPanel() {
     if (!sz) return;
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map(
-        (p) => p.id === d.activePageId ? { ...p, frame: { ...p.frame, w: sz[0], h: sz[1], preset: key } } : p
-      )
+      pages: d.pages.map((p) => {
+        if (p.id !== d.activePageId) return p;
+        const ow = p.frame.w || sz[0];
+        const oh = p.frame.h || sz[1];
+        const nw = sz[0];
+        const nh = sz[1];
+        const elements = scaleOnResize && (ow !== nw || oh !== nh) ? scaleElementsInTree(p.elements, nw / ow, nh / oh, Math.min(nw / ow, nh / oh)) : p.elements;
+        return { ...p, frame: { ...p.frame, w: nw, h: nh, preset: key }, elements };
+      })
     }));
   }
   function patchActiveFrame(patch) {
@@ -5433,6 +5475,8 @@ function ProductDesignPanel() {
         selCount: selEntries.length,
         activePage,
         pageState,
+        scaleOnResize,
+        setScaleOnResize,
         setEl,
         applyAttrs,
         applyProps,
