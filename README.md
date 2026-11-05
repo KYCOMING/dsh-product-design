@@ -41,6 +41,22 @@ dsh plugin --profile desktop remove dsh-product-design
 - 注册两个 agent 工具（`product_design_get_document` / `product_design_apply`）、一段系统提示和 `/design` 命令。
 - 不发起外部网络请求，不收集遥测。
 
+## 截图
+
+> 示例设计稿「Nimbus」：登录、首页、详情三个画板。
+
+### 编辑器：多画板、页面树与属性面板
+
+![编辑器](docs/screenshots/editor-pages.png)
+
+### 组件库：13 类组件，点击添加到当前页
+
+![组件库](docs/screenshots/editor-components.png)
+
+### 纯净预览：隐藏编辑器 UI，只保留产品画板
+
+![预览模式](docs/screenshots/preview.png)
+
 ## 功能
 
 - **多画板并排**：所有页面横向排在可平移 / 缩放的画布上，每页独立尺寸（手机 390×844 / 平板 768×1024 / 桌面 1280×800）、背景与组件。

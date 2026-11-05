@@ -4,6 +4,11 @@
 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Added
+- README 增加画板截图：编辑器多画板、组件库、纯净预览。
+
 ## [1.1.0] - 2026-11-05
 
 ### Added
