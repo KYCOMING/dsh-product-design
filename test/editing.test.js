@@ -9,6 +9,50 @@ let plugin;
 
 const doc = () => JSON.parse(window.localStorage.getItem('dsh-product-design:doc:v3'));
 
+// Editing tests need a populated artboard to act on. The product itself now
+// starts from a blank page, so seed a fixture (mirrors the old starter layout:
+// index 0 is a full-width navbar, index 6 is an on toggle).
+function starterDoc() {
+  const el = (id, type, x, y, w, h, extra = {}) => ({
+    id,
+    type,
+    x,
+    y,
+    w,
+    h,
+    state: extra.state || 'default',
+    props: extra.props || {},
+  });
+  return {
+    name: '',
+    activePageId: 'p1',
+    pages: [
+      {
+        id: 'p1',
+        name: 'Page 1',
+        frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
+        states: {},
+        elements: [
+          el('e0', 'navbar', 0, 0, 390, 56),
+          el('e1', 'text', 24, 84, 320, 30, {
+            props: { fontSize: 22, text: '欢迎回来' },
+          }),
+          el('e2', 'text', 24, 120, 320, 22, {
+            props: { fontSize: 13, fontWeight: 400, color: '#6b7280', text: '今天想设计点什么？' },
+          }),
+          el('e3', 'card', 24, 158, 342, 116),
+          el('e4', 'input', 24, 296, 342, 44),
+          el('e5', 'button', 24, 356, 150, 44),
+          el('e6', 'toggle', 300, 364, 50, 28, { state: 'on' }),
+          el('e7', 'badge', 24, 420, 70, 24),
+          el('e8', 'tabs', 0, 470, 390, 48),
+          el('e9', 'image', 24, 540, 342, 160),
+        ],
+      },
+    ],
+  };
+}
+
 const q = (sel) => container.querySelectorAll(sel);
 const btn = (title) =>
   Array.from(container.querySelectorAll('button')).find((b) => b.getAttribute('title') === title);
@@ -37,6 +81,7 @@ beforeEach(async () => {
   window.localStorage.clear();
   window.confirm = () => true;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  window.localStorage.setItem('dsh-product-design:doc:v3', JSON.stringify(starterDoc()));
   document.body.innerHTML = '';
   container = document.createElement('div');
   document.body.appendChild(container);

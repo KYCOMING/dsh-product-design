@@ -39,33 +39,16 @@ function makeEl(type, x, y, w, hh, props, state) {
   return el;
 }
 
-function starterElements(t) {
-  return [
-    makeEl('navbar', 0, 0, 390, 56),
-    makeEl('text', 24, 84, 320, 30, { fontSize: 22, text: t ? t('sample.welcome') : '欢迎回来' }),
-    makeEl('text', 24, 120, 320, 22, {
-      fontSize: 13,
-      fontWeight: 400,
-      color: '#6b7280',
-      text: t ? t('sample.welcomeSub') : '今天想设计点什么？',
-    }),
-    makeEl('card', 24, 158, 342, 116),
-    makeEl('input', 24, 296, 342, 44),
-    makeEl('button', 24, 356, 150, 44),
-    makeEl('toggle', 300, 364, 50, 28),
-    makeEl('badge', 24, 420, 70, 24),
-    makeEl('tabs', 0, 470, 390, 48),
-    makeEl('image', 24, 540, 342, 160),
-  ];
-}
-
 function defaultDoc(t) {
+  // A brand-new design starts as a single blank page: an empty artboard the
+  // user (or the agent) fills from the component library. We deliberately seed
+  // no sample content so opening product design never shows a welcome/demo page.
   const page = {
     id: uid(),
     name: t ? t('pages.default') + ' 1' : 'Page 1',
     frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
     states: {},
-    elements: starterElements(t),
+    elements: [],
   };
   return { name: '', pages: [page], activePageId: page.id };
 }

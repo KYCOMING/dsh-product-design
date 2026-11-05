@@ -9,6 +9,9 @@
 ### Added
 - **机器可读的 `install` 字段**：`package.json` 顶层新增 `install`，值为规范安装命令 `dsh plugin --profile web add github:KYCOMING/dsh-product-design`，供插件市场 L3「安装规范」检查直接从 manifest 解析安装路径（`engines.dsh` 已声明 DSH 版本要求）。
 
+### Changed
+- **默认画布改为空白页**：新会话/新建的设计稿不再预置「欢迎回来」示例页，默认只有一个空白画板，用户或 agent 从组件库自行搭建；移除随之不再使用的 `sample.welcome` / `sample.welcomeSub` 文案。
+
 ## [1.5.0] - 2026-11-05
 
 ### Changed
