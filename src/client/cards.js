@@ -107,6 +107,7 @@ export function selectTurnCards(owner) {
 
 function renderMiniElements(elements, t) {
   return (elements || []).map((el) => {
+    if (el.hidden) return null;
     const isBox = isContainerType(el.type);
     const style = {
       position: 'absolute',
@@ -115,6 +116,7 @@ function renderMiniElements(elements, t) {
       width: el.w,
       height: el.h,
       boxSizing: 'border-box',
+      opacity: el.opacity == null ? 1 : el.opacity,
     };
     if (isBox && el.type === 'container') {
       style.background = (el.props && el.props.background) || '#ffffff';

@@ -7,7 +7,9 @@ import {
   findElementEntry,
   isContainerType,
   isUnderAny,
+  moveElementInTree,
   pointInBox,
+  reorderInTree,
 } from '../shared/elements.js';
 import { SNAP_THRESHOLD, snapMoveBox, snapResizeBox } from '../shared/snapping.js';
 import { API_PREFIX, defaultState, TYPE_INFO } from './constants.js';
@@ -15,6 +17,7 @@ import { useT } from './i18n.js';
 import {
   apiFetch,
   defaultDoc,
+  emptyStates,
   loadDoc,
   loadUi,
   makeEl,
@@ -133,29 +136,6 @@ function replaceInTree(elements, id, updater) {
   return changed ? out : elements;
 }
 
-function reorderInTree(elements, id, toFront) {
-  const index = elements.findIndex((el) => el.id === id);
-  if (index !== -1) {
-    const arr = elements.slice();
-    const [el] = arr.splice(index, 1);
-    if (toFront) arr.push(el);
-    else arr.unshift(el);
-    return arr;
-  }
-  for (let i = 0; i < elements.length; i += 1) {
-    const el = elements[i];
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = reorderInTree(el.children, id, toFront);
-      if (kids !== el.children) {
-        const arr = elements.slice();
-        arr[i] = { ...el, children: kids };
-        return arr;
-      }
-    }
-  }
-  return elements;
-}
-
 function duplicateInTree(elements, idSet, rootIds) {
   const out = [];
   for (const el of elements) {
@@ -177,25 +157,13 @@ function duplicateInTree(elements, idSet, rootIds) {
   return out;
 }
 
-function scaleTree(elements, sx, sy, sf, ox, oy, isRoot) {
-  return elements.map((el) => {
-    const props = { ...(el.props || {}) };
-    if (typeof props.fontSize === 'number')
-      props.fontSize = Math.max(8, Math.round(props.fontSize * sf));
-    if (typeof props.radius === 'number') props.radius = Math.max(0, Math.round(props.radius * sf));
-    const scaled = {
-      ...el,
-      x: Math.round((isRoot ? el.x - ox : el.x) * sx),
-      y: Math.round((isRoot ? el.y - oy : el.y) * sy),
-      w: Math.max(12, Math.round(el.w * sx)),
-      h: Math.max(8, Math.round(el.h * sy)),
-      props,
-    };
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      scaled.children = scaleTree(el.children, sx, sy, sf, 0, 0, false);
-    }
-    return scaled;
-  });
+function sameDoc(a, b) {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch (e) {
+    return false;
+  }
 }
 
 // ------------------------------------------------------------------
@@ -236,6 +204,7 @@ function ProductDesignPanel() {
       }
       if (record) {
         pushPastSnapshot(prev);
+        lastEditRef.current = Date.now();
       }
       h.future = [];
     }
@@ -243,6 +212,16 @@ function ProductDesignPanel() {
     setDocState(next);
   }, []);
   const [selIds, setSelIds] = useState([]);
+  const [hoverId, setHoverId] = useState(null);
+  const [editing, setEditing] = useState(null); // { id, value } — inline text editor
+  const editingRef = useRef(null);
+  editingRef.current = editing;
+  const [ctxMenu, setCtxMenu] = useState(null); // { x, y }
+  const [layerQuery, setLayerQuery] = useState('');
+  const [previewStack, setPreviewStack] = useState([]);
+  const [previewOverlay, setPreviewOverlay] = useState(null);
+  const clipboardRef = useRef([]);
+  const lastEditRef = useRef(0);
   const [preview, setPreview] = useState(false);
   const [pageState, setPageState] = useState('normal');
   const [zoom, setZoom] = useState(1);
@@ -305,9 +284,7 @@ function ProductDesignPanel() {
           const nd = normalizeDoc(res.body.doc);
           if (nd) {
             hostRef.current.revision = res.body.revision;
-            hostRef.current.suppressSave = true;
-            docRef.current = nd;
-            setDocState(nd);
+            adoptRemoteDoc(nd);
           }
         }
       });
@@ -328,6 +305,9 @@ function ProductDesignPanel() {
     setDocState(localDoc);
     setSelIds([]);
     setPreview(false);
+    setPreviewStack([]);
+    setPreviewOverlay(null);
+    setEditing(null);
     histRef.current = { past: [], future: [] };
     (async () => {
       const canStream = typeof window.EventSource === 'function';
@@ -388,9 +368,7 @@ function ProductDesignPanel() {
             const nd = normalizeDoc(snap.body.doc);
             if (!nd) return;
             hostRef.current.revision = snap.body.revision;
-            hostRef.current.suppressSave = true;
-            docRef.current = nd;
-            setDocState(nd);
+            adoptRemoteDoc(nd);
           });
         };
       } catch (e) {
@@ -518,9 +496,47 @@ function ProductDesignPanel() {
       duplicateEl();
       return;
     }
+    if (mod && !e.shiftKey && (k === 'c' || k === 'C')) {
+      e.preventDefault();
+      copySelection();
+      return;
+    }
+    if (mod && !e.shiftKey && (k === 'x' || k === 'X')) {
+      e.preventDefault();
+      cutSelection();
+      return;
+    }
+    if (mod && !e.shiftKey && (k === 'v' || k === 'V')) {
+      e.preventDefault();
+      pasteClipboard();
+      return;
+    }
+    if (mod && (k === ']' || k === '}')) {
+      e.preventDefault();
+      reorderSelection(e.shiftKey ? 'front' : 'forward');
+      return;
+    }
+    if (mod && (k === '[' || k === '{')) {
+      e.preventDefault();
+      reorderSelection(e.shiftKey ? 'back' : 'backward');
+      return;
+    }
     if (k === 'Escape') {
-      if (preview) setPreview(false);
-      else setSelIds([]);
+      if (editingRef.current) {
+        setEditing(null);
+        return;
+      }
+      if (ctxMenu) {
+        setCtxMenu(null);
+        return;
+      }
+      if (preview) {
+        if (previewOverlay) setPreviewOverlay(null);
+        else if (previewStack.length > 1) setPreviewStack((stack) => stack.slice(0, -1));
+        else setPreview(false);
+      } else {
+        setSelIds([]);
+      }
       return;
     }
     if (preview) return;
@@ -544,6 +560,14 @@ function ProductDesignPanel() {
     return () => window.removeEventListener('keydown', fn);
   }, []);
 
+  // Close the context menu on any outside press.
+  useEffect(() => {
+    if (!ctxMenu) return undefined;
+    const close = () => setCtxMenu(null);
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [ctxMenu]);
+
   const activePage = doc.pages.find((p) => p.id === doc.activePageId) || doc.pages[0];
   const treeEntries = activePage ? collectElementEntries(activePage.elements) : [];
   const entryById = new Map(treeEntries.map((entry) => [entry.el.id, entry]));
@@ -560,6 +584,8 @@ function ProductDesignPanel() {
 
   const setActivePage = useCallback(
     (id) => {
+      setEditing(null);
+      setHoverId(null);
       setSelIds((ids) => {
         const page = docRef.current.pages.find((p) => p.id === id);
         if (!page) return [];
@@ -644,6 +670,184 @@ function ProductDesignPanel() {
     bumpHist((v) => v + 1);
   }
 
+  function adoptRemoteDoc(nd) {
+    const prev = docRef.current;
+    // Ignore the echo of our own save: SSE can beat the POST response, and the
+    // re-fetched document is then byte-for-byte what we already render.
+    if (prev && sameDoc(prev, nd)) return;
+    // A change that is not a local edit becomes its own undo step.
+    if (prev && Date.now() - lastEditRef.current > 800) pushPastSnapshot(prev);
+    hostRef.current.suppressSave = true;
+    docRef.current = nd;
+    setDocState(nd);
+    setEditing(null);
+    setSelIds((ids) =>
+      ids.filter((id) => nd.pages.some((p) => !!findElementEntry(p.elements, id))),
+    );
+  }
+
+  function mapSelection(fn, mode) {
+    const ids = new Set(topSelectedEntries().map((entry) => entry.el.id));
+    if (!ids.size) return;
+    setDoc(
+      (d) => ({
+        ...d,
+        pages: d.pages.map((p) => ({
+          ...p,
+          elements: mapTree(p.elements, (el) => (ids.has(el.id) ? fn(el) : el)),
+        })),
+      }),
+      mode,
+    );
+  }
+  function applyAttrs(patch, mode) {
+    mapSelection((el) => ({ ...el, ...patch }), mode);
+  }
+  function applyProps(patch, mode) {
+    mapSelection((el) => ({ ...el, props: { ...el.props, ...patch } }), mode);
+  }
+
+  function patchPageStates(key, patch) {
+    setDoc(
+      (d) => ({
+        ...d,
+        pages: d.pages.map((p) =>
+          p.id === d.activePageId
+            ? {
+                ...p,
+                states: {
+                  ...(p.states || {}),
+                  [key]: { ...((p.states || {})[key] || {}), ...patch },
+                },
+              }
+            : p,
+        ),
+      }),
+      'pstate:' + key,
+    );
+  }
+
+  function copySelection() {
+    const entries = topSelectedEntries();
+    if (!entries.length) return;
+    clipboardRef.current = entries.map((entry) => ({
+      el: cloneElementDeep(entry.el),
+      absX: entry.absX,
+      absY: entry.absY,
+    }));
+  }
+  function cutSelection() {
+    copySelection();
+    deleteEl();
+  }
+  function pasteClipboard() {
+    const items = clipboardRef.current;
+    if (!items || !items.length) return;
+    const page = docRef.current.pages.find((p) => p.id === docRef.current.activePageId);
+    if (!page) return;
+    const targetEntry =
+      selEntries.length === 1 && isContainerType(selEntries[0].el.type) ? selEntries[0] : null;
+    const newIds = [];
+    const copies = items.map((item) => {
+      const copy = cloneElementDeep(item.el, () => uid());
+      copy.x = Math.round(item.absX + 16 - (targetEntry ? targetEntry.absX : 0));
+      copy.y = Math.round(item.absY + 16 - (targetEntry ? targetEntry.absY : 0));
+      newIds.push(copy.id);
+      return copy;
+    });
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => {
+        if (p.id !== page.id) return p;
+        if (!targetEntry) return { ...p, elements: [...p.elements, ...copies] };
+        let elements = p.elements;
+        for (const copy of copies) elements = appendToContainer(elements, targetEntry.el.id, copy);
+        return { ...p, elements };
+      }),
+    }));
+    setSelIds(newIds);
+  }
+
+  function reorderSelection(mode) {
+    const ids = topSelectedEntries().map((entry) => entry.el.id);
+    if (!ids.length) return;
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => {
+        if (p.id !== d.activePageId) return p;
+        let elements = p.elements;
+        for (const id of ids) elements = reorderInTree(elements, id, mode);
+        return { ...p, elements };
+      }),
+    }));
+  }
+
+  function moveLayer(id, targetId, position) {
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) =>
+        p.id === d.activePageId
+          ? { ...p, elements: moveElementInTree(p.elements, id, targetId, position) }
+          : p,
+      ),
+    }));
+  }
+
+  function startTextEdit(id, value) {
+    setEditing({ id, value });
+  }
+  function changeText(id, value) {
+    setEditing((cur) => (cur && cur.id === id ? { id, value } : cur));
+  }
+  function commitText() {
+    const cur = editingRef.current;
+    setEditing(null);
+    if (!cur) return;
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => ({
+        ...p,
+        elements: replaceInTree(p.elements, cur.id, (el) => ({
+          ...el,
+          props: { ...el.props, text: cur.value },
+        })),
+      })),
+    }));
+  }
+  function cancelText() {
+    setEditing(null);
+  }
+
+  function togglePreview() {
+    if (preview) {
+      setPreview(false);
+      setPreviewStack([]);
+      setPreviewOverlay(null);
+      return;
+    }
+    setPreviewStack([docRef.current.activePageId]);
+    setPreviewOverlay(null);
+    setSelIds([]);
+    setEditing(null);
+    setPreview(true);
+  }
+
+  function interact(el) {
+    const link = (el.interactions || [])[0];
+    if (!link) return;
+    if (link.action === 'back') {
+      setPreviewStack((stack) => (stack.length > 1 ? stack.slice(0, -1) : stack));
+      return;
+    }
+    const page = docRef.current.pages.find((p) => p.id === link.targetPageId);
+    if (!page) return;
+    if (link.action === 'openOverlay') setPreviewOverlay(page);
+    else {
+      setPreviewOverlay(null);
+      setPreviewStack((stack) => [...stack, page.id]);
+    }
+  }
+
   // ----- document mutations -----
   function addPage() {
     const base = activePage;
@@ -656,6 +860,7 @@ function ProductDesignPanel() {
         preset: base ? base.frame.preset : 'mobile',
         background: '#ffffff',
       },
+      states: emptyStates(),
       elements: [],
     };
     setDoc((d) => ({ ...d, pages: [...d.pages, page], activePageId: page.id }));
@@ -668,6 +873,7 @@ function ProductDesignPanel() {
       id: uid(),
       name: src.name + ' ' + t('pages.copySuffix'),
       frame: { ...src.frame },
+      states: JSON.parse(JSON.stringify(src.states || emptyStates())),
       elements: cloneElementDeep(
         { id: 'root', type: 'group', x: 0, y: 0, w: 0, h: 0, children: src.elements },
         () => uid(),
@@ -769,59 +975,29 @@ function ProductDesignPanel() {
     if (!selId) return;
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, true) })),
+      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, 'front') })),
     }));
   }
   function sendBack() {
     if (!selId) return;
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, false) })),
+      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, 'back') })),
     }));
   }
-  /** Bounding box of a page's root elements (empty page → null). */
-  function elementsBounds(elements) {
-    if (!Array.isArray(elements) || elements.length === 0) return null;
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const e of elements) {
-      minX = Math.min(minX, e.x);
-      minY = Math.min(minY, e.y);
-      maxX = Math.max(maxX, e.x + e.w);
-      maxY = Math.max(maxY, e.y + e.h);
-    }
-    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
-  }
-
   function setPreset(key) {
     const map = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
     const sz = map[key];
     if (!sz) return;
+    // Resizing a frame never rescales its content: layout stays exactly where
+    // the user put it, like every other canvas tool.
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => {
-        if (p.id !== d.activePageId) return p;
-        const nw = sz[0];
-        const nh = sz[1];
-        const frame = { ...p.frame, w: nw, h: nh, preset: key };
-        const ow = p.frame.w || nw;
-        const oh = p.frame.h || nh;
-        if (ow === nw && oh === nh) return { ...p, frame };
-        const b = elementsBounds(p.elements);
-        const hasContent = b && b.w > 0 && b.h > 0;
-        // Only heal the legacy "half-width" documents; a page that already
-        // uses containers is a deliberate layout and should scale normally.
-        const hasContainer = p.elements.some((e) => isContainerType(e.type));
-        const inconsistent = !hasContainer && hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
-        const sx = inconsistent ? nw / b.w : nw / ow;
-        const sy = inconsistent ? nh / b.h : nh / oh;
-        const ox = inconsistent ? b.minX : 0;
-        const oy = inconsistent ? b.minY : 0;
-        const sf = Math.min(sx, sy);
-        return { ...p, frame, elements: scaleTree(p.elements, sx, sy, sf, ox, oy, true) };
-      }),
+      pages: d.pages.map((p) =>
+        p.id === d.activePageId
+          ? { ...p, frame: { ...p.frame, w: sz[0], h: sz[1], preset: key } }
+          : p,
+      ),
     }));
   }
   function patchActiveFrame(patch) {
@@ -1258,7 +1434,9 @@ function ProductDesignPanel() {
         h: Math.abs(cur.y - start.y),
       };
       setMarquee({ pageId: page.id, ...box });
-      const entries = collectElementEntries(page.elements).filter((entry) => entry.depth === 0);
+      const entries = collectElementEntries(page.elements).filter(
+        (entry) => entry.depth === 0 && !entry.el.hidden,
+      );
       const ids = entries
         .filter(
           (entry) =>
@@ -1374,6 +1552,98 @@ function ProductDesignPanel() {
   const canUndo = histRef.current.past.length > 0;
   const canRedo = histRef.current.future.length > 0;
 
+  const viewPage = preview
+    ? doc.pages.find((p) => p.id === previewStack[previewStack.length - 1]) || activePage
+    : activePage;
+  const crumbEntry = selEntries[0];
+  const breadcrumb = activePage
+    ? [
+        { id: activePage.id, label: activePage.name },
+        ...(crumbEntry
+          ? crumbEntry.ancestors.map((id) => {
+              const e = entryById.get(id);
+              return {
+                id,
+                label: e ? e.el.name || e.el.props.name || t('comp.' + e.el.type) : id,
+              };
+            })
+          : []),
+        ...(crumbEntry
+          ? [
+              {
+                id: crumbEntry.el.id,
+                label:
+                  crumbEntry.el.name || crumbEntry.el.props.text || t('comp.' + crumbEntry.el.type),
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const ctxEl = selEntries[0] ? selEntries[0].el : null;
+  const menuItems = ctxMenu
+    ? [
+        { label: t('ctx.copy'), key: '⌘C', onClick: copySelection, disabled: !selIds.length },
+        { label: t('ctx.cut'), key: '⌘X', onClick: cutSelection, disabled: !selIds.length },
+        {
+          label: t('ctx.paste'),
+          key: '⌘V',
+          onClick: pasteClipboard,
+          disabled: clipboardRef.current.length === 0,
+        },
+        { sep: true },
+        { label: t('ctx.duplicate'), key: '⌘D', onClick: duplicateEl, disabled: !selIds.length },
+        { sep: true },
+        {
+          label: t('ctx.front'),
+          onClick: () => reorderSelection('front'),
+          disabled: !selIds.length,
+        },
+        {
+          label: t('ctx.forward'),
+          key: '⌘]',
+          onClick: () => reorderSelection('forward'),
+          disabled: !selIds.length,
+        },
+        {
+          label: t('ctx.backward'),
+          key: '⌘[',
+          onClick: () => reorderSelection('backward'),
+          disabled: !selIds.length,
+        },
+        { label: t('ctx.back'), onClick: () => reorderSelection('back'), disabled: !selIds.length },
+        { sep: true },
+        {
+          label: t('ctx.group'),
+          key: '⌘G',
+          onClick: groupSelection,
+          disabled: selEntries.length < 2,
+        },
+        ...(ctxEl && ctxEl.type === 'group'
+          ? [{ label: t('ctx.ungroup'), key: '⇧⌘G', onClick: ungroupSelection }]
+          : []),
+        ...(ctxEl
+          ? [
+              {
+                label: ctxEl.hidden ? t('ctx.show') : t('ctx.hide'),
+                onClick: () => setEl(ctxEl.id, { hidden: !ctxEl.hidden }),
+              },
+              {
+                label: ctxEl.locked ? t('ctx.unlock') : t('ctx.lock'),
+                onClick: () => setEl(ctxEl.id, { locked: !ctxEl.locked }),
+              },
+            ]
+          : []),
+        { sep: true },
+        {
+          label: t('ctx.delete'),
+          key: '⌫',
+          onClick: deleteEl,
+          danger: true,
+          disabled: !selIds.length,
+        },
+      ]
+    : null;
+
   return h(
     'div',
     {
@@ -1394,7 +1664,7 @@ function ProductDesignPanel() {
           zoom,
           setZoom,
           preview,
-          setPreview,
+          togglePreview,
           undo,
           redo,
           canUndo,
@@ -1427,11 +1697,15 @@ function ProductDesignPanel() {
             selIds,
             setSelId: (id) => setSelIds(id ? [id] : []),
             setPreview,
+            setEl,
+            onLayerMove: moveLayer,
+            layerQuery,
+            setLayerQuery,
           }),
       h(CanvasView, {
         t,
         doc,
-        activePage,
+        activePage: viewPage,
         zoom,
         selIds,
         selBoxes,
@@ -1446,6 +1720,10 @@ function ProductDesignPanel() {
         panning,
         guides,
         marquee,
+        hoverId,
+        editing,
+        breadcrumb,
+        overlayPage: previewOverlay,
         renderStateFor,
         startDrag,
         startResize,
@@ -1456,16 +1734,34 @@ function ProductDesignPanel() {
         setUi,
         setUiFor,
         activate,
+        setHoverId,
+        onContextMenu: (ev, el) => {
+          if (el) {
+            if (!selIds.includes(el.id)) setSelIds([el.id]);
+          } else {
+            setSelIds([]);
+          }
+          setCtxMenu({ x: ev.clientX, y: ev.clientY });
+        },
+        onInteract: interact,
+        onStartTextEdit: startTextEdit,
+        onTextChange: changeText,
+        onTextCommit: commitText,
+        onTextCancel: cancelText,
+        onCloseOverlay: () => setPreviewOverlay(null),
       }),
       preview
         ? null
         : h(InspectorView, {
             t,
+            doc,
             sel,
             selCount: selEntries.length,
             activePage,
+            pageState,
             setEl,
-            setElProps,
+            applyAttrs,
+            applyProps,
             duplicateEl,
             bringFront,
             sendBack,
@@ -1473,6 +1769,7 @@ function ProductDesignPanel() {
             setPreset,
             renameActivePage,
             patchActiveFrame,
+            patchPageStates,
             alignSelection,
             distributeSelection,
             groupSelection,
@@ -1483,6 +1780,20 @@ function ProductDesignPanel() {
             startResizeRight,
           }),
     ),
+    preview && previewStack.length > 1
+      ? h(
+          'div',
+          { className: 'dpd-previewNav' },
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: () => setPreviewStack((stack) => stack.slice(0, -1)),
+            },
+            '‹ ' + t('preview.back'),
+          ),
+        )
+      : null,
     preview
       ? h(
           'button',
@@ -1490,9 +1801,46 @@ function ProductDesignPanel() {
             className: 'dpd-previewExit',
             type: 'button',
             title: t('toolbar.exitPreview'),
-            onClick: () => setPreview(false),
+            onClick: () => {
+              setPreview(false);
+              setPreviewStack([]);
+              setPreviewOverlay(null);
+            },
           },
           t('toolbar.exitPreview'),
+        )
+      : null,
+    ctxMenu
+      ? h(
+          'div',
+          {
+            className: 'dpd-ctxmenu',
+            style: {
+              left: Math.max(4, Math.min(ctxMenu.x, (window.innerWidth || 1200) - 200)),
+              top: Math.max(4, Math.min(ctxMenu.y, (window.innerHeight || 800) - 380)),
+            },
+            onMouseDown: (e) => e.stopPropagation(),
+            onContextMenu: (e) => e.preventDefault(),
+          },
+          menuItems.map((item, i) =>
+            item.sep
+              ? h('div', { key: 'sep' + i, className: 'dpd-ctxsep' })
+              : h(
+                  'button',
+                  {
+                    key: item.label + i,
+                    type: 'button',
+                    disabled: item.disabled,
+                    className: item.danger ? 'danger' : '',
+                    onClick: () => {
+                      setCtxMenu(null);
+                      item.onClick();
+                    },
+                  },
+                  h('span', null, item.label),
+                  item.key ? h('span', { className: 'k' }, item.key) : null,
+                ),
+          ),
         )
       : null,
   );

@@ -7,7 +7,7 @@ let container;
 let root;
 let plugin;
 
-const doc = () => JSON.parse(window.localStorage.getItem('dsh-product-design:doc:v2'));
+const doc = () => JSON.parse(window.localStorage.getItem('dsh-product-design:doc:v3'));
 
 const q = (sel) => container.querySelectorAll(sel);
 const btn = (title) =>
@@ -163,7 +163,7 @@ describe('编辑行为', () => {
     expect(doc().pages[0].elements[6].state).not.toBe(before);
   });
 
-  it('切换画布尺寸按宽高分别缩放，且切回可还原', async () => {
+  it('切换画布尺寸只改画板，元素位置尺寸不变', async () => {
     const select = container.querySelector('select.dpd-select');
     const setSelect = async (el, value) => {
       await act(async () => {
@@ -174,17 +174,14 @@ describe('编辑行为', () => {
       });
     };
 
-    const beforeW = doc().pages[0].elements[0].w;
-    const beforeH = doc().pages[0].elements[0].h;
+    const before = doc().pages[0].elements[0];
     await setSelect(select, 'desktop');
     expect(doc().pages[0].frame.w).toBe(1280);
-    // 铺满：元素宽度按 1280/390 放大
-    expect(doc().pages[0].elements[0].w).toBeGreaterThan(beforeW * 2);
+    expect(doc().pages[0].elements[0].w).toBe(before.w);
+    expect(doc().pages[0].elements[0].x).toBe(before.x);
 
     await setSelect(select, 'mobile');
     expect(doc().pages[0].frame.w).toBe(390);
-    // 可还原（四舍五入误差内）
-    expect(Math.abs(doc().pages[0].elements[0].w - beforeW)).toBeLessThanOrEqual(2);
-    expect(Math.abs(doc().pages[0].elements[0].h - beforeH)).toBeLessThanOrEqual(2);
+    expect(doc().pages[0].elements[0].w).toBe(before.w);
   });
 });

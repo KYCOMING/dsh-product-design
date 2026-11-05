@@ -339,7 +339,7 @@ describe('host API + tools', () => {
 
   it('POST /apply 与非法操作', async () => {
     const ok = await call('POST', '/dsh-product-design/api/apply', {
-      operations: [{ kind: 'add_element', type: 'card' }],
+      operations: [{ kind: 'add_page' }, { kind: 'add_element', type: 'card' }],
     });
     expect(ok.status).toBe(200);
     expect(ok.json.ok).toBe(true);

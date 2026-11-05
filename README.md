@@ -37,7 +37,7 @@ dsh plugin --profile desktop remove dsh-product-design
 ### 权限与数据
 
 - 在 Host 进程内注册同源 HTTP 路由 `/dsh-product-design/api`，提供文档读写与 SSE 变更推送。
-- 设计稿写入 `<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`；浏览器端另用 `localStorage` 做缓存/离线兜底。
+- 设计稿写入 `<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`；浏览器端另用 `localStorage`（`doc:v3:<sessionId>`）做缓存/离线兜底。
 - 注册两个 agent 工具（`product_design_get_document` / `product_design_apply`）、一段系统提示和 `/design` 命令。
 - 不发起外部网络请求，不收集遥测。
 
@@ -64,16 +64,21 @@ dsh plugin --profile desktop remove dsh-product-design
 - **容器与编组**：容器可嵌套任意组件并裁剪超出内容；拖入 / 拖出容器自动改变层级。多选后可 `⌘G` 编组、`⇧⌘G` 取消编组，容器/编组随子元素整体移动。
 - **多选与对齐**：`Shift + 点击` 多选、画板空白处拖拽框选；属性面板支持左/中/右、上/中/下对齐与水平/垂直分布。
 - **磁吸对齐**：拖动 / 缩放时自动吸附画板边缘、画板中心线、其他元素边缘与中心，并显示洋红参考线；顶部「磁吸」开关可关闭。
-- **画布编辑**：组件可拖拽移动、8 向手柄缩放、点选；支持复制、置顶、置底、删除、图层树（容器子元素缩进显示）。
-- **自适应尺寸**：切换画板尺寸（手机/平板/桌面）时，当前页组件按宽比/高比分别缩放（x、宽按宽比；y、高按高比）铺满新画板，切回原尺寸可还原；字号/圆角取较小比例。
+- **画布编辑**：组件可拖拽移动、8 向手柄缩放、点选；支持复制、置顶/置底/上移/下移、删除；悬停显示轮廓。
+- **就地编辑文本**：双击文本类组件直接改字，`Enter` 提交、`Shift+Enter` 换行、`Esc` 取消，字号/字重/颜色/对齐实时生效。
+- **图层树**：拖拽排序、拖入容器、显隐、锁定、双击重命名、按名称搜索；容器子元素按层级缩进。
+- **剪贴板与右键菜单**：`⌘C` / `⌘X` / `⌘V`（保留绝对位置、可跨页、可粘贴进选中容器）；右键菜单覆盖副本、层级、编组、显隐、锁定、删除。
+- **面包屑与多选**：画布左上角显示 `页面 › 容器 › 元素` 可逐级点选；多选后可批量改颜色/字号/圆角/不透明度，或对齐、分布、编组。
+- **画板尺寸**：切换手机/平板/桌面只改画板大小，**不会缩放或移动已有元素**。
 - **组件状态**：每个组件有独立状态集（如按钮 默认/悬停/按下/禁用，输入框 默认/聚焦/已填写/错误/禁用…），在右侧属性面板切换预览。
 - **预览模式**：一键进入「只看产品」的干净视图——隐藏工具栏与左右侧栏、只显示当前画板、不显示网格与页面标签；组件真实响应悬停 / 按下 / 点击，开关、复选框、标签页、下拉可交互。`Esc` 或右上角「退出预览」返回编辑器。
-- **页面状态**：顶部「正常 / 加载中 / 空状态 / 错误」一键切换整页效果。
+- **原型交互**：给任意元素配置 `点击 → 跳转页面 / 返回 / 打开为弹层`，预览里可以真的走通一条流程（带返回栈，`Esc` 逐层退出）。
+- **页面状态**：顶部「正常 / 加载中 / 空状态 / 错误」一键切换整页效果；三种状态的标题/说明/按钮文案可在右侧属性面板逐页编辑，AI 也能通过 `set_page_states` 写入。
 - **网格 + 缩放**：画布小方格网格随缩放变化；`Ctrl/⌘ + 滚轮` 缩放，普通滚轮滚动。
-- **编辑体验**：撤销 / 重做、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
+- **编辑体验**：撤销 / 重做（含 AI 改动）、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
 - **对话内产品预览（Visualize 风格）**：AI 调用 `product_design_apply` 后，聊天回合末尾会出现当前页面的产品缩略卡片，可一键「打开画布」；无需先手动打开画布。
-- **多会话独立设计稿**：每个会话拥有自己的设计稿；切换会话时画布自动切换，互不覆盖。旧版单稿会自动迁移到首个打开画布的会话。
-- **自动保存**：设计稿持久化到 Host（按会话分目录）和 `localStorage`（`doc:v2:<sessionId>`，旧 `doc:v1` 自动迁移为第 1 页）。
+- **多会话独立设计稿**：每个会话拥有自己的设计稿；切换会话时画布自动切换，互不覆盖。
+- **自动保存**：设计稿持久化到 Host（按会话分目录）和 `localStorage`（`doc:v3:<sessionId>`）。
 
 ## 快捷键
 
@@ -83,7 +88,10 @@ dsh plugin --profile desktop remove dsh-product-design
 | `⇧⌘Z` / `Ctrl+Shift+Z`、`⌘Y`  | 重做                                |
 | `Delete` / `Backspace`        | 删除选中组件                        |
 | `← → ↑ ↓`                     | 微移 1px（`Shift` + 方向键 = 10px） |
-| `⌘D` / `Ctrl+D`               | 复制选中组件                        |
+| `⌘D` / `Ctrl+D`               | 创建副本                            |
+| `⌘C` / `⌘X` / `⌘V`            | 复制 / 剪切 / 粘贴（可跨页）         |
+| `⌘]` / `⌘[`                   | 上移一层 / 下移一层                  |
+| `⇧⌘]` / `⇧⌘[`                 | 置于顶层 / 置于底层                  |
 | `⌘G` / `Ctrl+G`               | 编组选中组件                        |
 | `⇧⌘G` / `Ctrl+Shift+G`        | 取消编组                            |
 | `Shift + 点击`                | 多选 / 取消多选                     |
@@ -155,7 +163,7 @@ dsh-product-design/
   - `GET /events` → SSE，每次变更推送 `{ revision }`
 - **Agent 工具**（`ctx.get('tools').register`）：
   - `product_design_get_document`：读取当前文档（页面 / 元素 / 状态 / 属性）。
-  - `product_design_apply`：按顺序应用操作，返回生成的 page/element id 与新 revision。支持 `add_page` / `delete_page` / `rename_page` / `set_page_frame` / `clear_page` / `add_element` / `update_element` / `delete_element` / `set_document_name`；页面可用 `pageId`、`"@last"` 或 `pageIndex` 定位。
+  - `product_design_apply`：按顺序应用操作，返回生成的 page/element id 与新 revision。支持 `add_page` / `duplicate_page` / `delete_page` / `rename_page` / `set_active_page` / `set_page_frame` / `set_page_states` / `clear_page` / `add_element` / `update_element` / `delete_element` / `move_element` / `reorder_element` / `group_elements` / `ungroup_elements` / `set_document_name`；页面可用 `pageId`、`"@last"` 或 `pageIndex` 定位。元素支持 `name / hidden / locked / opacity / interactions`。
 - **模型提示段**：通过 `ctx.systemPrompt.section` 注册说明，告诉模型画布与工具、坐标系与组件/状态清单，以及“先 get 再单次 apply 批量搭建”。
 - **同步**：客户端 GET + SSE 拉取 Host 变更；本地编辑 400ms debounce 回写；冲突以 409 让客户端采纳服务端版本。Host 不可用时自动退回 localStorage 单机模式。
 - **安全**：路由复用 Host 的 `connection.requestRejection` 同源护栏（若有）；默认仅本机回环绑定。
@@ -177,9 +185,9 @@ pnpm run check      # build + syntax + lint + test 一次跑完
 ## 数据存储
 
 - **Host 权威**：`<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`（`{ revision, doc }`），按会话隔离、供 AI 工具读写；无会话上下文时退回旧版全局 `doc.json`。
-- `dsh-product-design:doc:v2:<sessionId>`：浏览器端 **按会话缓存/离线兜底**（Host 不可达时使用；首次连接时若 Host 为空则作为种子上报）。
+- `dsh-product-design:doc:v3:<sessionId>`：浏览器端 **按会话缓存/离线兜底**（Host 不可达时使用；首次连接时若 Host 为空则作为种子上报）。
 - `dsh-product-design:ui:v1`：界面偏好（左右侧栏宽度、当前分区、磁吸开关）。
-- 旧 `dsh-product-design:doc:v1`（单画板）在加载时自动迁移为 `doc:v2` 的第 1 页。
+- 文档格式为 v3；开发阶段不保留旧格式迁移，旧稿不会被读取。
 
 ## 版本与发布
 

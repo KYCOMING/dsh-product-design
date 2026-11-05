@@ -153,12 +153,118 @@ function cloneElementDeep(el, nextId) {
   }
   return copy;
 }
+function replaceList(elements, oldList, newList) {
+  if (elements === oldList) return newList;
+  let changed = false;
+  const out = elements.map((el) => {
+    if (isContainer(el) && Array.isArray(el.children)) {
+      const kids = replaceList(el.children, oldList, newList);
+      if (kids !== el.children) {
+        changed = true;
+        return { ...el, children: kids };
+      }
+    }
+    return el;
+  });
+  return changed ? out : elements;
+}
+function extractFromTree(elements, id) {
+  let extracted = null;
+  let changed = false;
+  const walk = (list) => {
+    const out = [];
+    for (const el of list) {
+      if (el.id === id) {
+        extracted = el;
+        changed = true;
+        continue;
+      }
+      if (isContainer(el) && Array.isArray(el.children)) {
+        const kids = walk(el.children);
+        if (kids !== el.children) {
+          out.push({ ...el, children: kids });
+          continue;
+        }
+      }
+      out.push(el);
+    }
+    return out;
+  };
+  const next = walk(elements);
+  return { elements: changed ? next : elements, extracted };
+}
+function insertIntoTree(elements, targetId, node, position) {
+  let inserted = false;
+  const walk = (list) => {
+    const out = [];
+    for (const el of list) {
+      if (el.id === targetId) {
+        if (position === "inside" && isContainer(el)) {
+          out.push({ ...el, children: [...el.children || [], node] });
+        } else if (position === "before") {
+          out.push(node, el);
+        } else {
+          out.push(el, node);
+        }
+        inserted = true;
+        continue;
+      }
+      if (isContainer(el) && Array.isArray(el.children)) {
+        const kids = walk(el.children);
+        if (kids !== el.children) {
+          out.push({ ...el, children: kids });
+          continue;
+        }
+      }
+      out.push(el);
+    }
+    return out;
+  };
+  const next = walk(elements);
+  return inserted ? next : elements;
+}
+function moveElementInTree(elements, id, targetId, position) {
+  if (!id || !targetId || id === targetId) return elements;
+  const src = findElementEntry(elements, id);
+  if (!src) return elements;
+  if (isContainer(src.el) && descendantIds(src.el).includes(targetId)) return elements;
+  const absX = src.absX;
+  const absY = src.absY;
+  const extracted = extractFromTree(elements, id);
+  if (!extracted.extracted) return elements;
+  const target = findElementEntry(extracted.elements, targetId);
+  if (!target) return elements;
+  if (position === "inside" && !isContainer(target.el)) return elements;
+  const parentAbsX = position === "inside" ? target.absX : target.absX - target.el.x;
+  const parentAbsY = position === "inside" ? target.absY : target.absY - target.el.y;
+  const moved = {
+    ...extracted.extracted,
+    x: Math.round(absX - parentAbsX),
+    y: Math.round(absY - parentAbsY)
+  };
+  return insertIntoTree(extracted.elements, targetId, moved, position);
+}
+function reorderInTree(elements, id, mode) {
+  const entry = findElementEntry(elements, id);
+  if (!entry) return elements;
+  const list = entry.list;
+  const from = entry.index;
+  let to = from;
+  if (mode === "front") to = list.length - 1;
+  else if (mode === "back") to = 0;
+  else if (mode === "forward") to = Math.min(list.length - 1, from + 1);
+  else if (mode === "backward") to = Math.max(0, from - 1);
+  if (to === from) return elements;
+  const next = list.slice();
+  const [el] = next.splice(from, 1);
+  next.splice(to, 0, el);
+  return replaceList(elements, list, next);
+}
 
 // src/client/constants.js
 var NS = "dsh-product-design";
 var PANEL_ID = "dsh-product-design";
-var STORAGE_KEY = "dsh-product-design:doc:v2";
-var LEGACY_KEY = "dsh-product-design:doc:v1";
+var STORAGE_KEY = "dsh-product-design:doc:v3";
 var UI_KEY = "dsh-product-design:ui:v1";
 var API_PREFIX = "/dsh-product-design/api";
 var ACCENT = "#6366f1";
@@ -377,7 +483,51 @@ var DICT = {
     "overlay.emptyBtn": "\u65B0\u5EFA\u7EC4\u4EF6",
     "overlay.errorTitle": "\u51FA\u4E86\u70B9\u95EE\u9898",
     "overlay.errorDesc": "\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5",
-    "overlay.errorBtn": "\u91CD\u8BD5"
+    "overlay.errorBtn": "\u91CD\u8BD5",
+    "ctx.copy": "\u590D\u5236",
+    "ctx.cut": "\u526A\u5207",
+    "ctx.paste": "\u7C98\u8D34",
+    "ctx.duplicate": "\u521B\u5EFA\u526F\u672C",
+    "ctx.front": "\u7F6E\u4E8E\u9876\u5C42",
+    "ctx.back": "\u7F6E\u4E8E\u5E95\u5C42",
+    "ctx.forward": "\u4E0A\u79FB\u4E00\u5C42",
+    "ctx.backward": "\u4E0B\u79FB\u4E00\u5C42",
+    "ctx.group": "\u7F16\u7EC4",
+    "ctx.ungroup": "\u53D6\u6D88\u7F16\u7EC4",
+    "ctx.hide": "\u9690\u85CF",
+    "ctx.show": "\u663E\u793A",
+    "ctx.lock": "\u9501\u5B9A",
+    "ctx.unlock": "\u89E3\u9501",
+    "ctx.delete": "\u5220\u9664",
+    "layers.search": "\u641C\u7D22\u56FE\u5C42\u2026",
+    "layers.rename": "\u53CC\u51FB\u91CD\u547D\u540D",
+    "layers.hide": "\u9690\u85CF\u56FE\u5C42",
+    "layers.show": "\u663E\u793A\u56FE\u5C42",
+    "layers.lock": "\u9501\u5B9A\u56FE\u5C42",
+    "layers.unlock": "\u89E3\u9501\u56FE\u5C42",
+    "layers.empty": "\u6CA1\u6709\u5339\u914D\u7684\u56FE\u5C42",
+    "inspector.name": "\u56FE\u5C42\u540D",
+    "inspector.opacity": "\u4E0D\u900F\u660E\u5EA6",
+    "inspector.fontWeight": "\u5B57\u91CD",
+    "inspector.textAlign": "\u5BF9\u9F50",
+    "inspector.interactions": "\u4EA4\u4E92",
+    "inspector.addInteraction": "\u6DFB\u52A0\u70B9\u51FB\u4EA4\u4E92",
+    "inspector.removeInteraction": "\u5220\u9664\u4EA4\u4E92",
+    "inspector.noInteractions": "\u8FD8\u6CA1\u6709\u4EA4\u4E92\u3002\u6DFB\u52A0\u540E\u53EF\u5728\u9884\u89C8\u91CC\u70B9\u51FB\u8DF3\u8F6C\u3002",
+    "inspector.action": "\u52A8\u4F5C",
+    "inspector.target": "\u76EE\u6807\u9875\u9762",
+    "inspector.action.navigate": "\u8DF3\u8F6C\u5230\u9875\u9762",
+    "inspector.action.back": "\u8FD4\u56DE\u4E0A\u4E00\u9875",
+    "inspector.action.openOverlay": "\u6253\u5F00\u4E3A\u5F39\u5C42",
+    "inspector.states": "\u9875\u9762\u72B6\u6001\u6587\u6848",
+    "inspector.stateText": "\u63D0\u793A\u6587\u6848",
+    "inspector.stateTitle": "\u6807\u9898",
+    "inspector.stateDesc": "\u8BF4\u660E",
+    "inspector.stateAction": "\u6309\u94AE\u6587\u6848",
+    "inspector.multiHint": "\u4FEE\u6539\u4F1A\u5E94\u7528\u5230\u5168\u90E8\u9009\u4E2D\u56FE\u5C42",
+    "textEdit.hint": "Enter \u6362\u884C \xB7 Esc \u53D6\u6D88",
+    "preview.back": "\u8FD4\u56DE",
+    "preview.exit": "\u9000\u51FA\u9884\u89C8"
   },
   en: {
     "entry.label": "Product Design",
@@ -491,7 +641,51 @@ var DICT = {
     "overlay.emptyBtn": "Add component",
     "overlay.errorTitle": "Something went wrong",
     "overlay.errorDesc": "Check your connection and try again",
-    "overlay.errorBtn": "Retry"
+    "overlay.errorBtn": "Retry",
+    "ctx.copy": "Copy",
+    "ctx.cut": "Cut",
+    "ctx.paste": "Paste",
+    "ctx.duplicate": "Duplicate",
+    "ctx.front": "Bring to front",
+    "ctx.back": "Send to back",
+    "ctx.forward": "Bring forward",
+    "ctx.backward": "Send backward",
+    "ctx.group": "Group",
+    "ctx.ungroup": "Ungroup",
+    "ctx.hide": "Hide",
+    "ctx.show": "Show",
+    "ctx.lock": "Lock",
+    "ctx.unlock": "Unlock",
+    "ctx.delete": "Delete",
+    "layers.search": "Search layers\u2026",
+    "layers.rename": "Double-click to rename",
+    "layers.hide": "Hide layer",
+    "layers.show": "Show layer",
+    "layers.lock": "Lock layer",
+    "layers.unlock": "Unlock layer",
+    "layers.empty": "No matching layers",
+    "inspector.name": "Layer name",
+    "inspector.opacity": "Opacity",
+    "inspector.fontWeight": "Weight",
+    "inspector.textAlign": "Align",
+    "inspector.interactions": "Interactions",
+    "inspector.addInteraction": "Add click interaction",
+    "inspector.removeInteraction": "Remove interaction",
+    "inspector.noInteractions": "No interactions yet. Add one to navigate between pages in preview.",
+    "inspector.action": "Action",
+    "inspector.target": "Target page",
+    "inspector.action.navigate": "Navigate to page",
+    "inspector.action.back": "Go back",
+    "inspector.action.openOverlay": "Open as overlay",
+    "inspector.states": "Page state copy",
+    "inspector.stateText": "Message",
+    "inspector.stateTitle": "Title",
+    "inspector.stateDesc": "Description",
+    "inspector.stateAction": "Button label",
+    "inspector.multiHint": "Changes apply to every selected layer",
+    "textEdit.hint": "Enter for newline \xB7 Esc to cancel",
+    "preview.back": "Back",
+    "preview.exit": "Exit preview"
   }
 };
 function isZh(active) {
@@ -1162,6 +1356,7 @@ function selectTurnCards(owner) {
 }
 function renderMiniElements(elements, t) {
   return (elements || []).map((el) => {
+    if (el.hidden) return null;
     const isBox = isContainerType(el.type);
     const style = {
       position: "absolute",
@@ -1169,7 +1364,8 @@ function renderMiniElements(elements, t) {
       top: el.y,
       width: el.w,
       height: el.h,
-      boxSizing: "border-box"
+      boxSizing: "border-box",
+      opacity: el.opacity == null ? 1 : el.opacity
     };
     if (isBox && el.type === "container") {
       style.background = el.props && el.props.background || "#ffffff";
@@ -1624,15 +1820,27 @@ function makeEl(type, x, y, w, hh, props, state) {
   const el = {
     id: uid(),
     type,
+    name: "",
     x,
     y,
     w,
     h: hh,
+    hidden: false,
+    locked: false,
+    opacity: 1,
     state: state || defaultState(type),
-    props: props || {}
+    props: props || {},
+    interactions: []
   };
   if (isContainerType(type)) el.children = [];
   return el;
+}
+function emptyStates() {
+  return {
+    loading: { text: "" },
+    empty: { title: "", desc: "", action: "" },
+    error: { title: "", desc: "", action: "" }
+  };
 }
 function starterElements(t) {
   return [
@@ -1658,9 +1866,36 @@ function defaultDoc(t) {
     id: uid(),
     name: t ? t("pages.default") + " 1" : "Page 1",
     frame: { w: 390, h: 844, preset: "mobile", background: "#ffffff" },
+    states: emptyStates(),
     elements: starterElements(t)
   };
   return { name: "", pages: [page], activePageId: page.id };
+}
+function normalizeInteractions(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    if (!["navigate", "back", "openOverlay"].includes(item.action)) continue;
+    const next = { trigger: "click", action: item.action };
+    if (item.action !== "back") next.targetPageId = String(item.targetPageId || "");
+    out.push(next);
+  }
+  return out;
+}
+function normalizeStates(raw) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const pick = (key, fields) => {
+    const value = src[key] && typeof src[key] === "object" ? src[key] : {};
+    const out = {};
+    for (const field of fields) out[field] = typeof value[field] === "string" ? value[field] : "";
+    return out;
+  };
+  return {
+    loading: pick("loading", ["text"]),
+    empty: pick("empty", ["title", "desc", "action"]),
+    error: pick("error", ["title", "desc", "action"])
+  };
 }
 function normalizeElement(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -1668,12 +1903,17 @@ function normalizeElement(raw) {
   const el = {
     id: raw.id || uid(),
     type,
+    name: typeof raw.name === "string" ? raw.name : "",
     x: Number.isFinite(Number(raw.x)) ? Number(raw.x) : 0,
     y: Number.isFinite(Number(raw.y)) ? Number(raw.y) : 0,
     w: Math.max(12, Number.isFinite(Number(raw.w)) ? Number(raw.w) : TYPE_INFO[type].size[0]),
     h: Math.max(8, Number.isFinite(Number(raw.h)) ? Number(raw.h) : TYPE_INFO[type].size[1]),
+    hidden: raw.hidden === true,
+    locked: raw.locked === true,
+    opacity: Number.isFinite(Number(raw.opacity)) ? Math.max(0, Math.min(1, Number(raw.opacity))) : 1,
     state: raw.state || defaultState(type),
-    props: raw.props && typeof raw.props === "object" ? { ...raw.props } : {}
+    props: raw.props && typeof raw.props === "object" ? { ...raw.props } : {},
+    interactions: normalizeInteractions(raw.interactions)
   };
   if (isContainerType(type)) {
     el.children = Array.isArray(raw.children) ? raw.children.map(normalizeElement).filter(Boolean) : [];
@@ -1684,50 +1924,32 @@ function normalizeElements(list) {
   return Array.isArray(list) ? list.map(normalizeElement).filter(Boolean) : [];
 }
 function normalizeDoc(doc) {
-  if (!doc) return null;
-  if (Array.isArray(doc.pages) && doc.pages.length) {
-    const pages = doc.pages.filter((p) => p && Array.isArray(p.elements)).map((p) => {
-      const fr = p.frame || {};
-      return {
-        id: p.id || uid(),
-        name: p.name || "Page",
-        frame: {
-          w: fr.w || 390,
-          h: fr.h || 844,
-          preset: fr.preset || "mobile",
-          background: fr.background || "#ffffff"
-        },
-        elements: normalizeElements(p.elements)
-      };
-    });
-    if (!pages.length) return null;
-    const activePageId = pages.some((p) => p.id === doc.activePageId) ? doc.activePageId : pages[0].id;
-    return { name: doc.name || "", pages, activePageId };
-  }
-  if (doc.frame && Array.isArray(doc.elements)) {
-    const fr = doc.frame;
-    const page = {
-      id: uid(),
-      name: "Page 1",
+  if (!doc || !Array.isArray(doc.pages)) return null;
+  const pages = doc.pages.filter((p) => p && Array.isArray(p.elements)).map((p) => {
+    const fr = p.frame || {};
+    return {
+      id: p.id || uid(),
+      name: p.name || "Page",
       frame: {
         w: fr.w || 390,
         h: fr.h || 844,
         preset: fr.preset || "mobile",
         background: fr.background || "#ffffff"
       },
-      elements: normalizeElements(doc.elements)
+      states: normalizeStates(p.states),
+      elements: normalizeElements(p.elements)
     };
-    return { name: doc.name || "", pages: [page], activePageId: page.id };
-  }
-  return null;
+  });
+  if (!pages.length) return null;
+  const activePageId = pages.some((p) => p.id === doc.activePageId) ? doc.activePageId : pages[0].id;
+  return { name: doc.name || "", pages, activePageId };
 }
 function docStorageKey(sessionId) {
   return sessionId ? `${STORAGE_KEY}:${sessionId}` : STORAGE_KEY;
 }
 function loadDoc(sessionId) {
   try {
-    let raw = window.localStorage.getItem(docStorageKey(sessionId));
-    if (!raw && !sessionId) raw = window.localStorage.getItem(LEGACY_KEY);
+    const raw = window.localStorage.getItem(docStorageKey(sessionId));
     if (!raw) return null;
     return normalizeDoc(JSON.parse(raw));
   } catch (e) {
@@ -1905,6 +2127,7 @@ var CSS = [
   ".dpd-libItem:hover{border-color:var(--dsw-alias-brand-primary,#6366f1);box-shadow:0 2px 8px rgba(0,0,0,.06)}",
   ".dpd-libThumb{position:relative;width:100%;height:32px;display:flex;align-items:center;justify-content:center;overflow:hidden}",
   ".dpd-libName{font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}",
+  ".dpd-canvasWrap{position:relative;flex:1;min-width:0;display:flex}",
   ".dpd-canvas{flex:1;min-width:0;overflow:auto;background-color:var(--dsw-alias-bg-layer-2,#f0f1f4);position:relative}",
   ".dpd-previewMode .dpd-canvas{background:#e9ebf0}",
   ".dpd-previewMode .dpd-canvasinner{align-items:center;justify-content:center;padding:24px}",
@@ -1969,21 +2192,76 @@ var CSS = [
   ".dpd-overlayTitle{font-size:15px;font-weight:600;color:#161a22}",
   ".dpd-overlayDesc{font-size:12.5px;color:#6b7280;max-width:240px;line-height:1.5}",
   ".dpd-spinner{width:28px;height:28px;border:3px solid rgba(99,102,241,.22);border-top-color:#6366f1;border-radius:50%;animation:dpd-spin .8s linear infinite}",
-  "@keyframes dpd-spin{to{transform:rotate(360deg)}}"
+  "@keyframes dpd-spin{to{transform:rotate(360deg)}}",
+  ".dpd-el.dpd-hover{outline:1.5px solid rgba(99,102,241,.5);outline-offset:-1.5px}",
+  ".dpd-el.dpd-locked{cursor:default!important}",
+  ".dpd-textEditor{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:2px 4px;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);border-radius:4px;background:rgba(255,255,255,.96);color:#111827;resize:none;outline:none;overflow:hidden;z-index:80;font-family:inherit}",
+  ".dpd-breadcrumb{position:absolute;top:8px;left:12px;z-index:90;display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.94);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:7px;padding:3px 5px;box-shadow:0 2px 8px rgba(17,24,39,.06);max-width:calc(100% - 24px);overflow:hidden}",
+  ".dpd-breadcrumb button{border:none;background:transparent;color:var(--dsw-alias-label-secondary,#6b7280);font:inherit;font-size:11.5px;padding:2px 5px;border-radius:4px;cursor:pointer;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}",
+  ".dpd-breadcrumb button:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4);color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-breadcrumb button.cur{color:var(--dsw-alias-label-primary,#111);font-weight:600}",
+  ".dpd-breadcrumb .sep{color:var(--dsw-alias-label-secondary,#6b7280);opacity:.5;font-size:10px}",
+  ".dpd-ctxmenu{position:fixed;z-index:400;min-width:172px;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:9px;box-shadow:0 10px 30px rgba(17,24,39,.16);padding:4px;display:flex;flex-direction:column}",
+  ".dpd-ctxmenu button{display:flex;align-items:center;justify-content:space-between;gap:16px;border:none;background:transparent;color:var(--dsw-alias-label-primary,#111);font:inherit;font-size:12px;text-align:left;padding:6px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}",
+  ".dpd-ctxmenu button:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
+  ".dpd-ctxmenu button:disabled{opacity:.4;cursor:default}",
+  ".dpd-ctxmenu button.danger{color:#e5484d}",
+  ".dpd-ctxmenu button .k{font-size:10.5px;color:var(--dsw-alias-label-secondary,#6b7280)}",
+  ".dpd-ctxsep{height:1px;background:var(--dsw-alias-border-l1,#e5e6eb);margin:4px 2px}",
+  ".dpd-search{display:flex;align-items:center;gap:6px;padding:0 12px 8px}",
+  ".dpd-search input{flex:1;min-width:0;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:6px;padding:4px 8px;font:inherit;font-size:11.5px;color:inherit}",
+  ".dpd-search input:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-layer .nmInput{flex:1;min-width:0;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-brand-primary,#6366f1);border-radius:4px;padding:1px 4px;font:inherit;font-size:12px;color:inherit}",
+  ".dpd-layer .eye,.dpd-layer .lock{width:16px;height:16px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;padding:0;opacity:.55;flex-shrink:0}",
+  ".dpd-layer .eye:hover,.dpd-layer .lock:hover{opacity:1}",
+  ".dpd-layer .eye.on,.dpd-layer .lock.on{opacity:1;color:var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-layer.off .nm{opacity:.45;text-decoration:line-through}",
+  ".dpd-layer.dragging{opacity:.45}",
+  ".dpd-layer.drop-before{box-shadow:inset 0 2px 0 var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-layer.drop-after{box-shadow:inset 0 -2px 0 var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-layer.drop-inside{background:rgba(99,102,241,.12)}",
+  ".dpd-interRow{display:flex;align-items:center;gap:6px;padding:4px 12px;font-size:11.5px;color:var(--dsw-alias-label-secondary,#6b7280)}",
+  ".dpd-interRow select{flex:1;min-width:0}",
+  ".dpd-overlayBackdrop{position:absolute;inset:0;background:rgba(17,24,39,.34);z-index:100;display:flex;align-items:center;justify-content:center}",
+  ".dpd-overlayFrame{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(17,24,39,.4)}",
+  ".dpd-previewNav{position:absolute;top:16px;left:16px;z-index:120;display:flex;gap:6px}",
+  ".dpd-previewNav button{border:none;border-radius:999px;padding:7px 13px;background:rgba(17,24,39,.58);color:#fff;font:inherit;font-size:12px;cursor:pointer;opacity:.65}",
+  ".dpd-previewNav button:hover{opacity:1;background:rgba(17,24,39,.82)}"
 ].join("\n");
 function StyleBlock() {
   return h("style", { dangerouslySetInnerHTML: { __html: CSS } });
 }
 
 // src/client/overlay.js
+function textOr(value, fallback) {
+  return value && value.trim() ? value : fallback;
+}
+function OverlayAction(props) {
+  return h(
+    "div",
+    {
+      style: {
+        marginTop: 4,
+        padding: "7px 14px",
+        borderRadius: 8,
+        background: "#6366f1",
+        color: "#fff",
+        fontSize: 12.5,
+        fontWeight: 600
+      }
+    },
+    props.label
+  );
+}
 function PageOverlay(props) {
-  const { pageState, t } = props;
+  const { pageState, content, t } = props;
+  const c = content || {};
   if (pageState === "loading") {
     return h(
       "div",
       { className: "dpd-overlay" },
       h("div", { className: "dpd-spinner" }),
-      h("div", { className: "dpd-overlayDesc" }, t("overlay.loading"))
+      h("div", { className: "dpd-overlayDesc" }, textOr(c.text, t("overlay.loading")))
     );
   }
   if (pageState === "empty") {
@@ -1996,8 +2274,9 @@ function PageOverlay(props) {
         h("rect", { x: 2, y: 2, width: 12, height: 12, rx: 2.5 }),
         h("path", { d: "M5 8h6M8 5v6" })
       ),
-      h("div", { className: "dpd-overlayTitle" }, t("overlay.emptyTitle")),
-      h("div", { className: "dpd-overlayDesc" }, t("overlay.emptyDesc"))
+      h("div", { className: "dpd-overlayTitle" }, textOr(c.title, t("overlay.emptyTitle"))),
+      h("div", { className: "dpd-overlayDesc" }, textOr(c.desc, t("overlay.emptyDesc"))),
+      h(OverlayAction, { label: textOr(c.action, t("overlay.emptyBtn")) })
     );
   }
   if (pageState === "error") {
@@ -2010,8 +2289,9 @@ function PageOverlay(props) {
         h("circle", { cx: 8, cy: 8, r: 6 }),
         h("path", { d: "M8 5v4M8 11h.01" })
       ),
-      h("div", { className: "dpd-overlayTitle" }, t("overlay.errorTitle")),
-      h("div", { className: "dpd-overlayDesc" }, t("overlay.errorDesc"))
+      h("div", { className: "dpd-overlayTitle" }, textOr(c.title, t("overlay.errorTitle"))),
+      h("div", { className: "dpd-overlayDesc" }, textOr(c.desc, t("overlay.errorDesc"))),
+      h(OverlayAction, { label: textOr(c.action, t("overlay.errorBtn")) })
     );
   }
   return null;
@@ -2030,6 +2310,15 @@ var HANDLES = [
   ["sw", "nesw-resize"],
   ["w", "ew-resize"]
 ];
+function textStyle(el) {
+  return {
+    fontSize: el.props && el.props.fontSize || 14,
+    fontWeight: el.props && el.props.fontWeight || 400,
+    color: el.props && el.props.color || "#111827",
+    textAlign: el.props && el.props.textAlign || "left",
+    lineHeight: 1.4
+  };
+}
 function CanvasView(props) {
   const {
     t,
@@ -2049,6 +2338,10 @@ function CanvasView(props) {
     panning,
     guides,
     marquee,
+    hoverId,
+    editing,
+    breadcrumb,
+    overlayPage,
     renderStateFor,
     startDrag,
     startResize,
@@ -2058,26 +2351,39 @@ function CanvasView(props) {
     setActivePage,
     setUi,
     setUiFor,
-    activate
+    activate,
+    setHoverId,
+    onContextMenu,
+    onInteract,
+    onStartTextEdit,
+    onTextChange,
+    onTextCommit,
+    onTextCancel,
+    onCloseOverlay
   } = props;
   const selectedSet = new Set(selIds || []);
-  function renderElements(elements, pageId) {
+  function renderElements(elements, pageId, isOverlay) {
     return elements.map((el) => {
+      if (el.hidden) return null;
       const st = renderStateFor(el);
       const u = ui[el.id] || {};
       const info = TYPE_INFO[el.type] || TYPE_INFO.text;
-      const cursor = spaceDown ? panning ? "grabbing" : "grab" : preview ? info.interactive ? "pointer" : "default" : "move";
+      const isEditing = !!(editing && editing.id === el.id && !preview);
+      const cursor = spaceDown ? panning ? "grabbing" : "grab" : preview ? info.interactive || el.interactions && el.interactions.length ? "pointer" : "default" : el.locked ? "default" : "move";
       const isBox = isContainerType(el.type);
-      const selected = selectedSet.has(el.id) && !preview;
+      const selected = selectedSet.has(el.id) && !preview && !isOverlay;
       const style = {
         left: el.x,
         top: el.y,
         width: el.w,
         height: el.h,
-        cursor
+        cursor,
+        opacity: el.opacity == null ? 1 : el.opacity
       };
       let className = "dpd-el";
       if (selected) className += " dpd-sel";
+      if (!preview && !isOverlay && hoverId === el.id && !selected) className += " dpd-hover";
+      if (el.locked) className += " dpd-locked";
       if (isBox) {
         className += el.type === "container" ? " dpd-container" : " dpd-group";
         if (el.type === "container") {
@@ -2089,27 +2395,53 @@ function CanvasView(props) {
       const handlers = {
         onMouseDown: (ev) => {
           if (ev.button === 1 || spaceRef.current) return;
-          if (preview) {
-            if (el.type === "button") setUiFor(el.id, { press: true });
+          if (preview || isOverlay) {
+            if (preview && el.type === "button") setUiFor(el.id, { press: true });
+            return;
+          }
+          ev.stopPropagation();
+          if (el.locked) {
+            setSelId(el.id);
             return;
           }
           startDrag(ev, pageId, el);
         },
         onMouseEnter: () => {
-          if (preview && (el.type === "button" || el.type === "card"))
-            setUiFor(el.id, { hover: true });
+          if (preview) {
+            if (el.type === "button" || el.type === "card") setUiFor(el.id, { hover: true });
+          } else if (!isOverlay) {
+            setHoverId(el.id);
+          }
         },
         onMouseLeave: () => {
           if (preview) setUiFor(el.id, { hover: false, press: false });
+          else if (!isOverlay && hoverId === el.id) setHoverId(null);
         },
         onMouseUp: () => {
           if (preview && el.type === "button") setUiFor(el.id, { press: false });
         },
+        onDoubleClick: (ev) => {
+          if (preview || isOverlay) return;
+          if (!info.hasText) return;
+          ev.stopPropagation();
+          setSelId(el.id);
+          onStartTextEdit(el.id, el.props.text || "");
+        },
         onClick: (ev) => {
           if (preview) {
             ev.stopPropagation();
-            activate(el, ev);
+            if (el.interactions && el.interactions.length) onInteract(el);
+            else activate(el, ev);
+          } else if (!isOverlay) {
+            ev.stopPropagation();
+            setSelId(el.id);
           }
+        },
+        onContextMenu: (ev) => {
+          if (preview || isOverlay) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          onContextMenu(ev, el);
         }
       };
       return h(
@@ -2119,10 +2451,30 @@ function CanvasView(props) {
           "data-el-id": el.id,
           className,
           style,
-          title: isBox ? el.props.name || t("comp." + el.type) : void 0,
+          title: el.name || el.props.name || t("comp." + el.type),
           ...handlers
         },
-        isBox ? renderElements(el.children || [], pageId) : h(
+        isEditing ? h("textarea", {
+          className: "dpd-textEditor",
+          value: editing.value,
+          autoFocus: true,
+          spellCheck: false,
+          style: textStyle(el),
+          onMouseDown: (ev) => ev.stopPropagation(),
+          onDoubleClick: (ev) => ev.stopPropagation(),
+          onChange: (ev) => onTextChange(el.id, ev.target.value),
+          onBlur: () => onTextCommit(el.id),
+          onKeyDown: (ev) => {
+            ev.stopPropagation();
+            if (ev.key === "Escape") {
+              ev.preventDefault();
+              onTextCancel();
+            } else if (ev.key === "Enter" && !ev.shiftKey) {
+              ev.preventDefault();
+              onTextCommit(el.id);
+            }
+          }
+        }) : isBox ? renderElements(el.children || [], pageId, isOverlay) : h(
           "div",
           { style: { width: "100%", height: "100%", pointerEvents: "none" } },
           renderWidget(el, st, t, { tabsActive: u.tabs, preview })
@@ -2163,6 +2515,7 @@ function CanvasView(props) {
     const selectionNodes = !preview && pageActive ? selBoxes.map((box) => {
       const single = selBoxes.length === 1;
       const node = sel;
+      const showHandles = single && node && !node.locked;
       return h(
         "div",
         {
@@ -2170,7 +2523,7 @@ function CanvasView(props) {
           className: "dpd-selBox" + (single ? "" : " multi"),
           style: { left: box.x, top: box.y, width: box.w, height: box.h }
         },
-        single && node ? HANDLES.map(
+        showHandles ? HANDLES.map(
           ([dir, cur]) => h("div", {
             key: dir,
             className: "dpd-handle h-" + dir,
@@ -2210,7 +2563,11 @@ function CanvasView(props) {
         height: marquee.h
       }
     }) : null;
-    const overlay = pageActive && pageState !== "normal" ? h(PageOverlay, { pageState, t }) : null;
+    const overlay = pageActive && pageState !== "normal" ? h(PageOverlay, {
+      pageState,
+      content: p.states && p.states[pageState] || null,
+      t
+    }) : null;
     return h(
       "div",
       {
@@ -2230,6 +2587,12 @@ function CanvasView(props) {
             return;
           }
           startMarquee(ev, p);
+        },
+        onContextMenu: (ev) => {
+          if (preview) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          onContextMenu(ev, null);
         }
       },
       els,
@@ -2259,6 +2622,12 @@ function CanvasView(props) {
         }
         if (!preview) setSelId(null);
         else setUi({});
+      },
+      onContextMenu: (ev) => {
+        if (preview) return;
+        ev.preventDefault();
+        setSelId(null);
+        onContextMenu(ev, null);
       }
     },
     h(
@@ -2289,31 +2658,107 @@ function CanvasView(props) {
           frameNodes
         )
       )
+    ),
+    overlayPage ? h(OverlayLayer, {
+      page: overlayPage,
+      t,
+      renderElements,
+      onClose: onCloseOverlay
+    }) : null
+  );
+  return h(
+    "div",
+    { className: "dpd-canvasWrap" },
+    !preview && breadcrumb && breadcrumb.length ? h(
+      "div",
+      { className: "dpd-breadcrumb" },
+      breadcrumb.map(
+        (item, i) => h(
+          "span",
+          { key: item.id || i, style: { display: "contents" } },
+          i > 0 ? h("span", { className: "sep" }, "\u203A") : null,
+          h(
+            "button",
+            {
+              type: "button",
+              className: i === breadcrumb.length - 1 ? "cur" : "",
+              onClick: () => setSelId(item.id),
+              title: item.label
+            },
+            item.label
+          )
+        )
+      )
+    ) : null,
+    canvas
+  );
+}
+function OverlayLayer(props) {
+  const { page, renderElements, onClose } = props;
+  const frame = page.frame || { w: 390, h: 844 };
+  const vh = typeof window !== "undefined" ? window.innerHeight : 900;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const scale = Math.min(1, vh * 0.8 / Math.max(1, frame.h), vw * 0.6 / Math.max(1, frame.w));
+  return h(
+    "div",
+    { className: "dpd-overlayBackdrop", onMouseDown: onClose },
+    h(
+      "div",
+      {
+        className: "dpd-overlayFrame",
+        style: {
+          width: Math.round(frame.w * scale),
+          height: Math.round(frame.h * scale),
+          background: frame.background || "#ffffff"
+        },
+        onMouseDown: (ev) => ev.stopPropagation(),
+        onClick: (ev) => ev.stopPropagation()
+      },
+      h(
+        "div",
+        {
+          style: {
+            width: frame.w,
+            height: frame.h,
+            position: "relative",
+            transform: "scale(" + scale + ")",
+            transformOrigin: "top left"
+          }
+        },
+        renderElements(page.elements || [], page.id, true)
+      )
     )
   );
-  return canvas;
 }
 
 // src/client/ui/inspector.js
+var PAGE_STATE_KEYS = {
+  loading: ["text"],
+  empty: ["title", "desc", "action"],
+  error: ["title", "desc", "action"]
+};
 function InspectorView(props) {
   const {
     t,
+    doc,
     sel,
     selCount,
     activePage,
-    setEl,
-    setElProps,
+    pageState,
+    setPreset,
+    renameActivePage,
+    patchActiveFrame,
+    patchPageStates,
     duplicateEl,
     bringFront,
     sendBack,
     deleteEl,
-    setPreset,
-    renameActivePage,
-    patchActiveFrame,
     alignSelection,
     distributeSelection,
     groupSelection,
     ungroupSelection,
+    applyAttrs,
+    applyProps,
     rightWidth,
     rightCollapsed,
     toggleRight,
@@ -2367,12 +2812,56 @@ function InspectorView(props) {
       t(key)
     )
   );
+  const colorRow = (value, onChange, label) => h(
+    "div",
+    { className: "dpd-row" },
+    h("label", null, label),
+    h("input", {
+      className: "dpd-color",
+      type: "color",
+      value: value || ACCENT,
+      onChange: (e) => onChange(e.target.value)
+    }),
+    h("input", {
+      className: "dpd-input",
+      type: "text",
+      value: value || ACCENT,
+      onChange: (e) => onChange(e.target.value)
+    })
+  );
   let inspectorBody;
   if (selCount > 1) {
     inspectorBody = h(
       "div",
-      null,
+      { key: "multi" },
       h("div", { className: "dpd-empty" }, t("inspector.multi") + " \xB7 " + selCount),
+      h("div", { className: "dpd-hint" }, t("inspector.multiHint")),
+      colorRow(null, (v) => applyProps({ color: v }, "mcolor"), t("inspector.color")),
+      h(
+        "div",
+        { className: "dpd-row" },
+        h("label", null, t("inspector.fontSize")),
+        numInput(14, (v) => applyProps({ fontSize: v }, "mfs")),
+        h("label", null, t("inspector.radius")),
+        numInput(8, (v) => applyProps({ radius: v }, "mradius"))
+      ),
+      h(
+        "div",
+        { className: "dpd-row" },
+        h("label", null, t("inspector.opacity")),
+        h("input", {
+          className: "dpd-input",
+          type: "number",
+          min: 0,
+          max: 100,
+          step: 5,
+          defaultValue: 100,
+          onChange: (e) => {
+            const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+            applyAttrs({ opacity: v / 100 }, "mopacity");
+          }
+        })
+      ),
       h(
         "div",
         { className: "dpd-section" },
@@ -2412,9 +2901,23 @@ function InspectorView(props) {
   } else if (sel) {
     const info = TYPE_INFO[sel.type] || TYPE_INFO.text;
     const stateList = info.states || ["default"];
+    const pages = doc && doc.pages || [];
+    const interactions = sel.interactions || [];
     inspectorBody = h(
       "div",
-      null,
+      { key: "single" },
+      h(
+        "div",
+        { className: "dpd-row" },
+        h("label", null, t("inspector.name")),
+        h("input", {
+          className: "dpd-input",
+          type: "text",
+          value: sel.name || "",
+          placeholder: sel.props.text || sel.props.name || t("comp." + sel.type),
+          onChange: (e) => applyAttrs({ name: e.target.value }, "name:" + sel.id)
+        })
+      ),
       h(
         "div",
         { className: "dpd-row" },
@@ -2426,13 +2929,13 @@ function InspectorView(props) {
             "div",
             { className: "dpd-field" },
             h("span", null, "X"),
-            numInput(sel.x, (v) => setEl(sel.id, { x: v }, "x:" + sel.id))
+            numInput(sel.x, (v) => applyAttrs({ x: v }, "x:" + sel.id))
           ),
           h(
             "div",
             { className: "dpd-field" },
             h("span", null, "Y"),
-            numInput(sel.y, (v) => setEl(sel.id, { y: v }, "y:" + sel.id))
+            numInput(sel.y, (v) => applyAttrs({ y: v }, "y:" + sel.id))
           )
         )
       ),
@@ -2447,13 +2950,13 @@ function InspectorView(props) {
             "div",
             { className: "dpd-field" },
             h("span", null, "W"),
-            numInput(sel.w, (v) => setEl(sel.id, { w: Math.max(16, v) }, "w:" + sel.id))
+            numInput(sel.w, (v) => applyAttrs({ w: Math.max(16, v) }, "w:" + sel.id))
           ),
           h(
             "div",
             { className: "dpd-field" },
             h("span", null, "H"),
-            numInput(sel.h, (v) => setEl(sel.id, { h: Math.max(12, v) }, "h:" + sel.id))
+            numInput(sel.h, (v) => applyAttrs({ h: Math.max(12, v) }, "h:" + sel.id))
           )
         )
       ),
@@ -2466,51 +2969,63 @@ function InspectorView(props) {
           type: "text",
           value: sel.props.text || "",
           placeholder: t("sample.text"),
-          onChange: (e) => setElProps(sel.id, { text: e.target.value }, "text:" + sel.id)
+          onChange: (e) => applyProps({ text: e.target.value }, "text:" + sel.id)
         })
       ) : null,
-      info.hasColor || info.hasText ? h(
-        "div",
-        { className: "dpd-row" },
-        h("label", null, t("inspector.color")),
-        h("input", {
-          className: "dpd-color",
-          type: "color",
-          value: sel.props.color || ACCENT,
-          onChange: (e) => setElProps(sel.id, { color: e.target.value }, "color:" + sel.id)
-        }),
-        h("input", {
-          className: "dpd-input",
-          type: "text",
-          value: sel.props.color || ACCENT,
-          onChange: (e) => setElProps(sel.id, { color: e.target.value }, "color:" + sel.id)
-        })
+      info.hasColor || info.hasText ? colorRow(
+        sel.props.color,
+        (v) => applyProps({ color: v }, "color:" + sel.id),
+        t("inspector.color")
       ) : null,
       info.hasFont ? h(
         "div",
-        { className: "dpd-row" },
-        h("label", null, t("inspector.fontSize")),
-        numInput(
-          sel.props.fontSize || 14,
-          (v) => setElProps(sel.id, { fontSize: v }, "fs:" + sel.id)
+        null,
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.fontSize")),
+          numInput(
+            sel.props.fontSize || 14,
+            (v) => applyProps({ fontSize: v }, "fs:" + sel.id)
+          )
+        ),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.fontWeight")),
+          h(
+            "select",
+            {
+              className: "dpd-select",
+              style: { flex: 1 },
+              value: String(sel.props.fontWeight || 400),
+              onChange: (e) => applyProps({ fontWeight: Number(e.target.value) }, "fw:" + sel.id)
+            },
+            [400, 500, 600, 700].map(
+              (w) => h("option", { key: w, value: String(w) }, String(w))
+            )
+          )
+        ),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.textAlign")),
+          h(
+            "select",
+            {
+              className: "dpd-select",
+              style: { flex: 1 },
+              value: sel.props.textAlign || "left",
+              onChange: (e) => applyProps({ textAlign: e.target.value }, "ta:" + sel.id)
+            },
+            ["left", "center", "right"].map((v) => h("option", { key: v, value: v }, v))
+          )
         )
       ) : null,
       sel.type === "container" || sel.type === "group" ? h(
         "div",
         { className: "dpd-section" },
         h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.container"))),
-        h(
-          "div",
-          { className: "dpd-row" },
-          h("label", null, t("inspector.containerName")),
-          h("input", {
-            className: "dpd-input",
-            type: "text",
-            value: sel.props.name || "",
-            placeholder: t("comp." + sel.type),
-            onChange: (e) => setElProps(sel.id, { name: e.target.value }, "cname:" + sel.id)
-          })
-        ),
         sel.type === "container" ? h(
           "div",
           { className: "dpd-row" },
@@ -2519,13 +3034,13 @@ function InspectorView(props) {
             className: "dpd-color",
             type: "color",
             value: sel.props.background || "#ffffff",
-            onChange: (e) => setElProps(sel.id, { background: e.target.value }, "cbg:" + sel.id)
+            onChange: (e) => applyProps({ background: e.target.value }, "cbg:" + sel.id)
           }),
           h("input", {
             className: "dpd-input",
             type: "text",
             value: sel.props.background || "#ffffff",
-            onChange: (e) => setElProps(sel.id, { background: e.target.value }, "cbg:" + sel.id)
+            onChange: (e) => applyProps({ background: e.target.value }, "cbg:" + sel.id)
           })
         ) : null,
         sel.type === "container" ? h(
@@ -2534,7 +3049,7 @@ function InspectorView(props) {
           h("input", {
             type: "checkbox",
             checked: sel.props.clipContent !== false,
-            onChange: (e) => setElProps(sel.id, { clipContent: e.target.checked }, "clip:" + sel.id)
+            onChange: (e) => applyProps({ clipContent: e.target.checked }, "clip:" + sel.id)
           }),
           t("inspector.clipContent")
         ) : null
@@ -2545,8 +3060,25 @@ function InspectorView(props) {
         h("label", null, t("inspector.radius")),
         numInput(
           sel.props.radius != null ? sel.props.radius : 8,
-          (v) => setElProps(sel.id, { radius: v }, "radius:" + sel.id)
+          (v) => applyProps({ radius: v }, "radius:" + sel.id)
         )
+      ),
+      h(
+        "div",
+        { className: "dpd-row" },
+        h("label", null, t("inspector.opacity")),
+        h("input", {
+          className: "dpd-input",
+          type: "number",
+          min: 0,
+          max: 100,
+          step: 5,
+          value: Math.round((sel.opacity == null ? 1 : sel.opacity) * 100),
+          onChange: (e) => {
+            const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+            applyAttrs({ opacity: v / 100 }, "opacity:" + sel.id);
+          }
+        })
       ),
       h(
         "div",
@@ -2562,10 +3094,87 @@ function InspectorView(props) {
                 key: s,
                 type: "button",
                 className: "dpd-chip" + ((sel.state || defaultState(sel.type)) === s ? " active" : ""),
-                onClick: () => setEl(sel.id, { state: s })
+                onClick: () => applyAttrs({ state: s })
               },
               t("stateName." + s)
             )
+          )
+        )
+      ),
+      h(
+        "div",
+        { className: "dpd-section" },
+        h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.interactions"))),
+        interactions.length === 0 ? h("div", { className: "dpd-hint" }, t("inspector.noInteractions")) : interactions.map(
+          (item, i) => h(
+            "div",
+            { className: "dpd-interRow", key: "inter-" + i },
+            h(
+              "select",
+              {
+                className: "dpd-select",
+                value: item.action,
+                onChange: (e) => {
+                  const next = interactions.slice();
+                  const action = e.target.value;
+                  next[i] = {
+                    trigger: "click",
+                    action,
+                    ...action === "back" ? {} : { targetPageId: item.targetPageId || "" }
+                  };
+                  applyAttrs({ interactions: next });
+                }
+              },
+              ["navigate", "back", "openOverlay"].map(
+                (a) => h("option", { key: a, value: a }, t("inspector.action." + a))
+              )
+            ),
+            item.action === "back" ? null : h(
+              "select",
+              {
+                className: "dpd-select",
+                value: item.targetPageId || "",
+                onChange: (e) => {
+                  const next = interactions.slice();
+                  next[i] = { ...item, targetPageId: e.target.value };
+                  applyAttrs({ interactions: next });
+                }
+              },
+              [h("option", { key: "", value: "" }, "\u2014")].concat(
+                pages.map((p) => h("option", { key: p.id, value: p.id }, p.name))
+              )
+            ),
+            h(
+              "button",
+              {
+                className: "dpd-mini",
+                type: "button",
+                title: t("inspector.removeInteraction"),
+                onClick: () => applyAttrs({ interactions: interactions.filter((_, j) => j !== i) })
+              },
+              "\xD7"
+            )
+          )
+        ),
+        h(
+          "div",
+          { className: "dpd-actions" },
+          h(
+            "button",
+            {
+              className: "dpd-btn",
+              type: "button",
+              onClick: () => {
+                const target = pages.find((p) => p.id !== activePage.id) || activePage;
+                applyAttrs({
+                  interactions: [
+                    ...interactions,
+                    { trigger: "click", action: "navigate", targetPageId: target.id }
+                  ]
+                });
+              }
+            },
+            t("inspector.addInteraction")
           )
         )
       ),
@@ -2604,9 +3213,12 @@ function InspectorView(props) {
       )
     );
   } else {
+    const states = activePage && activePage.states || {};
+    const stateKeys = PAGE_STATE_KEYS[pageState] || null;
+    const stateValue = stateKeys ? states[pageState] || {} : null;
     inspectorBody = h(
       "div",
-      null,
+      { key: "page" },
       h("div", { className: "dpd-empty" }, t("inspector.empty")),
       h(
         "div",
@@ -2657,7 +3269,33 @@ function InspectorView(props) {
             onChange: (e) => patchActiveFrame({ background: e.target.value })
           })
         )
-      )
+      ),
+      stateKeys ? h(
+        "div",
+        { className: "dpd-section" },
+        h(
+          "div",
+          { className: "dpd-panelTitle" },
+          h("span", null, t("inspector.states")),
+          h("span", null, t("state." + pageState))
+        ),
+        stateKeys.map(
+          (field) => h(
+            "div",
+            { className: "dpd-row", key: field },
+            h("label", null, t("inspector.state" + field[0].toUpperCase() + field.slice(1))),
+            h("input", {
+              className: "dpd-input",
+              type: "text",
+              value: stateValue && stateValue[field] || "",
+              placeholder: t(
+                pageState === "loading" ? "overlay.loading" : pageState === "empty" ? field === "title" ? "overlay.emptyTitle" : field === "desc" ? "overlay.emptyDesc" : "overlay.emptyBtn" : field === "title" ? "overlay.errorTitle" : field === "desc" ? "overlay.errorDesc" : "overlay.errorBtn"
+              ),
+              onChange: (e) => patchPageStates(pageState, { [field]: e.target.value })
+            })
+          )
+        )
+      ) : null
     );
   }
   const right = h(
@@ -2686,6 +3324,28 @@ function InspectorView(props) {
 }
 
 // src/client/ui/left.js
+function LockGlyph(props) {
+  const locked = props.locked;
+  return h(
+    "svg",
+    {
+      width: 13,
+      height: 13,
+      viewBox: "0 0 16 16",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.3,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      "aria-hidden": true
+    },
+    h("rect", { x: 3.5, y: 7, width: 9, height: 6.5, rx: 1.6 }),
+    locked ? h("path", { d: "M5.5 7V5.4a2.5 2.5 0 0 1 5 0V7" }) : h("path", { d: "M5.5 7V5.4a2.5 2.5 0 0 1 4.7-1.2" })
+  );
+}
+function layerLabel(el, t) {
+  return el.name || el.props.text || el.props.name || t("comp." + el.type);
+}
 function LeftView(props) {
   const {
     t,
@@ -2702,8 +3362,16 @@ function LeftView(props) {
     startResizeLeft,
     selIds,
     setSelId,
-    setPreview
+    setPreview,
+    setEl,
+    onLayerMove,
+    layerQuery,
+    setLayerQuery
   } = props;
+  const [dragId, setDragId] = useState2(null);
+  const [dropTarget, setDropTarget] = useState2(null);
+  const [renaming, setRenaming] = useState2(null);
+  const [renameValue, setRenameValue] = useState2("");
   const pageRows = doc.pages.map(
     (p) => h(
       "div",
@@ -2743,10 +3411,13 @@ function LeftView(props) {
     )
   );
   const activeElements = activePage && activePage.elements || [];
+  const query = (layerQuery || "").trim().toLowerCase();
   const layerRows = [];
   const collectRows = (elements, depth) => {
     elements.slice().reverse().forEach((el) => {
-      layerRows.push({ el, depth });
+      const label = layerLabel(el, t);
+      const matches = !query || label.toLowerCase().includes(query);
+      if (matches) layerRows.push({ el, depth, label });
       if (isContainerType(el.type) && Array.isArray(el.children)) {
         collectRows(el.children, depth + 1);
       }
@@ -2837,6 +3508,11 @@ function LeftView(props) {
       )
     )
   );
+  const commitRename = (el) => {
+    const value = renameValue.trim();
+    setRenaming(null);
+    if (value && value !== layerLabel(el, t)) setEl(el.id, { name: value });
+  };
   const layersBody = h(
     "div",
     { className: "dpd-sectionBody" },
@@ -2859,25 +3535,125 @@ function LeftView(props) {
     ),
     h(
       "div",
+      { className: "dpd-search" },
+      h("input", {
+        type: "search",
+        value: layerQuery || "",
+        placeholder: t("layers.search"),
+        onChange: (e) => setLayerQuery(e.target.value)
+      })
+    ),
+    h(
+      "div",
       { className: "dpd-layers" },
-      layerRows.map(
-        ({ el, depth }) => h(
+      layerRows.length === 0 ? h("div", { className: "dpd-empty" }, t("layers.empty")) : layerRows.map(({ el, depth, label }) => {
+        const isDrop = dropTarget && dropTarget.id === el.id;
+        let cls = "dpd-layer";
+        if (selectedSet.has(el.id)) cls += " active";
+        if (el.hidden) cls += " off";
+        if (dragId === el.id) cls += " dragging";
+        if (isDrop) cls += " drop-" + dropTarget.position;
+        return h(
           "div",
           {
             key: el.id,
-            className: "dpd-layer" + (selectedSet.has(el.id) ? " active" : ""),
+            className: cls,
+            draggable: true,
             style: { paddingLeft: 8 + depth * 16 },
             onClick: () => {
               setSelId(el.id);
               setPreview(false);
               setActivePage(activePage.id);
+            },
+            onDragStart: (e) => {
+              setDragId(el.id);
+              try {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", el.id);
+              } catch (err) {
+              }
+            },
+            onDragEnd: () => {
+              setDragId(null);
+              setDropTarget(null);
+            },
+            onDragOver: (e) => {
+              if (!dragId || dragId === el.id) return;
+              e.preventDefault();
+              const rect = e.currentTarget.getBoundingClientRect();
+              const ratio = (e.clientY - rect.top) / Math.max(1, rect.height);
+              const position = isContainerType(el.type) && ratio > 0.25 && ratio < 0.75 ? "inside" : ratio < 0.5 ? "before" : "after";
+              setDropTarget({ id: el.id, position });
+            },
+            onDragLeave: () => {
+              setDropTarget((cur) => cur && cur.id === el.id ? null : cur);
+            },
+            onDrop: (e) => {
+              e.preventDefault();
+              const source = dragId || e.dataTransfer.getData("text/plain");
+              const position = dropTarget && dropTarget.id === el.id ? dropTarget.position : "after";
+              setDragId(null);
+              setDropTarget(null);
+              if (source && source !== el.id) onLayerMove(source, el.id, position);
             }
           },
-          isContainerType(el.type) ? h("span", { className: "caret" }, depth >= 0 ? "\u25BE" : "") : null,
+          isContainerType(el.type) ? h("span", { className: "caret" }, "\u25BE") : null,
           h("span", { className: "dot" }, h(Svg, { size: 13 }, libGlyph(el.type))),
-          h("span", { className: "nm" }, el.props.text || el.props.name || t("comp." + el.type))
-        )
-      )
+          renaming === el.id ? h("input", {
+            className: "nmInput",
+            value: renameValue,
+            autoFocus: true,
+            onClick: (e) => e.stopPropagation(),
+            onChange: (e) => setRenameValue(e.target.value),
+            onBlur: () => commitRename(el),
+            onKeyDown: (e) => {
+              e.stopPropagation();
+              if (e.key === "Enter") commitRename(el);
+              else if (e.key === "Escape") setRenaming(null);
+            }
+          }) : h(
+            "span",
+            {
+              className: "nm",
+              title: t("layers.rename"),
+              onDoubleClick: (e) => {
+                e.stopPropagation();
+                setRenaming(el.id);
+                setRenameValue(label);
+              }
+            },
+            label
+          ),
+          h(
+            "button",
+            {
+              className: "eye" + (el.hidden ? " on" : ""),
+              type: "button",
+              title: el.hidden ? t("layers.show") : t("layers.hide"),
+              "aria-label": el.hidden ? t("layers.show") : t("layers.hide"),
+              onClick: (e) => {
+                e.stopPropagation();
+                setEl(el.id, { hidden: !el.hidden });
+              }
+            },
+            h(IconEye, { size: 13 })
+          ),
+          h(
+            "button",
+            {
+              className: "lock" + (el.locked ? " on" : ""),
+              type: "button",
+              title: el.locked ? t("layers.unlock") : t("layers.lock"),
+              "aria-label": el.locked ? t("layers.unlock") : t("layers.lock"),
+              onClick: (e) => {
+                e.stopPropagation();
+                setEl(el.id, { locked: !el.locked });
+              }
+            },
+            h(LockGlyph, { locked: el.locked })
+          )
+        );
+      })
     )
   );
   const sectionContent = section === "pages" ? pagesBody : section === "components" ? componentsBody : section === "layers" ? layersBody : null;
@@ -2920,7 +3696,7 @@ function ToolbarView(props) {
     zoom,
     setZoom,
     preview,
-    setPreview,
+    togglePreview,
     undo,
     redo,
     canUndo,
@@ -3057,7 +3833,7 @@ function ToolbarView(props) {
         className: "dpd-btn" + (preview ? " primary" : ""),
         type: "button",
         onClick: () => {
-          setPreview((v) => !v);
+          togglePreview();
           setSelId(null);
         }
       },
@@ -3103,7 +3879,7 @@ function removeFromTree(elements, idSet) {
   }
   return changed ? out : elements;
 }
-function extractFromTree(elements, id) {
+function extractFromTree2(elements, id) {
   let extracted = null;
   let changed = false;
   const walk = (list) => {
@@ -3164,28 +3940,6 @@ function replaceInTree(elements, id, updater) {
   });
   return changed ? out : elements;
 }
-function reorderInTree(elements, id, toFront) {
-  const index = elements.findIndex((el) => el.id === id);
-  if (index !== -1) {
-    const arr = elements.slice();
-    const [el] = arr.splice(index, 1);
-    if (toFront) arr.push(el);
-    else arr.unshift(el);
-    return arr;
-  }
-  for (let i = 0; i < elements.length; i += 1) {
-    const el = elements[i];
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = reorderInTree(el.children, id, toFront);
-      if (kids !== el.children) {
-        const arr = elements.slice();
-        arr[i] = { ...el, children: kids };
-        return arr;
-      }
-    }
-  }
-  return elements;
-}
 function duplicateInTree(elements, idSet, rootIds) {
   const out = [];
   for (const el of elements) {
@@ -3206,25 +3960,13 @@ function duplicateInTree(elements, idSet, rootIds) {
   }
   return out;
 }
-function scaleTree(elements, sx, sy, sf, ox, oy, isRoot) {
-  return elements.map((el) => {
-    const props = { ...el.props || {} };
-    if (typeof props.fontSize === "number")
-      props.fontSize = Math.max(8, Math.round(props.fontSize * sf));
-    if (typeof props.radius === "number") props.radius = Math.max(0, Math.round(props.radius * sf));
-    const scaled = {
-      ...el,
-      x: Math.round((isRoot ? el.x - ox : el.x) * sx),
-      y: Math.round((isRoot ? el.y - oy : el.y) * sy),
-      w: Math.max(12, Math.round(el.w * sx)),
-      h: Math.max(8, Math.round(el.h * sy)),
-      props
-    };
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      scaled.children = scaleTree(el.children, sx, sy, sf, 0, 0, false);
-    }
-    return scaled;
-  });
+function sameDoc(a, b) {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch (e) {
+    return false;
+  }
 }
 function ProductDesignPanel() {
   const t = useT();
@@ -3253,6 +3995,7 @@ function ProductDesignPanel() {
       }
       if (record) {
         pushPastSnapshot(prev);
+        lastEditRef.current = Date.now();
       }
       h2.future = [];
     }
@@ -3260,6 +4003,16 @@ function ProductDesignPanel() {
     setDocState(next);
   }, []);
   const [selIds, setSelIds] = useState2([]);
+  const [hoverId, setHoverId] = useState2(null);
+  const [editing, setEditing] = useState2(null);
+  const editingRef = useRef(null);
+  editingRef.current = editing;
+  const [ctxMenu, setCtxMenu] = useState2(null);
+  const [layerQuery, setLayerQuery] = useState2("");
+  const [previewStack, setPreviewStack] = useState2([]);
+  const [previewOverlay, setPreviewOverlay] = useState2(null);
+  const clipboardRef = useRef([]);
+  const lastEditRef = useRef(0);
   const [preview, setPreview] = useState2(false);
   const [pageState, setPageState] = useState2("normal");
   const [zoom, setZoom] = useState2(1);
@@ -3317,9 +4070,7 @@ function ProductDesignPanel() {
           const nd = normalizeDoc(res.body.doc);
           if (nd) {
             hostRef.current.revision = res.body.revision;
-            hostRef.current.suppressSave = true;
-            docRef.current = nd;
-            setDocState(nd);
+            adoptRemoteDoc(nd);
           }
         }
       });
@@ -3336,6 +4087,9 @@ function ProductDesignPanel() {
     setDocState(localDoc);
     setSelIds([]);
     setPreview(false);
+    setPreviewStack([]);
+    setPreviewOverlay(null);
+    setEditing(null);
     histRef.current = { past: [], future: [] };
     (async () => {
       const canStream = typeof window.EventSource === "function";
@@ -3392,9 +4146,7 @@ function ProductDesignPanel() {
             const nd = normalizeDoc(snap.body.doc);
             if (!nd) return;
             hostRef.current.revision = snap.body.revision;
-            hostRef.current.suppressSave = true;
-            docRef.current = nd;
-            setDocState(nd);
+            adoptRemoteDoc(nd);
           });
         };
       } catch (e) {
@@ -3505,9 +4257,47 @@ function ProductDesignPanel() {
       duplicateEl();
       return;
     }
+    if (mod && !e.shiftKey && (k === "c" || k === "C")) {
+      e.preventDefault();
+      copySelection();
+      return;
+    }
+    if (mod && !e.shiftKey && (k === "x" || k === "X")) {
+      e.preventDefault();
+      cutSelection();
+      return;
+    }
+    if (mod && !e.shiftKey && (k === "v" || k === "V")) {
+      e.preventDefault();
+      pasteClipboard();
+      return;
+    }
+    if (mod && (k === "]" || k === "}")) {
+      e.preventDefault();
+      reorderSelection(e.shiftKey ? "front" : "forward");
+      return;
+    }
+    if (mod && (k === "[" || k === "{")) {
+      e.preventDefault();
+      reorderSelection(e.shiftKey ? "back" : "backward");
+      return;
+    }
     if (k === "Escape") {
-      if (preview) setPreview(false);
-      else setSelIds([]);
+      if (editingRef.current) {
+        setEditing(null);
+        return;
+      }
+      if (ctxMenu) {
+        setCtxMenu(null);
+        return;
+      }
+      if (preview) {
+        if (previewOverlay) setPreviewOverlay(null);
+        else if (previewStack.length > 1) setPreviewStack((stack) => stack.slice(0, -1));
+        else setPreview(false);
+      } else {
+        setSelIds([]);
+      }
       return;
     }
     if (preview) return;
@@ -3530,6 +4320,12 @@ function ProductDesignPanel() {
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
   }, []);
+  useEffect2(() => {
+    if (!ctxMenu) return void 0;
+    const close = () => setCtxMenu(null);
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [ctxMenu]);
   const activePage = doc.pages.find((p) => p.id === doc.activePageId) || doc.pages[0];
   const treeEntries = activePage ? collectElementEntries(activePage.elements) : [];
   const entryById = new Map(treeEntries.map((entry) => [entry.el.id, entry]));
@@ -3545,6 +4341,8 @@ function ProductDesignPanel() {
   const multiBounds = selEntries.length > 1 ? boundsOfEntries(selEntries) : null;
   const setActivePage = useCallback2(
     (id) => {
+      setEditing(null);
+      setHoverId(null);
       setSelIds((ids) => {
         const page = docRef.current.pages.find((p) => p.id === id);
         if (!page) return [];
@@ -3628,6 +4426,167 @@ function ProductDesignPanel() {
     lastKeyRef.current = { key: null, time: 0 };
     bumpHist((v) => v + 1);
   }
+  function adoptRemoteDoc(nd) {
+    const prev = docRef.current;
+    if (prev && sameDoc(prev, nd)) return;
+    if (prev && Date.now() - lastEditRef.current > 800) pushPastSnapshot(prev);
+    hostRef.current.suppressSave = true;
+    docRef.current = nd;
+    setDocState(nd);
+    setEditing(null);
+    setSelIds(
+      (ids) => ids.filter((id) => nd.pages.some((p) => !!findElementEntry(p.elements, id)))
+    );
+  }
+  function mapSelection(fn, mode) {
+    const ids = new Set(topSelectedEntries().map((entry) => entry.el.id));
+    if (!ids.size) return;
+    setDoc(
+      (d) => ({
+        ...d,
+        pages: d.pages.map((p) => ({
+          ...p,
+          elements: mapTree(p.elements, (el) => ids.has(el.id) ? fn(el) : el)
+        }))
+      }),
+      mode
+    );
+  }
+  function applyAttrs(patch, mode) {
+    mapSelection((el) => ({ ...el, ...patch }), mode);
+  }
+  function applyProps(patch, mode) {
+    mapSelection((el) => ({ ...el, props: { ...el.props, ...patch } }), mode);
+  }
+  function patchPageStates(key, patch) {
+    setDoc(
+      (d) => ({
+        ...d,
+        pages: d.pages.map(
+          (p) => p.id === d.activePageId ? {
+            ...p,
+            states: {
+              ...p.states || {},
+              [key]: { ...(p.states || {})[key] || {}, ...patch }
+            }
+          } : p
+        )
+      }),
+      "pstate:" + key
+    );
+  }
+  function copySelection() {
+    const entries = topSelectedEntries();
+    if (!entries.length) return;
+    clipboardRef.current = entries.map((entry) => ({
+      el: cloneElementDeep(entry.el),
+      absX: entry.absX,
+      absY: entry.absY
+    }));
+  }
+  function cutSelection() {
+    copySelection();
+    deleteEl();
+  }
+  function pasteClipboard() {
+    const items = clipboardRef.current;
+    if (!items || !items.length) return;
+    const page = docRef.current.pages.find((p) => p.id === docRef.current.activePageId);
+    if (!page) return;
+    const targetEntry = selEntries.length === 1 && isContainerType(selEntries[0].el.type) ? selEntries[0] : null;
+    const newIds = [];
+    const copies = items.map((item) => {
+      const copy = cloneElementDeep(item.el, () => uid());
+      copy.x = Math.round(item.absX + 16 - (targetEntry ? targetEntry.absX : 0));
+      copy.y = Math.round(item.absY + 16 - (targetEntry ? targetEntry.absY : 0));
+      newIds.push(copy.id);
+      return copy;
+    });
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => {
+        if (p.id !== page.id) return p;
+        if (!targetEntry) return { ...p, elements: [...p.elements, ...copies] };
+        let elements = p.elements;
+        for (const copy of copies) elements = appendToContainer(elements, targetEntry.el.id, copy);
+        return { ...p, elements };
+      })
+    }));
+    setSelIds(newIds);
+  }
+  function reorderSelection(mode) {
+    const ids = topSelectedEntries().map((entry) => entry.el.id);
+    if (!ids.length) return;
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => {
+        if (p.id !== d.activePageId) return p;
+        let elements = p.elements;
+        for (const id of ids) elements = reorderInTree(elements, id, mode);
+        return { ...p, elements };
+      })
+    }));
+  }
+  function moveLayer(id, targetId, position) {
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map(
+        (p) => p.id === d.activePageId ? { ...p, elements: moveElementInTree(p.elements, id, targetId, position) } : p
+      )
+    }));
+  }
+  function startTextEdit(id, value) {
+    setEditing({ id, value });
+  }
+  function changeText(id, value) {
+    setEditing((cur) => cur && cur.id === id ? { id, value } : cur);
+  }
+  function commitText() {
+    const cur = editingRef.current;
+    setEditing(null);
+    if (!cur) return;
+    setDoc((d) => ({
+      ...d,
+      pages: d.pages.map((p) => ({
+        ...p,
+        elements: replaceInTree(p.elements, cur.id, (el) => ({
+          ...el,
+          props: { ...el.props, text: cur.value }
+        }))
+      }))
+    }));
+  }
+  function cancelText() {
+    setEditing(null);
+  }
+  function togglePreview() {
+    if (preview) {
+      setPreview(false);
+      setPreviewStack([]);
+      setPreviewOverlay(null);
+      return;
+    }
+    setPreviewStack([docRef.current.activePageId]);
+    setPreviewOverlay(null);
+    setSelIds([]);
+    setEditing(null);
+    setPreview(true);
+  }
+  function interact(el) {
+    const link = (el.interactions || [])[0];
+    if (!link) return;
+    if (link.action === "back") {
+      setPreviewStack((stack) => stack.length > 1 ? stack.slice(0, -1) : stack);
+      return;
+    }
+    const page = docRef.current.pages.find((p) => p.id === link.targetPageId);
+    if (!page) return;
+    if (link.action === "openOverlay") setPreviewOverlay(page);
+    else {
+      setPreviewOverlay(null);
+      setPreviewStack((stack) => [...stack, page.id]);
+    }
+  }
   function addPage() {
     const base = activePage;
     const page = {
@@ -3639,6 +4598,7 @@ function ProductDesignPanel() {
         preset: base ? base.frame.preset : "mobile",
         background: "#ffffff"
       },
+      states: emptyStates(),
       elements: []
     };
     setDoc((d) => ({ ...d, pages: [...d.pages, page], activePageId: page.id }));
@@ -3651,6 +4611,7 @@ function ProductDesignPanel() {
       id: uid(),
       name: src.name + " " + t("pages.copySuffix"),
       frame: { ...src.frame },
+      states: JSON.parse(JSON.stringify(src.states || emptyStates())),
       elements: cloneElementDeep(
         { id: "root", type: "group", x: 0, y: 0, w: 0, h: 0, children: src.elements },
         () => uid()
@@ -3748,29 +4709,15 @@ function ProductDesignPanel() {
     if (!selId) return;
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, true) }))
+      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, "front") }))
     }));
   }
   function sendBack() {
     if (!selId) return;
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, false) }))
+      pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, "back") }))
     }));
-  }
-  function elementsBounds(elements) {
-    if (!Array.isArray(elements) || elements.length === 0) return null;
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const e of elements) {
-      minX = Math.min(minX, e.x);
-      minY = Math.min(minY, e.y);
-      maxX = Math.max(maxX, e.x + e.w);
-      maxY = Math.max(maxY, e.y + e.h);
-    }
-    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
   }
   function setPreset(key) {
     const map = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
@@ -3778,25 +4725,9 @@ function ProductDesignPanel() {
     if (!sz) return;
     setDoc((d) => ({
       ...d,
-      pages: d.pages.map((p) => {
-        if (p.id !== d.activePageId) return p;
-        const nw = sz[0];
-        const nh = sz[1];
-        const frame = { ...p.frame, w: nw, h: nh, preset: key };
-        const ow = p.frame.w || nw;
-        const oh = p.frame.h || nh;
-        if (ow === nw && oh === nh) return { ...p, frame };
-        const b = elementsBounds(p.elements);
-        const hasContent = b && b.w > 0 && b.h > 0;
-        const hasContainer = p.elements.some((e) => isContainerType(e.type));
-        const inconsistent = !hasContainer && hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
-        const sx = inconsistent ? nw / b.w : nw / ow;
-        const sy = inconsistent ? nh / b.h : nh / oh;
-        const ox = inconsistent ? b.minX : 0;
-        const oy = inconsistent ? b.minY : 0;
-        const sf = Math.min(sx, sy);
-        return { ...p, frame, elements: scaleTree(p.elements, sx, sy, sf, ox, oy, true) };
-      })
+      pages: d.pages.map(
+        (p) => p.id === d.activePageId ? { ...p, frame: { ...p.frame, w: sz[0], h: sz[1], preset: key } } : p
+      )
     }));
   }
   function patchActiveFrame(patch) {
@@ -4097,7 +5028,7 @@ function ProductDesignPanel() {
       const absY = entry.absY;
       const targetAbsX = target ? target.absX : 0;
       const targetAbsY = target ? target.absY : 0;
-      const extracted = extractFromTree(page.elements, elId);
+      const extracted = extractFromTree2(page.elements, elId);
       if (!extracted.extracted) return d;
       const moved = {
         ...extracted.extracted,
@@ -4212,7 +5143,9 @@ function ProductDesignPanel() {
         h: Math.abs(cur.y - start.y)
       };
       setMarquee({ pageId: page.id, ...box });
-      const entries = collectElementEntries(page.elements).filter((entry) => entry.depth === 0);
+      const entries = collectElementEntries(page.elements).filter(
+        (entry) => entry.depth === 0 && !entry.el.hidden
+      );
       const ids = entries.filter(
         (entry) => entry.absX < box.x + box.w && entry.absX + entry.w > box.x && entry.absY < box.y + box.h && entry.absY + entry.h > box.y
       ).map((entry) => entry.el.id);
@@ -4315,6 +5248,82 @@ function ProductDesignPanel() {
   }
   const canUndo = histRef.current.past.length > 0;
   const canRedo = histRef.current.future.length > 0;
+  const viewPage = preview ? doc.pages.find((p) => p.id === previewStack[previewStack.length - 1]) || activePage : activePage;
+  const crumbEntry = selEntries[0];
+  const breadcrumb = activePage ? [
+    { id: activePage.id, label: activePage.name },
+    ...crumbEntry ? crumbEntry.ancestors.map((id) => {
+      const e = entryById.get(id);
+      return {
+        id,
+        label: e ? e.el.name || e.el.props.name || t("comp." + e.el.type) : id
+      };
+    }) : [],
+    ...crumbEntry ? [
+      {
+        id: crumbEntry.el.id,
+        label: crumbEntry.el.name || crumbEntry.el.props.text || t("comp." + crumbEntry.el.type)
+      }
+    ] : []
+  ] : [];
+  const ctxEl = selEntries[0] ? selEntries[0].el : null;
+  const menuItems = ctxMenu ? [
+    { label: t("ctx.copy"), key: "\u2318C", onClick: copySelection, disabled: !selIds.length },
+    { label: t("ctx.cut"), key: "\u2318X", onClick: cutSelection, disabled: !selIds.length },
+    {
+      label: t("ctx.paste"),
+      key: "\u2318V",
+      onClick: pasteClipboard,
+      disabled: clipboardRef.current.length === 0
+    },
+    { sep: true },
+    { label: t("ctx.duplicate"), key: "\u2318D", onClick: duplicateEl, disabled: !selIds.length },
+    { sep: true },
+    {
+      label: t("ctx.front"),
+      onClick: () => reorderSelection("front"),
+      disabled: !selIds.length
+    },
+    {
+      label: t("ctx.forward"),
+      key: "\u2318]",
+      onClick: () => reorderSelection("forward"),
+      disabled: !selIds.length
+    },
+    {
+      label: t("ctx.backward"),
+      key: "\u2318[",
+      onClick: () => reorderSelection("backward"),
+      disabled: !selIds.length
+    },
+    { label: t("ctx.back"), onClick: () => reorderSelection("back"), disabled: !selIds.length },
+    { sep: true },
+    {
+      label: t("ctx.group"),
+      key: "\u2318G",
+      onClick: groupSelection,
+      disabled: selEntries.length < 2
+    },
+    ...ctxEl && ctxEl.type === "group" ? [{ label: t("ctx.ungroup"), key: "\u21E7\u2318G", onClick: ungroupSelection }] : [],
+    ...ctxEl ? [
+      {
+        label: ctxEl.hidden ? t("ctx.show") : t("ctx.hide"),
+        onClick: () => setEl(ctxEl.id, { hidden: !ctxEl.hidden })
+      },
+      {
+        label: ctxEl.locked ? t("ctx.unlock") : t("ctx.lock"),
+        onClick: () => setEl(ctxEl.id, { locked: !ctxEl.locked })
+      }
+    ] : [],
+    { sep: true },
+    {
+      label: t("ctx.delete"),
+      key: "\u232B",
+      onClick: deleteEl,
+      danger: true,
+      disabled: !selIds.length
+    }
+  ] : null;
   return h(
     "div",
     {
@@ -4333,7 +5342,7 @@ function ProductDesignPanel() {
       zoom,
       setZoom,
       preview,
-      setPreview,
+      togglePreview,
       undo,
       redo,
       canUndo,
@@ -4363,12 +5372,16 @@ function ProductDesignPanel() {
         startResizeLeft,
         selIds,
         setSelId: (id) => setSelIds(id ? [id] : []),
-        setPreview
+        setPreview,
+        setEl,
+        onLayerMove: moveLayer,
+        layerQuery,
+        setLayerQuery
       }),
       h(CanvasView, {
         t,
         doc,
-        activePage,
+        activePage: viewPage,
         zoom,
         selIds,
         selBoxes,
@@ -4383,6 +5396,10 @@ function ProductDesignPanel() {
         panning,
         guides,
         marquee,
+        hoverId,
+        editing,
+        breadcrumb,
+        overlayPage: previewOverlay,
         renderStateFor,
         startDrag,
         startResize,
@@ -4392,15 +5409,33 @@ function ProductDesignPanel() {
         setActivePage,
         setUi,
         setUiFor,
-        activate
+        activate,
+        setHoverId,
+        onContextMenu: (ev, el) => {
+          if (el) {
+            if (!selIds.includes(el.id)) setSelIds([el.id]);
+          } else {
+            setSelIds([]);
+          }
+          setCtxMenu({ x: ev.clientX, y: ev.clientY });
+        },
+        onInteract: interact,
+        onStartTextEdit: startTextEdit,
+        onTextChange: changeText,
+        onTextCommit: commitText,
+        onTextCancel: cancelText,
+        onCloseOverlay: () => setPreviewOverlay(null)
       }),
       preview ? null : h(InspectorView, {
         t,
+        doc,
         sel,
         selCount: selEntries.length,
         activePage,
+        pageState,
         setEl,
-        setElProps,
+        applyAttrs,
+        applyProps,
         duplicateEl,
         bringFront,
         sendBack,
@@ -4408,6 +5443,7 @@ function ProductDesignPanel() {
         setPreset,
         renameActivePage,
         patchActiveFrame,
+        patchPageStates,
         alignSelection,
         distributeSelection,
         groupSelection,
@@ -4418,15 +5454,60 @@ function ProductDesignPanel() {
         startResizeRight
       })
     ),
+    preview && previewStack.length > 1 ? h(
+      "div",
+      { className: "dpd-previewNav" },
+      h(
+        "button",
+        {
+          type: "button",
+          onClick: () => setPreviewStack((stack) => stack.slice(0, -1))
+        },
+        "\u2039 " + t("preview.back")
+      )
+    ) : null,
     preview ? h(
       "button",
       {
         className: "dpd-previewExit",
         type: "button",
         title: t("toolbar.exitPreview"),
-        onClick: () => setPreview(false)
+        onClick: () => {
+          setPreview(false);
+          setPreviewStack([]);
+          setPreviewOverlay(null);
+        }
       },
       t("toolbar.exitPreview")
+    ) : null,
+    ctxMenu ? h(
+      "div",
+      {
+        className: "dpd-ctxmenu",
+        style: {
+          left: Math.max(4, Math.min(ctxMenu.x, (window.innerWidth || 1200) - 200)),
+          top: Math.max(4, Math.min(ctxMenu.y, (window.innerHeight || 800) - 380))
+        },
+        onMouseDown: (e) => e.stopPropagation(),
+        onContextMenu: (e) => e.preventDefault()
+      },
+      menuItems.map(
+        (item, i) => item.sep ? h("div", { key: "sep" + i, className: "dpd-ctxsep" }) : h(
+          "button",
+          {
+            key: item.label + i,
+            type: "button",
+            disabled: item.disabled,
+            className: item.danger ? "danger" : "",
+            onClick: () => {
+              setCtxMenu(null);
+              item.onClick();
+            }
+          },
+          h("span", null, item.label),
+          item.key ? h("span", { className: "k" }, item.key) : null
+        )
+      )
     ) : null
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOps, emptyDoc, ensureDoc, repairDoc, summarizeDoc } from '../src/host/model.js';
+import { applyOps, emptyDoc, ensureDoc, summarizeDoc } from '../src/host/model.js';
 
 describe('host 文档 reducer', () => {
   it('add_page + add_element 生成 id 并保持结构', () => {
@@ -87,68 +87,92 @@ describe('host 文档 reducer', () => {
     expect(results[3].pageId).toBe(doc.pages[1].id);
   });
 
-  it('set_page_frame 切换尺寸时按宽高分别缩放（可还原、可关闭）', () => {
+  it('set_page_frame 只改画板尺寸，不动元素几何', () => {
     const { doc } = applyOps(emptyDoc(), [
       { kind: 'add_page', preset: 'desktop' },
-      {
-        kind: 'add_element',
-        type: 'button',
-        x: 200,
-        y: 100,
-        w: 200,
-        h: 60,
-        props: { fontSize: 20, radius: 10 },
-      },
+      { kind: 'add_element', type: 'button', x: 200, y: 100, w: 200, h: 60 },
     ]);
     const pageId = doc.pages[0].id;
     const before = doc.pages[0].elements[0];
-
-    const shrunk = applyOps(doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
-    const after = shrunk.pages[0].elements[0];
-    expect(shrunk.pages[0].frame).toMatchObject({ w: 390, h: 844, preset: 'mobile' });
-    const sx = 390 / 1280;
-    const sy = 844 / 800;
-    const sf = Math.min(sx, sy);
-    expect(after.w).toBe(Math.max(12, Math.round(before.w * sx)));
-    expect(after.h).toBe(Math.max(8, Math.round(before.h * sy)));
-    expect(after.x).toBe(Math.round(before.x * sx));
-    expect(after.y).toBe(Math.round(before.y * sy));
-    expect(after.props.fontSize).toBe(Math.max(8, Math.round(before.props.fontSize * sf)));
-
-    // 切回桌面应还原（四舍五入误差内）
-    const restored = applyOps(shrunk, [{ kind: 'set_page_frame', pageId, preset: 'desktop' }]).doc;
-    expect(Math.abs(restored.pages[0].elements[0].w - before.w)).toBeLessThanOrEqual(1);
-    expect(Math.abs(restored.pages[0].elements[0].h - before.h)).toBeLessThanOrEqual(1);
-
-    const kept = applyOps(doc, [
-      { kind: 'set_page_frame', pageId, preset: 'mobile', scaleElements: false },
-    ]).doc;
-    expect(kept.pages[0].elements[0].w).toBe(before.w);
+    const out = applyOps(doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
+    expect(out.pages[0].frame).toMatchObject({ w: 390, h: 844, preset: 'mobile' });
+    expect(out.pages[0].elements[0]).toMatchObject({
+      x: before.x,
+      y: before.y,
+      w: before.w,
+      h: before.h,
+    });
   });
 
-  it('repairDoc 修复半宽错位文档（幂等）', () => {
-    const doc = {
-      name: '',
-      activePageId: 'p',
-      pages: [
-        {
-          id: 'p',
-          name: 'P',
-          frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
-          elements: [
-            { id: 'n', type: 'navbar', x: 0, y: 0, w: 198, h: 46, state: 'default', props: {} },
-            { id: 't', type: 'tabs', x: 0, y: 387, w: 198, h: 40, state: 'default', props: {} },
-          ],
-        },
-      ],
-    };
-    const first = repairDoc(doc);
-    expect(first.changed).toBe(true);
-    const els = first.doc.pages[0].elements;
-    const maxX = Math.max(...els.map((e) => e.x + e.w));
-    const maxY = Math.max(...els.map((e) => e.y + e.h));
-    expect(Math.abs(maxX - 390)).toBeLessThanOrEqual(1);
-    expect(Math.abs(maxY - 844)).toBeLessThanOrEqual(1);
-    expect(repairDoc(first.doc).changed).toBe(false);
+  it('duplicate_page 深拷贝并分配新 id', () => {
+    const first = applyOps(emptyDoc(), [
+      { kind: 'add_page', name: 'A' },
+      { kind: 'add_element', type: 'button', props: { text: 'ok' } },
+    ]);
+    const pageId = first.doc.pages[0].id;
+    const out = applyOps(first.doc, [{ kind: 'duplicate_page', pageId, name: 'B' }]);
+    expect(out.doc.pages).toHaveLength(2);
+    expect(out.doc.pages[1].name).toBe('B');
+    expect(out.doc.pages[1].elements[0].id).not.toBe(out.doc.pages[0].elements[0].id);
+    expect(out.doc.pages[1].elements[0].props.text).toBe('ok');
+  });
+
+  it('move_element / reorder_element 保持屏幕位置与层级', () => {
+    const first = applyOps(emptyDoc(), [
+      { kind: 'add_page' },
+      { kind: 'add_container', x: 40, y: 40, w: 300, h: 200, name: 'C' },
+      { kind: 'add_element', type: 'button', x: 60, y: 60, w: 100, h: 40 },
+    ]);
+    const pageId = first.doc.pages[0].id;
+    const containerId = first.doc.pages[0].elements[0].id;
+    const buttonId = first.doc.pages[0].elements[1].id;
+    const moved = applyOps(first.doc, [
+      { kind: 'move_element', pageId, elementId: buttonId, containerId },
+    ]).doc;
+    const box = moved.pages[0].elements[0];
+    expect(box.children).toHaveLength(1);
+    // absolute position is preserved: 60-40 = 20
+    expect(box.children[0]).toMatchObject({ x: 20, y: 20 });
+    const reordered = applyOps(moved, [
+      { kind: 'reorder_element', pageId, elementId: box.children[0].id, position: 'front' },
+    ]).doc;
+    expect(reordered.pages[0].elements[0].children).toHaveLength(1);
+  });
+
+  it('add_page 后未指定 pageId 的元素落在新页', () => {
+    const { doc } = applyOps(emptyDoc(), [
+      { kind: 'add_page', name: 'A' },
+      { kind: 'add_element', type: 'text', props: { text: 'on A' } },
+      { kind: 'add_page', name: 'B' },
+      { kind: 'add_element', type: 'card', props: { text: 'on B' } },
+    ]);
+    expect(doc.pages[0].elements).toHaveLength(1);
+    expect(doc.pages[1].elements).toHaveLength(1);
+    expect(doc.pages[1].elements[0].type).toBe('card');
+    expect(doc.activePageId).toBe(doc.pages[1].id);
+  });
+
+  it('按 elementId 操作时可跨页定位，无需 pageId', () => {
+    const { doc } = applyOps(emptyDoc(), [
+      { kind: 'add_page', name: 'A' },
+      { kind: 'add_element', type: 'button', props: { text: 'go' } },
+      { kind: 'add_page', name: 'B' },
+    ]);
+    const buttonId = doc.pages[0].elements[0].id;
+    const out = applyOps(doc, [
+      { kind: 'update_element', elementId: buttonId, props: { text: 'changed' } },
+    ]).doc;
+    expect(out.pages[0].elements[0].props.text).toBe('changed');
+    expect(out.pages[1].elements).toHaveLength(0);
+  });
+
+  it('set_page_states 写入可编辑的状态文案', () => {
+    const { doc } = applyOps(emptyDoc(), [{ kind: 'add_page' }]);
+    const pageId = doc.pages[0].id;
+    const out = applyOps(doc, [
+      { kind: 'set_page_states', pageId, states: { empty: { title: '还没有项目' } } },
+    ]).doc;
+    expect(out.pages[0].states.empty.title).toBe('还没有项目');
+    expect(out.pages[0].states.empty.desc).toBe('');
   });
 });

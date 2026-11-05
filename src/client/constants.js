@@ -1,7 +1,6 @@
 const NS = 'dsh-product-design';
 const PANEL_ID = 'dsh-product-design';
-const STORAGE_KEY = 'dsh-product-design:doc:v2';
-const LEGACY_KEY = 'dsh-product-design:doc:v1';
+const STORAGE_KEY = 'dsh-product-design:doc:v3';
 const UI_KEY = 'dsh-product-design:ui:v1';
 /** Host half's same-origin API (see index.js). The browser is a view over it. */
 const API_PREFIX = '/dsh-product-design/api';
@@ -110,7 +109,6 @@ export {
   ACCENT,
   API_PREFIX,
   defaultState,
-  LEGACY_KEY,
   LIB_ORDER,
   NS,
   PANEL_ID,

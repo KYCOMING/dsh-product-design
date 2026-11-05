@@ -12,8 +12,8 @@
  *   GET  /events  → text/event-stream, one `{ revision }` per change
  *
  * Each conversation owns one document under
- * `storages/dsh-product-design/sessions/<sessionId>/doc.json`. Requests and
- * tool calls without a session id use the legacy global document.
+ * `storages/dsh-product-design/sessions/<sessionId>/doc.json`. A request
+ * without a session id falls back to the `default` session.
  *
  * Tools (registered globally when the deployment serves a tool registry):
  *   product_design_get_document
@@ -23,7 +23,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { applyOps, emptyDoc, ensureDoc, repairDoc, summarizeDoc } from './model.js';
+import { applyOps, emptyDoc, ensureDoc, summarizeDoc } from './model.js';
 
 const API_PREFIX = '/dsh-product-design/api';
 const MAX_BODY = 4 * 1024 * 1024;
@@ -35,11 +35,13 @@ const GUIDANCE = [
   '打开方式：侧边栏「产品设计」图标；或直接用 /design <需求> 让 AI 绘制。',
   '每个会话拥有独立设计稿；你可以直接用工具读写当前会话的画布，不需要用户先打开面板：',
   '  product_design_get_document：读取页面/元素/状态。',
-  '  product_design_apply：按操作增删改（add_page / add_container / add_element / update_element / delete_element / group_elements / ungroup_elements / set_page_frame / clear_page / set_document_name 等）。',
+  '  product_design_apply：按操作增删改（add_page / duplicate_page / set_active_page / set_page_frame / set_page_states / add_container / add_element / update_element / delete_element / move_element / reorder_element / group_elements / ungroup_elements / clear_page / set_document_name）。',
   '画布坐标原点在每页左上角；默认手机页 390×844。元素类型：container, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select。',
-  '容器（container）可以嵌套子元素：add_element/add_container 传 containerId 即可放入容器，子元素坐标相对容器左上角；容器支持裁剪内容。',
-  'props 常用键：text、color、fontSize、fontWeight、radius；容器还可传 name、background、clipContent。状态见各类型（如 button: default/hover/active/disabled）。',
-  '操作里需要页面时可用 pageId，或用 pageId:"@last" / pageIndex（0基）指向同一次 apply 内新建的页面，无需先知道 id。',
+  '容器（container）可以嵌套子元素：add_element/add_container 传 containerId 即可放入容器，子元素坐标相对容器左上角；容器支持裁剪内容。move_element 可把元素移到另一个容器。',
+  'props 常用键：text、color、fontSize、fontWeight、radius；容器还可传 name、background、clipContent。元素还支持 name（图层名）、hidden、locked、opacity、interactions。',
+  'interactions 是原型连线：[{ action: "navigate"|"back"|"openOverlay", targetPageId }]。给按钮加 navigate 就能在预览里走通流程。',
+  '页面级状态用 set_page_states 写文案：states.loading.text、states.empty.title/desc/action、states.error.title/desc/action。',
+  '状态见各类型（如 button: default/hover/active/disabled）。不传 pageId 时默认作用于当前活动页；add_page / duplicate_page 会把新页设为活动页，所以「先 add_page 再 add_element」会自然落在新页。也可用 pageId:"@last" / pageIndex（0基）显式指定。',
   '当用户提出产品设计/原型需求时：先 get_document，再用一次 apply 批量搭好页面与元素；结果会自动出现在对话内的产品预览卡片里，用户也可点侧边栏「产品设计」查看完整画布。',
 ].join('\n');
 
@@ -54,10 +56,6 @@ function dshHome() {
     return p;
   }
   return join(homedir(), '.dsh');
-}
-
-function docFile() {
-  return join(dshHome(), 'storages', 'dsh-product-design', 'doc.json');
 }
 
 /** Keep session ids usable as one path segment without losing uniqueness. */
@@ -82,50 +80,13 @@ function sessionDocFile(sessionId) {
   );
 }
 
-/**
- * The pre-session single document is migrated once into the first session that
- * asks for a document. Later sessions start empty instead of inheriting it.
- */
-function migrateLegacyDoc(file) {
-  if (file === docFile()) return;
-  try {
-    readFileSync(file, 'utf8');
-    return;
-  } catch {
-    /* no session document yet */
-  }
-  const legacy = docFile();
-  let raw;
-  try {
-    raw = readFileSync(legacy, 'utf8');
-  } catch {
-    return;
-  }
-  try {
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, raw, 'utf8');
-    renameSync(legacy, `${legacy}.migrated`);
-  } catch {
-    /* migration is best-effort; an empty session document is still usable */
-  }
-}
-
-/** Lazily create one store per session; no session id keeps the legacy document. */
+/** Lazily create one store per session. Every request belongs to a session. */
 function createStores() {
   const stores = new Map();
-  let legacy = null;
   return {
     forSession(sessionId) {
-      if (!sessionId) {
-        if (!legacy) legacy = createStore(docFile());
-        return legacy;
-      }
-      const key = safeSessionId(sessionId);
-      if (!stores.has(key)) {
-        const file = sessionDocFile(key);
-        migrateLegacyDoc(file);
-        stores.set(key, createStore(file));
-      }
+      const key = safeSessionId(sessionId || 'default');
+      if (!stores.has(key)) stores.set(key, createStore(sessionDocFile(key)));
       return stores.get(key);
     },
   };
@@ -142,20 +103,6 @@ function createStore(file) {
     }
   } catch {
     /* no file yet — start empty */
-  }
-
-  // Heal documents left inconsistent by older versions (frame changed without
-  // scaling the elements). Persist immediately so reads and the canvas agree.
-  const repaired = repairDoc(doc);
-  if (repaired.changed) {
-    doc = repaired.doc;
-    revision += 1;
-    try {
-      mkdirSync(dirname(file), { recursive: true });
-      writeFileSync(file, JSON.stringify({ revision, doc }), 'utf8');
-    } catch {
-      /* best-effort */
-    }
   }
 
   const subscribers = new Set();
@@ -410,15 +357,20 @@ function applyTool(stores) {
       'Apply an ordered list of operations to the product-design canvas (a simplified Figma). The Host owns the document and broadcasts the result to the open canvas.',
       'Operations (each an object with `kind`):',
       'add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} → pageId',
-      'delete_page {pageId}; rename_page {pageId, name}; set_page_frame {pageId, preset?|width?, height?, background?}; clear_page {pageId}',
-      'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?} → elementId (a frame-like container; pass containerId (or "@last") to nest it)',
-      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, props?: {text,color,fontSize,fontWeight,radius}, state?} → elementId (containerId also accepts "@last" for the most recently added container in this apply)',
-      'update_element {pageId?, elementId, x?, y?, w?, h?, state?, props?}; delete_element {pageId?, elementId}',
+      'duplicate_page {pageId, name?} → pageId (copies the whole page with fresh element ids)',
+      'delete_page {pageId}; rename_page {pageId, name}; set_active_page {pageId}',
+      'set_page_frame {pageId, preset?|width?, height?, background?} (never rescales elements); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}',
+      'clear_page {pageId}',
+      'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?} → elementId (a frame-like container; pass containerId (or "@last") to nest it)',
+      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius}, interactions?} → elementId (containerId also accepts "@last")',
+      'update_element {pageId?, elementId, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?, interactions?}; delete_element {pageId?, elementId}',
+      'move_element {pageId?, elementId, containerId?: string|null, index?} (reparent without moving on screen); reorder_element {pageId?, elementId, position: front|back|forward|backward}',
       'group_elements {pageId?, elementIds: string[]} → groupId; ungroup_elements {pageId?, elementId}',
       'set_document_name {name}',
       'Element types: container, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select.',
       'Container children use coordinates relative to the container; containers clip content by default. States: button[default,hover,active,disabled]; input[default,focus,filled,error,disabled]; card[default,hover]; toggle[on,off]; checkbox[unchecked,checked]; select[default,open,disabled]; others default.',
-      'Page targeting: any op that needs a page accepts pageId, or pageId: "@last" for the most recently added page, or pageIndex (0-based). This lets one apply call add a page then place elements on it without knowing its id.',
+      'interactions: [{ action: "navigate"|"back"|"openOverlay", targetPageId }] — wire buttons between pages so the prototype can be walked through in preview.',
+      'Page targeting: any op that needs a page accepts pageId, or pageId: "@last" for the most recently added page, or pageIndex (0-based). Without pageId the op targets the active page; add_page and duplicate_page make the new page active, so add_page followed by add_element lands on the new page.',
       'Returns generated page/element ids and the new revision. Prefer one apply call with several ops over many calls.',
     ].join(' '),
     parameters: {

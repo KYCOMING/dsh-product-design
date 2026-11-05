@@ -7,7 +7,7 @@ let container;
 let root;
 let plugin;
 
-const KEY = 'dsh-product-design:doc:v2';
+const KEY = 'dsh-product-design:doc:v3';
 const doc = () => JSON.parse(window.localStorage.getItem(KEY));
 const q = (sel) => container.querySelectorAll(sel);
 const one = (sel) => container.querySelector(sel);

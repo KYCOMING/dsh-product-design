@@ -7,10 +7,25 @@
 ## [Unreleased]
 
 ### Added
-- README 增加画板截图：编辑器多画板、组件库、纯净预览。
+- **原型交互（页面跳转）**：元素支持 `interactions: [{ action: navigate|back|openOverlay, targetPageId }]`，右侧属性面板可增删改；预览里点击即可走通流程，带返回栈与弹层，`Esc` 逐层退出。
+- **双击就地编辑文本**：画布上双击文本类组件直接编辑，`Enter` 提交、`Shift+Enter` 换行、`Esc` 取消，字号/字重/颜色/对齐实时套用。
+- **图层操作**：拖拽排序、拖入容器、显隐、锁定、双击重命名、按名称搜索。
+- **剪贴板**：`⌘C` / `⌘X` / `⌘V`，保留元素在画布上的绝对位置，可跨页粘贴；选中容器时粘贴进容器。
+- **右键菜单**：复制 / 剪切 / 粘贴 / 副本 / 层级（置顶、置底、上移、下移）/ 编组 / 显隐 / 锁定 / 删除。
+- **面包屑**：画布左上角显示 `页面 › 容器 › 元素`，可逐级点选。
+- **多选批量改属性**：颜色、字号、圆角、不透明度一次应用到全部选中图层。
+- **悬停轮廓**：编辑态悬停即高亮元素边界，容器内元素更容易点中。
+- **页面状态文案可编辑**：`page.states.{loading,empty,error}` 的标题/说明/按钮文案在属性面板可改，AI 也可通过 `set_page_states` 写入；不再是一层写死的蒙层。
+- **Host 新操作**：`duplicate_page`、`set_active_page`、`set_page_states`、`move_element`（换父容器且保持屏幕位置）、`reorder_element`（front/back/forward/backward）；`update_element` 支持 `name/hidden/locked/opacity/interactions`。
+- 新增回归测试：就地编辑、图层显隐、剪贴板、右键删除、原型跳转/弹层、AI 改动撤销。
 
 ### Changed
+- **文档格式升到 v3（破坏性，不做兼容）**：元素新增 `name / hidden / locked / opacity / interactions`，页面新增 `states`；localStorage 键改为 `dsh-product-design:doc:v3`。移除 v1→v2 迁移、半宽文档自愈 `repairDoc`、旧全局 `doc.json` 迁移等全部兼容代码。
+- **切画板尺寸不再缩放内容**：`set_page_frame` 与画板预设只改 frame，元素几何保持不变（原来的按比例缩放有损且不可逆）。
+- **AI 改动可撤销**：Host 通过 SSE 推来的文档变更会作为独立历史步骤记录，`⌘Z` 可回退；自己保存的回声不会产生多余步骤。
+- **图层面板默认行为**：容器子元素按层级缩进，隐藏元素仍可在图层树里选中与恢复。
 - `package.json` 的 `description` 改为中英文双语，与 GitHub About 保持一致。
+- README 增加画板截图：编辑器多画板、组件库、纯净预览。
 
 ## [1.1.0] - 2026-11-05
 

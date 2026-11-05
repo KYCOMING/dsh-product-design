@@ -28,7 +28,7 @@ export function ToolbarView(props) {
     zoom,
     setZoom,
     preview,
-    setPreview,
+    togglePreview,
     undo,
     redo,
     canUndo,
@@ -166,7 +166,7 @@ export function ToolbarView(props) {
         className: 'dpd-btn' + (preview ? ' primary' : ''),
         type: 'button',
         onClick: () => {
-          setPreview((v) => !v);
+          togglePreview();
           setSelId(null);
         },
       },

@@ -64,6 +64,15 @@ function findElementEntry(elements, id, parent = null, parentAbsX = 0, parentAbs
   }
   return null;
 }
+function descendantIds(el, out = []) {
+  if (!el || !isContainer(el) || !Array.isArray(el.children)) return out;
+  for (const child of el.children) {
+    if (!child) continue;
+    out.push(child.id);
+    descendantIds(child, out);
+  }
+  return out;
+}
 function boundsOfEntries(entries) {
   if (!entries || !entries.length) return null;
   let minX = Infinity;
@@ -89,6 +98,37 @@ function cloneElementDeep(el, nextId) {
     delete copy.children;
   }
   return copy;
+}
+function replaceList(elements, oldList, newList) {
+  if (elements === oldList) return newList;
+  let changed = false;
+  const out = elements.map((el) => {
+    if (isContainer(el) && Array.isArray(el.children)) {
+      const kids = replaceList(el.children, oldList, newList);
+      if (kids !== el.children) {
+        changed = true;
+        return { ...el, children: kids };
+      }
+    }
+    return el;
+  });
+  return changed ? out : elements;
+}
+function reorderInTree(elements, id, mode) {
+  const entry = findElementEntry(elements, id);
+  if (!entry) return elements;
+  const list = entry.list;
+  const from = entry.index;
+  let to = from;
+  if (mode === "front") to = list.length - 1;
+  else if (mode === "back") to = 0;
+  else if (mode === "forward") to = Math.min(list.length - 1, from + 1);
+  else if (mode === "backward") to = Math.max(0, from - 1);
+  if (to === from) return elements;
+  const next = list.slice();
+  const [el] = next.splice(from, 1);
+  next.splice(to, 0, el);
+  return replaceList(elements, list, next);
 }
 
 // src/host/model.js
@@ -129,6 +169,7 @@ var PRESETS = {
   tablet: [768, 1024],
   desktop: [1280, 800]
 };
+var INTERACTION_ACTIONS = ["navigate", "back", "openOverlay"];
 var seq = 0;
 function newId(prefix) {
   seq += 1;
@@ -141,52 +182,93 @@ var num = (v, d) => {
   return Number.isFinite(n) ? n : d;
 };
 var str = (v, d) => typeof v === "string" ? v : d;
-function elementsBounds(elements) {
-  if (!Array.isArray(elements) || elements.length === 0) return null;
-  const entries = collectElementEntries(elements);
-  const b = boundsOfEntries(entries);
-  if (!b) return null;
-  return { minX: b.x, minY: b.y, maxX: b.x + b.w, maxY: b.y + b.h, w: b.w, h: b.h };
-}
-function scaleProps(props, s) {
-  const out = isObj(props) ? { ...props } : {};
-  if (typeof out.fontSize === "number") out.fontSize = Math.max(8, Math.round(out.fontSize * s));
-  if (typeof out.radius === "number") out.radius = Math.max(0, Math.round(out.radius * s));
-  return out;
-}
-function scaleElementDeep(e, sx, sy, sf, ox, oy, isRoot) {
-  const out = {
-    ...e,
-    x: Math.round((isRoot ? e.x - ox : e.x) * sx),
-    y: Math.round((isRoot ? e.y - oy : e.y) * sy),
-    w: Math.max(12, Math.round(e.w * sx)),
-    h: Math.max(8, Math.round(e.h * sy)),
-    props: scaleProps(e.props, sf)
-  };
-  if (isContainerType(e.type) && Array.isArray(e.children)) {
-    out.children = e.children.map((child) => scaleElementDeep(child, sx, sy, sf, 0, 0, false));
-  }
-  return out;
-}
-function removeElementById(elements, id) {
-  let changed = false;
+var clamp01 = (v) => Math.max(0, Math.min(1, v));
+function normalizeInteractions(raw) {
+  if (!Array.isArray(raw)) return [];
   const out = [];
-  for (const el of elements) {
-    if (el.id === id) {
-      changed = true;
-      continue;
-    }
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = removeElementById(el.children, id);
-      if (kids !== el.children) {
-        changed = true;
-        out.push({ ...el, children: kids });
-        continue;
-      }
-    }
-    out.push(el);
+  for (const item of raw) {
+    if (!isObj(item)) continue;
+    const action = INTERACTION_ACTIONS.includes(item.action) ? item.action : null;
+    if (!action) continue;
+    const next = { trigger: "click", action };
+    if (action !== "back") next.targetPageId = str(item.targetPageId, "");
+    out.push(next);
   }
-  return changed ? out : elements;
+  return out;
+}
+function normalizePageStates(raw) {
+  const src = isObj(raw) ? raw : {};
+  const pick = (key, fields) => {
+    const value = isObj(src[key]) ? src[key] : {};
+    const out = {};
+    for (const field of fields) out[field] = str(value[field], "");
+    return out;
+  };
+  return {
+    loading: pick("loading", ["text"]),
+    empty: pick("empty", ["title", "desc", "action"]),
+    error: pick("error", ["title", "desc", "action"])
+  };
+}
+function emptyDoc() {
+  return { name: "", pages: [], activePageId: null };
+}
+function defaultStateFor(type) {
+  if (type === "toggle") return "on";
+  if (type === "checkbox") return "unchecked";
+  return "default";
+}
+function ensureElement(raw) {
+  const e = isObj(raw) ? raw : {};
+  const type = ELEMENT_TYPES[e.type] ? e.type : "text";
+  const [dw, dh] = ELEMENT_TYPES[type];
+  const states = ELEMENT_STATES[type] || ["default"];
+  const out = {
+    id: str(e.id, "") || newId("e"),
+    type,
+    name: str(e.name, ""),
+    x: num(e.x, 0),
+    y: num(e.y, 0),
+    w: Math.max(12, num(e.w, dw)),
+    h: Math.max(8, num(e.h, dh)),
+    hidden: e.hidden === true,
+    locked: e.locked === true,
+    opacity: clamp01(num(e.opacity, 1)),
+    state: states.includes(e.state) ? e.state : defaultStateFor(type),
+    props: isObj(e.props) ? clone(e.props) : {},
+    interactions: normalizeInteractions(e.interactions)
+  };
+  if (isContainerType(type)) {
+    out.children = Array.isArray(e.children) ? e.children.filter(isObj).map(ensureElement) : [];
+  }
+  return out;
+}
+function ensurePage(raw) {
+  const p = isObj(raw) ? raw : {};
+  const frame = isObj(p.frame) ? p.frame : {};
+  const preset = PRESETS[frame.preset] ? frame.preset : "mobile";
+  const size = PRESETS[preset];
+  return {
+    id: str(p.id, "") || newId("p"),
+    name: str(p.name, "Page"),
+    frame: {
+      w: Math.max(1, num(frame.w, size[0])),
+      h: Math.max(1, num(frame.h, size[1])),
+      preset,
+      background: str(frame.background, "#ffffff")
+    },
+    states: normalizePageStates(p.states),
+    elements: Array.isArray(p.elements) ? p.elements.filter(isObj).map(ensureElement) : []
+  };
+}
+function ensureDoc(raw) {
+  const doc = isObj(raw) ? clone(raw) : emptyDoc();
+  doc.pages = Array.isArray(doc.pages) ? doc.pages.filter(isObj).map(ensurePage) : [];
+  doc.name = str(doc.name, "");
+  if (!doc.pages.some((p) => p.id === doc.activePageId)) {
+    doc.activePageId = doc.pages.length ? doc.pages[0].id : null;
+  }
+  return doc;
 }
 function clone(x) {
   if (typeof structuredClone === "function") {
@@ -197,60 +279,6 @@ function clone(x) {
   }
   return JSON.parse(JSON.stringify(x));
 }
-function emptyDoc() {
-  return { name: "", pages: [], activePageId: null };
-}
-function defaultStateFor(type) {
-  if (type === "toggle") return "on";
-  if (type === "checkbox") return "unchecked";
-  return "default";
-}
-function ensureDoc(raw) {
-  const doc = isObj(raw) ? clone(raw) : emptyDoc();
-  if (!Array.isArray(doc.pages)) doc.pages = [];
-  doc.pages = doc.pages.filter(isObj).map((p) => {
-    const frame = isObj(p.frame) ? p.frame : {};
-    const preset = PRESETS[frame.preset] ? frame.preset : "mobile";
-    const size = PRESETS[preset];
-    return {
-      id: str(p.id, "") || newId("p"),
-      name: str(p.name, "Page"),
-      frame: {
-        w: num(frame.w, size[0]),
-        h: num(frame.h, size[1]),
-        preset,
-        background: str(frame.background, "#ffffff")
-      },
-      elements: Array.isArray(p.elements) ? p.elements.filter(isObj).map(ensureElement) : []
-    };
-  });
-  if (typeof doc.name !== "string") doc.name = "";
-  if (!doc.pages.some((p) => p.id === doc.activePageId)) {
-    doc.activePageId = doc.pages.length ? doc.pages[0].id : null;
-  }
-  return doc;
-}
-function ensureElement(e) {
-  const type = ELEMENT_TYPES[e.type] ? e.type : "text";
-  const [dw, dh] = ELEMENT_TYPES[type];
-  const props = isObj(e.props) ? clone(e.props) : {};
-  const states = ELEMENT_STATES[type] || ["default"];
-  const state = states.includes(e.state) ? e.state : defaultStateFor(type);
-  const out = {
-    id: str(e.id, "") || newId("e"),
-    type,
-    x: num(e.x, 0),
-    y: num(e.y, 0),
-    w: Math.max(12, num(e.w, dw)),
-    h: Math.max(8, num(e.h, dh)),
-    state,
-    props
-  };
-  if (isContainerType(type)) {
-    out.children = Array.isArray(e.children) ? e.children.filter(isObj).map(ensureElement) : [];
-  }
-  return out;
-}
 function findPage(doc, op, opIndex) {
   let page;
   if (op && op.pageId === "@last") {
@@ -260,12 +288,26 @@ function findPage(doc, op, opIndex) {
   } else if (op && op.pageId) {
     page = doc.pages.find((p) => p.id === op.pageId);
   } else {
-    page = doc.pages[0];
+    page = doc.pages.find((p) => p.id === doc.activePageId) || doc.pages[0];
   }
   if (!page) {
     const target = op && op.pageId !== void 0 ? `"${op.pageId}"` : String(op && op.pageIndex);
     throw new Error(`op[${opIndex}] references unknown page ${target}; add a page first`);
   }
+  return page;
+}
+function findPageForElement(doc, op, index) {
+  if (op.pageId !== void 0 || typeof op.pageIndex === "number") return findPage(doc, op, index);
+  const ids = op.elementId ? [op.elementId] : Array.isArray(op.elementIds) ? op.elementIds : [];
+  for (const id of ids) {
+    const page = doc.pages.find((p) => !!findElementEntry(p.elements, id));
+    if (page) return page;
+  }
+  return findPage(doc, op, index);
+}
+function requirePageById(doc, pageId, opIndex, label) {
+  const page = doc.pages.find((p) => p.id === pageId);
+  if (!page) throw new Error(`op[${opIndex}] ${label}: unknown page "${pageId}"`);
   return page;
 }
 function applyOne(doc, op, index, state) {
@@ -278,7 +320,7 @@ function applyOne(doc, op, index, state) {
   if (kind === "add_page") {
     const preset = PRESETS[op.preset] ? op.preset : "mobile";
     const size = PRESETS[preset];
-    const page = {
+    const page = ensurePage({
       id: newId("p"),
       name: str(op.name, `Page ${doc.pages.length + 1}`),
       frame: {
@@ -288,10 +330,24 @@ function applyOne(doc, op, index, state) {
         background: str(op.background, "#ffffff")
       },
       elements: []
-    };
+    });
     doc.pages.push(page);
-    if (!doc.activePageId) doc.activePageId = page.id;
+    doc.activePageId = page.id;
     return { op: index, kind, pageId: page.id, name: page.name };
+  }
+  if (kind === "duplicate_page") {
+    const source = requirePageById(doc, op.pageId, index, "duplicate_page");
+    const copy = ensurePage({
+      id: newId("p"),
+      name: str(op.name, `${source.name} copy`),
+      frame: { ...source.frame },
+      states: clone(source.states),
+      elements: source.elements.map((el) => cloneElementDeep(el, () => newId("e")))
+    });
+    const at = doc.pages.indexOf(source) + 1;
+    doc.pages.splice(at, 0, copy);
+    doc.activePageId = copy.id;
+    return { op: index, kind, pageId: copy.id, name: copy.name };
   }
   if (kind === "delete_page") {
     const idx = doc.pages.findIndex((p) => p.id === op.pageId);
@@ -307,33 +363,35 @@ function applyOne(doc, op, index, state) {
     page.name = str(op.name, page.name);
     return { op: index, kind, pageId: page.id };
   }
+  if (kind === "set_active_page") {
+    const page = requirePageById(doc, op.pageId, index, "set_active_page");
+    doc.activePageId = page.id;
+    return { op: index, kind, pageId: page.id };
+  }
   if (kind === "set_page_frame") {
     const page = findPage(doc, op, index);
     const preset = PRESETS[op.preset] ? op.preset : page.frame.preset;
     const size = PRESETS[preset] || [page.frame.w, page.frame.h];
-    const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
-    const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
-    const ow = page.frame.w;
-    const oh = page.frame.h;
-    if (op.scaleElements !== false && ow > 0 && oh > 0 && (ow !== nw || oh !== nh)) {
-      const b = elementsBounds(page.elements);
-      const hasContent = b && b.w > 0 && b.h > 0;
-      const hasContainer = page.elements.some((e) => isContainerType(e.type));
-      const inconsistent = !hasContainer && hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
-      const sx = inconsistent ? nw / b.w : nw / ow;
-      const sy = inconsistent ? nh / b.h : nh / oh;
-      const ox = inconsistent ? b.minX : 0;
-      const oy = inconsistent ? b.minY : 0;
-      const sf = Math.min(sx, sy);
-      page.elements = page.elements.map((e) => scaleElementDeep(e, sx, sy, sf, ox, oy, true));
-    }
     page.frame = {
       preset,
-      w: nw,
-      h: nh,
+      w: Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w)),
+      h: Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h)),
       background: str(op.background, page.frame.background)
     };
-    return { op: index, kind, pageId: page.id, scaled: op.scaleElements !== false };
+    return { op: index, kind, pageId: page.id };
+  }
+  if (kind === "set_page_states") {
+    const page = findPage(doc, op, index);
+    const patch = isObj(op.states) ? op.states : {};
+    const merged = {};
+    for (const key of ["loading", "empty", "error"]) {
+      merged[key] = {
+        ...page.states && page.states[key] || {},
+        ...isObj(patch[key]) ? patch[key] : {}
+      };
+    }
+    page.states = normalizePageStates(merged);
+    return { op: index, kind, pageId: page.id };
   }
   if (kind === "clear_page") {
     const page = findPage(doc, op, index);
@@ -357,12 +415,17 @@ function applyOne(doc, op, index, state) {
     const el = ensureElement({
       id: newId("e"),
       type,
+      name: str(op.name, ""),
       x: num(op.x, target ? 16 : fullWidth ? 0 : 24),
       y: num(op.y, 24 + n % 10 * 18),
       w,
       h: Math.max(8, num(op.h, dh)),
+      hidden: op.hidden === true,
+      locked: op.locked === true,
+      opacity: num(op.opacity, 1),
       state: op.state,
-      props: op.props
+      props: op.props,
+      interactions: op.interactions
     });
     if (target) target.el.children = [...target.el.children || [], el];
     else page.elements.push(el);
@@ -381,10 +444,14 @@ function applyOne(doc, op, index, state) {
     const el = ensureElement({
       id: newId("e"),
       type: "container",
+      name: str(op.name, `Container ${n + 1}`),
       x: num(op.x, Math.min(24, Math.max(0, boundW - 40))),
       y: num(op.y, 24 + n % 8 * 18),
       w: Math.max(12, num(op.w, Math.min(320, boundW))),
       h: Math.max(8, num(op.h, Math.min(240, boundH))),
+      hidden: op.hidden === true,
+      locked: op.locked === true,
+      opacity: num(op.opacity, 1),
       props: {
         name: str(op.name, `Container ${n + 1}`),
         background: str(op.background, "#ffffff"),
@@ -398,7 +465,7 @@ function applyOne(doc, op, index, state) {
     return { op: index, kind, pageId: page.id, elementId: el.id, type: "container" };
   }
   if (kind === "update_element") {
-    const page = findPage(doc, op, index);
+    const page = findPageForElement(doc, op, index);
     const entry = findElementEntry(page.elements, op.elementId);
     if (!entry) throw new Error(`op[${index}] update_element: unknown element "${op.elementId}"`);
     const el = entry.el;
@@ -406,21 +473,66 @@ function applyOne(doc, op, index, state) {
     if (op.y !== void 0) el.y = num(op.y, el.y);
     if (op.w !== void 0) el.w = Math.max(12, num(op.w, el.w));
     if (op.h !== void 0) el.h = Math.max(8, num(op.h, el.h));
+    if (op.name !== void 0) el.name = str(op.name, el.name);
+    if (op.hidden !== void 0) el.hidden = op.hidden === true;
+    if (op.locked !== void 0) el.locked = op.locked === true;
+    if (op.opacity !== void 0) el.opacity = clamp01(num(op.opacity, el.opacity));
     if (op.state !== void 0 && (ELEMENT_STATES[el.type] || []).includes(op.state))
       el.state = op.state;
+    if (op.interactions !== void 0) el.interactions = normalizeInteractions(op.interactions);
     if (isObj(op.props)) el.props = { ...el.props, ...clone(op.props) };
     return { op: index, kind, pageId: page.id, elementId: el.id };
   }
   if (kind === "delete_element") {
-    const page = findPage(doc, op, index);
+    const page = findPageForElement(doc, op, index);
     const before = collectElementEntries(page.elements).length;
     page.elements = removeElementById(page.elements, op.elementId);
     if (collectElementEntries(page.elements).length === before)
       throw new Error(`op[${index}] delete_element: unknown element "${op.elementId}"`);
     return { op: index, kind, pageId: page.id, elementId: op.elementId };
   }
+  if (kind === "move_element") {
+    const page = findPageForElement(doc, op, index);
+    const entry = findElementEntry(page.elements, op.elementId);
+    if (!entry) throw new Error(`op[${index}] move_element: unknown element "${op.elementId}"`);
+    const containerId = op.containerId === void 0 ? null : op.containerId;
+    if (containerId && containerId === op.elementId)
+      throw new Error(`op[${index}] move_element: cannot move an element into itself`);
+    if (containerId && descendantIds(entry.el).includes(containerId))
+      throw new Error(`op[${index}] move_element: cannot move into a descendant`);
+    const absX = entry.absX;
+    const absY = entry.absY;
+    const removed = removeElementById(page.elements, op.elementId);
+    const moved = { ...entry.el, x: 0, y: 0 };
+    if (containerId) {
+      const target = findElementEntry(removed, containerId);
+      if (!target || !isContainerType(target.el.type))
+        throw new Error(`op[${index}] move_element: unknown container "${containerId}"`);
+      moved.x = Math.round(absX - target.absX);
+      moved.y = Math.round(absY - target.absY);
+      const kids = (target.el.children || []).slice();
+      const at = Number.isFinite(op.index) ? Math.max(0, Math.min(kids.length, Number(op.index))) : kids.length;
+      kids.splice(at, 0, moved);
+      target.el.children = kids;
+    } else {
+      moved.x = Math.round(absX);
+      moved.y = Math.round(absY);
+      const at = Number.isFinite(op.index) ? Math.max(0, Math.min(removed.length, Number(op.index))) : removed.length;
+      removed.splice(at, 0, moved);
+    }
+    page.elements = removed;
+    return { op: index, kind, pageId: page.id, elementId: moved.id };
+  }
+  if (kind === "reorder_element") {
+    const page = findPageForElement(doc, op, index);
+    const position = ["front", "back", "forward", "backward"].includes(op.position) ? op.position : "front";
+    if (!findElementEntry(page.elements, op.elementId))
+      throw new Error(`op[${index}] reorder_element: unknown element "${op.elementId}"`);
+    page.elements = reorderInTree(page.elements, op.elementId, position);
+    return { op: index, kind, pageId: page.id, elementId: op.elementId, position };
+  }
   if (kind === "group_elements") {
-    const page = findPage(doc, op, index);
+    const page = findPageForElement(doc, op, index);
     const ids = Array.isArray(op.elementIds) ? op.elementIds : [];
     if (ids.length < 2) throw new Error(`op[${index}] group_elements: need at least two ids`);
     const entries = ids.map((id) => findElementEntry(page.elements, id));
@@ -435,11 +547,11 @@ function applyOne(doc, op, index, state) {
     const group = ensureElement({
       id: newId("e"),
       type: "group",
+      name: str(op.name, "Group"),
       x: bounds.x - parentAbsX,
       y: bounds.y - parentAbsY,
       w: bounds.w,
-      h: bounds.h,
-      props: { name: str(op.name, "Group") }
+      h: bounds.h
     });
     group.children = entries.map((entry) => {
       const copy = cloneElementDeep(entry.el);
@@ -456,7 +568,7 @@ function applyOne(doc, op, index, state) {
     return { op: index, kind, pageId: page.id, groupId: group.id };
   }
   if (kind === "ungroup_elements") {
-    const page = findPage(doc, op, index);
+    const page = findPageForElement(doc, op, index);
     const entry = findElementEntry(page.elements, op.elementId);
     if (!entry) throw new Error(`op[${index}] ungroup_elements: unknown element "${op.elementId}"`);
     if (entry.el.type !== "group")
@@ -476,6 +588,26 @@ function applyOne(doc, op, index, state) {
   }
   throw new Error(`op[${index}] has unknown kind "${kind}"`);
 }
+function removeElementById(elements, id) {
+  let changed = false;
+  const out = [];
+  for (const el of elements) {
+    if (el.id === id) {
+      changed = true;
+      continue;
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = removeElementById(el.children, id);
+      if (kids !== el.children) {
+        changed = true;
+        out.push({ ...el, children: kids });
+        continue;
+      }
+    }
+    out.push(el);
+  }
+  return changed ? out : elements;
+}
 function applyOps(rawDoc, ops) {
   if (!Array.isArray(ops)) throw new Error("operations must be an array");
   if (ops.length === 0) throw new Error("operations must not be empty");
@@ -484,27 +616,6 @@ function applyOps(rawDoc, ops) {
   const results = ops.map((op, i) => applyOne(doc, op, i, state));
   if (!doc.activePageId && doc.pages.length) doc.activePageId = doc.pages[0].id;
   return { doc, results };
-}
-function repairDoc(rawDoc) {
-  if (!isObj(rawDoc) || !Array.isArray(rawDoc.pages)) return { doc: rawDoc, changed: false };
-  let changed = false;
-  for (const page of rawDoc.pages) {
-    if (!isObj(page) || !Array.isArray(page.elements) || page.elements.length === 0) continue;
-    const frame = isObj(page.frame) ? page.frame : {};
-    const ow = num(frame.w, 390);
-    const oh = num(frame.h, 844);
-    const b = elementsBounds(page.elements);
-    if (!b || b.w <= 0 || b.h <= 0) continue;
-    if (!page.elements.some((e) => isContainerType(e.type)) && b.w >= ow * 0.4 && b.w < ow * 0.8) {
-      const sx = ow / b.w;
-      const sy = oh / b.h;
-      page.elements = page.elements.map(
-        (e) => scaleElementDeep(e, sx, sy, Math.min(sx, sy), b.minX, b.minY, true)
-      );
-      changed = true;
-    }
-  }
-  return { doc: rawDoc, changed };
 }
 function summarizeDoc(rawDoc) {
   const doc = ensureDoc(rawDoc ?? emptyDoc());
@@ -518,7 +629,8 @@ function summarizeDoc(rawDoc) {
         name: p.name,
         frame: `${p.frame.w}\xD7${p.frame.h}`,
         elements: entries.length,
-        containers: entries.filter((entry) => isContainerType(entry.el.type)).length
+        containers: entries.filter((entry) => isContainerType(entry.el.type)).length,
+        links: entries.filter((entry) => entry.el.interactions?.length).length
       };
     })
   };
@@ -533,11 +645,13 @@ var GUIDANCE = [
   "\u6253\u5F00\u65B9\u5F0F\uFF1A\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u56FE\u6807\uFF1B\u6216\u76F4\u63A5\u7528 /design <\u9700\u6C42> \u8BA9 AI \u7ED8\u5236\u3002",
   "\u6BCF\u4E2A\u4F1A\u8BDD\u62E5\u6709\u72EC\u7ACB\u8BBE\u8BA1\u7A3F\uFF1B\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528\u5DE5\u5177\u8BFB\u5199\u5F53\u524D\u4F1A\u8BDD\u7684\u753B\u5E03\uFF0C\u4E0D\u9700\u8981\u7528\u6237\u5148\u6253\u5F00\u9762\u677F\uFF1A",
   "  product_design_get_document\uFF1A\u8BFB\u53D6\u9875\u9762/\u5143\u7D20/\u72B6\u6001\u3002",
-  "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / add_container / add_element / update_element / delete_element / group_elements / ungroup_elements / set_page_frame / clear_page / set_document_name \u7B49\uFF09\u3002",
+  "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / duplicate_page / set_active_page / set_page_frame / set_page_states / add_container / add_element / update_element / delete_element / move_element / reorder_element / group_elements / ungroup_elements / clear_page / set_document_name\uFF09\u3002",
   "\u753B\u5E03\u5750\u6807\u539F\u70B9\u5728\u6BCF\u9875\u5DE6\u4E0A\u89D2\uFF1B\u9ED8\u8BA4\u624B\u673A\u9875 390\xD7844\u3002\u5143\u7D20\u7C7B\u578B\uFF1Acontainer, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select\u3002",
-  "\u5BB9\u5668\uFF08container\uFF09\u53EF\u4EE5\u5D4C\u5957\u5B50\u5143\u7D20\uFF1Aadd_element/add_container \u4F20 containerId \u5373\u53EF\u653E\u5165\u5BB9\u5668\uFF0C\u5B50\u5143\u7D20\u5750\u6807\u76F8\u5BF9\u5BB9\u5668\u5DE6\u4E0A\u89D2\uFF1B\u5BB9\u5668\u652F\u6301\u88C1\u526A\u5185\u5BB9\u3002",
-  "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u5BB9\u5668\u8FD8\u53EF\u4F20 name\u3001background\u3001clipContent\u3002\u72B6\u6001\u89C1\u5404\u7C7B\u578B\uFF08\u5982 button: default/hover/active/disabled\uFF09\u3002",
-  '\u64CD\u4F5C\u91CC\u9700\u8981\u9875\u9762\u65F6\u53EF\u7528 pageId\uFF0C\u6216\u7528 pageId:"@last" / pageIndex\uFF080\u57FA\uFF09\u6307\u5411\u540C\u4E00\u6B21 apply \u5185\u65B0\u5EFA\u7684\u9875\u9762\uFF0C\u65E0\u9700\u5148\u77E5\u9053 id\u3002',
+  "\u5BB9\u5668\uFF08container\uFF09\u53EF\u4EE5\u5D4C\u5957\u5B50\u5143\u7D20\uFF1Aadd_element/add_container \u4F20 containerId \u5373\u53EF\u653E\u5165\u5BB9\u5668\uFF0C\u5B50\u5143\u7D20\u5750\u6807\u76F8\u5BF9\u5BB9\u5668\u5DE6\u4E0A\u89D2\uFF1B\u5BB9\u5668\u652F\u6301\u88C1\u526A\u5185\u5BB9\u3002move_element \u53EF\u628A\u5143\u7D20\u79FB\u5230\u53E6\u4E00\u4E2A\u5BB9\u5668\u3002",
+  "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u5BB9\u5668\u8FD8\u53EF\u4F20 name\u3001background\u3001clipContent\u3002\u5143\u7D20\u8FD8\u652F\u6301 name\uFF08\u56FE\u5C42\u540D\uFF09\u3001hidden\u3001locked\u3001opacity\u3001interactions\u3002",
+  'interactions \u662F\u539F\u578B\u8FDE\u7EBF\uFF1A[{ action: "navigate"|"back"|"openOverlay", targetPageId }]\u3002\u7ED9\u6309\u94AE\u52A0 navigate \u5C31\u80FD\u5728\u9884\u89C8\u91CC\u8D70\u901A\u6D41\u7A0B\u3002',
+  "\u9875\u9762\u7EA7\u72B6\u6001\u7528 set_page_states \u5199\u6587\u6848\uFF1Astates.loading.text\u3001states.empty.title/desc/action\u3001states.error.title/desc/action\u3002",
+  '\u72B6\u6001\u89C1\u5404\u7C7B\u578B\uFF08\u5982 button: default/hover/active/disabled\uFF09\u3002\u4E0D\u4F20 pageId \u65F6\u9ED8\u8BA4\u4F5C\u7528\u4E8E\u5F53\u524D\u6D3B\u52A8\u9875\uFF1Badd_page / duplicate_page \u4F1A\u628A\u65B0\u9875\u8BBE\u4E3A\u6D3B\u52A8\u9875\uFF0C\u6240\u4EE5\u300C\u5148 add_page \u518D add_element\u300D\u4F1A\u81EA\u7136\u843D\u5728\u65B0\u9875\u3002\u4E5F\u53EF\u7528 pageId:"@last" / pageIndex\uFF080\u57FA\uFF09\u663E\u5F0F\u6307\u5B9A\u3002',
   "\u5F53\u7528\u6237\u63D0\u51FA\u4EA7\u54C1\u8BBE\u8BA1/\u539F\u578B\u9700\u6C42\u65F6\uFF1A\u5148 get_document\uFF0C\u518D\u7528\u4E00\u6B21 apply \u6279\u91CF\u642D\u597D\u9875\u9762\u4E0E\u5143\u7D20\uFF1B\u7ED3\u679C\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u5BF9\u8BDD\u5185\u7684\u4EA7\u54C1\u9884\u89C8\u5361\u7247\u91CC\uFF0C\u7528\u6237\u4E5F\u53EF\u70B9\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u67E5\u770B\u5B8C\u6574\u753B\u5E03\u3002"
 ].join("\n");
 var inject = ["webServer"];
@@ -550,9 +664,6 @@ function dshHome() {
     return p;
   }
   return join(homedir(), ".dsh");
-}
-function docFile() {
-  return join(dshHome(), "storages", "dsh-product-design", "doc.json");
 }
 function safeSessionId(sessionId) {
   const value = String(sessionId || "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
@@ -569,42 +680,12 @@ function sessionDocFile(sessionId) {
     "doc.json"
   );
 }
-function migrateLegacyDoc(file) {
-  if (file === docFile()) return;
-  try {
-    readFileSync(file, "utf8");
-    return;
-  } catch {
-  }
-  const legacy = docFile();
-  let raw;
-  try {
-    raw = readFileSync(legacy, "utf8");
-  } catch {
-    return;
-  }
-  try {
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, raw, "utf8");
-    renameSync(legacy, `${legacy}.migrated`);
-  } catch {
-  }
-}
 function createStores() {
   const stores = /* @__PURE__ */ new Map();
-  let legacy = null;
   return {
     forSession(sessionId) {
-      if (!sessionId) {
-        if (!legacy) legacy = createStore(docFile());
-        return legacy;
-      }
-      const key = safeSessionId(sessionId);
-      if (!stores.has(key)) {
-        const file = sessionDocFile(key);
-        migrateLegacyDoc(file);
-        stores.set(key, createStore(file));
-      }
+      const key = safeSessionId(sessionId || "default");
+      if (!stores.has(key)) stores.set(key, createStore(sessionDocFile(key)));
       return stores.get(key);
     }
   };
@@ -619,16 +700,6 @@ function createStore(file) {
       doc = parsed.doc ?? null;
     }
   } catch {
-  }
-  const repaired = repairDoc(doc);
-  if (repaired.changed) {
-    doc = repaired.doc;
-    revision += 1;
-    try {
-      mkdirSync(dirname(file), { recursive: true });
-      writeFileSync(file, JSON.stringify({ revision, doc }), "utf8");
-    } catch {
-    }
   }
   const subscribers = /* @__PURE__ */ new Set();
   function notify() {
@@ -851,15 +922,20 @@ function applyTool(stores) {
       "Apply an ordered list of operations to the product-design canvas (a simplified Figma). The Host owns the document and broadcasts the result to the open canvas.",
       "Operations (each an object with `kind`):",
       "add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} \u2192 pageId",
-      "delete_page {pageId}; rename_page {pageId, name}; set_page_frame {pageId, preset?|width?, height?, background?}; clear_page {pageId}",
-      'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?} \u2192 elementId (a frame-like container; pass containerId (or "@last") to nest it)',
-      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, props?: {text,color,fontSize,fontWeight,radius}, state?} \u2192 elementId (containerId also accepts "@last" for the most recently added container in this apply)',
-      "update_element {pageId?, elementId, x?, y?, w?, h?, state?, props?}; delete_element {pageId?, elementId}",
+      "duplicate_page {pageId, name?} \u2192 pageId (copies the whole page with fresh element ids)",
+      "delete_page {pageId}; rename_page {pageId, name}; set_active_page {pageId}",
+      "set_page_frame {pageId, preset?|width?, height?, background?} (never rescales elements); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}",
+      "clear_page {pageId}",
+      'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?} \u2192 elementId (a frame-like container; pass containerId (or "@last") to nest it)',
+      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius}, interactions?} \u2192 elementId (containerId also accepts "@last")',
+      "update_element {pageId?, elementId, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?, interactions?}; delete_element {pageId?, elementId}",
+      "move_element {pageId?, elementId, containerId?: string|null, index?} (reparent without moving on screen); reorder_element {pageId?, elementId, position: front|back|forward|backward}",
       "group_elements {pageId?, elementIds: string[]} \u2192 groupId; ungroup_elements {pageId?, elementId}",
       "set_document_name {name}",
       "Element types: container, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select.",
       "Container children use coordinates relative to the container; containers clip content by default. States: button[default,hover,active,disabled]; input[default,focus,filled,error,disabled]; card[default,hover]; toggle[on,off]; checkbox[unchecked,checked]; select[default,open,disabled]; others default.",
-      'Page targeting: any op that needs a page accepts pageId, or pageId: "@last" for the most recently added page, or pageIndex (0-based). This lets one apply call add a page then place elements on it without knowing its id.',
+      'interactions: [{ action: "navigate"|"back"|"openOverlay", targetPageId }] \u2014 wire buttons between pages so the prototype can be walked through in preview.',
+      'Page targeting: any op that needs a page accepts pageId, or pageId: "@last" for the most recently added page, or pageIndex (0-based). Without pageId the op targets the active page; add_page and duplicate_page make the new page active, so add_page followed by add_element lands on the new page.',
       "Returns generated page/element ids and the new revision. Prefer one apply call with several ops over many calls."
     ].join(" "),
     parameters: {

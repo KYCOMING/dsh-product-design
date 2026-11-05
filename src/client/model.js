@@ -1,12 +1,5 @@
 import { isContainerType } from '../shared/elements.js';
-import {
-  API_PREFIX,
-  defaultState,
-  LEGACY_KEY,
-  STORAGE_KEY,
-  TYPE_INFO,
-  UI_KEY,
-} from './constants.js';
+import { API_PREFIX, defaultState, STORAGE_KEY, TYPE_INFO, UI_KEY } from './constants.js';
 
 // ------------------------------------------------------------------
 // document model + persistence
@@ -19,16 +12,30 @@ function makeEl(type, x, y, w, hh, props, state) {
   const el = {
     id: uid(),
     type,
+    name: '',
     x,
     y,
     w,
     h: hh,
+    hidden: false,
+    locked: false,
+    opacity: 1,
     state: state || defaultState(type),
     props: props || {},
+    interactions: [],
   };
   if (isContainerType(type)) el.children = [];
   return el;
 }
+
+function emptyStates() {
+  return {
+    loading: { text: '' },
+    empty: { title: '', desc: '', action: '' },
+    error: { title: '', desc: '', action: '' },
+  };
+}
+
 function starterElements(t) {
   return [
     makeEl('navbar', 0, 0, 390, 56),
@@ -48,27 +55,65 @@ function starterElements(t) {
     makeEl('image', 24, 540, 342, 160),
   ];
 }
+
 function defaultDoc(t) {
   const page = {
     id: uid(),
     name: t ? t('pages.default') + ' 1' : 'Page 1',
     frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
+    states: emptyStates(),
     elements: starterElements(t),
   };
   return { name: '', pages: [page], activePageId: page.id };
 }
+
+function normalizeInteractions(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    if (!['navigate', 'back', 'openOverlay'].includes(item.action)) continue;
+    const next = { trigger: 'click', action: item.action };
+    if (item.action !== 'back') next.targetPageId = String(item.targetPageId || '');
+    out.push(next);
+  }
+  return out;
+}
+
+function normalizeStates(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const pick = (key, fields) => {
+    const value = src[key] && typeof src[key] === 'object' ? src[key] : {};
+    const out = {};
+    for (const field of fields) out[field] = typeof value[field] === 'string' ? value[field] : '';
+    return out;
+  };
+  return {
+    loading: pick('loading', ['text']),
+    empty: pick('empty', ['title', 'desc', 'action']),
+    error: pick('error', ['title', 'desc', 'action']),
+  };
+}
+
 function normalizeElement(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const type = TYPE_INFO[raw.type] ? raw.type : 'text';
   const el = {
     id: raw.id || uid(),
     type,
+    name: typeof raw.name === 'string' ? raw.name : '',
     x: Number.isFinite(Number(raw.x)) ? Number(raw.x) : 0,
     y: Number.isFinite(Number(raw.y)) ? Number(raw.y) : 0,
     w: Math.max(12, Number.isFinite(Number(raw.w)) ? Number(raw.w) : TYPE_INFO[type].size[0]),
     h: Math.max(8, Number.isFinite(Number(raw.h)) ? Number(raw.h) : TYPE_INFO[type].size[1]),
+    hidden: raw.hidden === true,
+    locked: raw.locked === true,
+    opacity: Number.isFinite(Number(raw.opacity))
+      ? Math.max(0, Math.min(1, Number(raw.opacity)))
+      : 1,
     state: raw.state || defaultState(type),
     props: raw.props && typeof raw.props === 'object' ? { ...raw.props } : {},
+    interactions: normalizeInteractions(raw.interactions),
   };
   if (isContainerType(type)) {
     el.children = Array.isArray(raw.children)
@@ -77,65 +122,51 @@ function normalizeElement(raw) {
   }
   return el;
 }
+
 function normalizeElements(list) {
   return Array.isArray(list) ? list.map(normalizeElement).filter(Boolean) : [];
 }
+
 function normalizeDoc(doc) {
-  if (!doc) return null;
-  if (Array.isArray(doc.pages) && doc.pages.length) {
-    const pages = doc.pages
-      .filter((p) => p && Array.isArray(p.elements))
-      .map((p) => {
-        const fr = p.frame || {};
-        return {
-          id: p.id || uid(),
-          name: p.name || 'Page',
-          frame: {
-            w: fr.w || 390,
-            h: fr.h || 844,
-            preset: fr.preset || 'mobile',
-            background: fr.background || '#ffffff',
-          },
-          elements: normalizeElements(p.elements),
-        };
-      });
-    if (!pages.length) return null;
-    const activePageId = pages.some((p) => p.id === doc.activePageId)
-      ? doc.activePageId
-      : pages[0].id;
-    return { name: doc.name || '', pages, activePageId };
-  }
-  // v1 single-frame migration
-  if (doc.frame && Array.isArray(doc.elements)) {
-    const fr = doc.frame;
-    const page = {
-      id: uid(),
-      name: 'Page 1',
-      frame: {
-        w: fr.w || 390,
-        h: fr.h || 844,
-        preset: fr.preset || 'mobile',
-        background: fr.background || '#ffffff',
-      },
-      elements: normalizeElements(doc.elements),
-    };
-    return { name: doc.name || '', pages: [page], activePageId: page.id };
-  }
-  return null;
+  if (!doc || !Array.isArray(doc.pages)) return null;
+  const pages = doc.pages
+    .filter((p) => p && Array.isArray(p.elements))
+    .map((p) => {
+      const fr = p.frame || {};
+      return {
+        id: p.id || uid(),
+        name: p.name || 'Page',
+        frame: {
+          w: fr.w || 390,
+          h: fr.h || 844,
+          preset: fr.preset || 'mobile',
+          background: fr.background || '#ffffff',
+        },
+        states: normalizeStates(p.states),
+        elements: normalizeElements(p.elements),
+      };
+    });
+  if (!pages.length) return null;
+  const activePageId = pages.some((p) => p.id === doc.activePageId)
+    ? doc.activePageId
+    : pages[0].id;
+  return { name: doc.name || '', pages, activePageId };
 }
+
 function docStorageKey(sessionId) {
   return sessionId ? `${STORAGE_KEY}:${sessionId}` : STORAGE_KEY;
 }
+
 function loadDoc(sessionId) {
   try {
-    let raw = window.localStorage.getItem(docStorageKey(sessionId));
-    if (!raw && !sessionId) raw = window.localStorage.getItem(LEGACY_KEY);
+    const raw = window.localStorage.getItem(docStorageKey(sessionId));
     if (!raw) return null;
     return normalizeDoc(JSON.parse(raw));
   } catch (e) {
     return null;
   }
 }
+
 function saveDoc(doc, sessionId) {
   try {
     window.localStorage.setItem(docStorageKey(sessionId), JSON.stringify(doc));
@@ -143,6 +174,7 @@ function saveDoc(doc, sessionId) {
     /* quota / private mode: ignore */
   }
 }
+
 function loadUi() {
   try {
     const raw = window.localStorage.getItem(UI_KEY);
@@ -151,6 +183,7 @@ function loadUi() {
     return {};
   }
 }
+
 function saveUi(ui) {
   try {
     window.localStorage.setItem(UI_KEY, JSON.stringify(ui));
@@ -210,12 +243,14 @@ function apiFetch(path, init, sessionId) {
 export {
   apiFetch,
   defaultDoc,
+  emptyStates,
   loadDoc,
   loadUi,
   makeEl,
   normalizeDoc,
   normalizeElement,
   normalizeElements,
+  normalizeStates,
   saveDoc,
   saveUi,
   starterElements,

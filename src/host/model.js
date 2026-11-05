@@ -5,18 +5,24 @@
  * unit-tested in isolation and reused by the Host tools. The Host owns the
  * document and applies ordered operations; the browser panel is a view over it.
  *
- * Document shape (mirrors the client's v2 model):
- *   { name, activePageId, pages: [{ id, name, frame: {w,h,preset,background}, elements: [] }] }
- * Element shape:
- *   { id, type, x, y, w, h, state, props: { text, color, fontSize, fontWeight, radius } }
+ * Document shape:
+ *   { name, activePageId, pages: [page] }
+ *   page:    { id, name, frame: { w, h, preset, background }, states, elements }
+ *   element: { id, type, name, x, y, w, h, hidden, locked, opacity, state, props, interactions }
+ *
+ * There is deliberately no legacy migration: the document format is versioned
+ * by the storage key, and old shapes are simply not supported.
  */
 
 import {
   boundsOfEntries,
   cloneElementDeep,
   collectElementEntries,
+  descendantIds,
   findElementEntry,
   isContainerType,
+  moveElementInTree,
+  reorderInTree,
 } from '../shared/elements.js';
 
 export const ELEMENT_TYPES = {
@@ -53,11 +59,16 @@ export const ELEMENT_STATES = {
   select: ['default', 'open', 'disabled'],
 };
 
+/** Page-level preview states. Each one carries its own editable copy. */
+export const PAGE_STATES = ['normal', 'loading', 'empty', 'error'];
+
 const PRESETS = {
   mobile: [390, 844],
   tablet: [768, 1024],
   desktop: [1280, 800],
 };
+
+const INTERACTION_ACTIONS = ['navigate', 'back', 'openOverlay'];
 
 let seq = 0;
 function newId(prefix) {
@@ -75,59 +86,101 @@ const num = (v, d) => {
   return Number.isFinite(n) ? n : d;
 };
 const str = (v, d) => (typeof v === 'string' ? v : d);
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-/** Bounding box of a page's elements (including nested children), in page coords. */
-function elementsBounds(elements) {
-  if (!Array.isArray(elements) || elements.length === 0) return null;
-  const entries = collectElementEntries(elements);
-  const b = boundsOfEntries(entries);
-  if (!b) return null;
-  return { minX: b.x, minY: b.y, maxX: b.x + b.w, maxY: b.y + b.h, w: b.w, h: b.h };
-}
-
-/** Scale a component's font size / radius with the frame change factor. */
-function scaleProps(props, s) {
-  const out = isObj(props) ? { ...props } : {};
-  if (typeof out.fontSize === 'number') out.fontSize = Math.max(8, Math.round(out.fontSize * s));
-  if (typeof out.radius === 'number') out.radius = Math.max(0, Math.round(out.radius * s));
-  return out;
-}
-
-/** Scale an element subtree; root coordinates are shifted by ox/oy first. */
-function scaleElementDeep(e, sx, sy, sf, ox, oy, isRoot) {
-  const out = {
-    ...e,
-    x: Math.round((isRoot ? e.x - ox : e.x) * sx),
-    y: Math.round((isRoot ? e.y - oy : e.y) * sy),
-    w: Math.max(12, Math.round(e.w * sx)),
-    h: Math.max(8, Math.round(e.h * sy)),
-    props: scaleProps(e.props, sf),
-  };
-  if (isContainerType(e.type) && Array.isArray(e.children)) {
-    out.children = e.children.map((child) => scaleElementDeep(child, sx, sy, sf, 0, 0, false));
-  }
-  return out;
-}
-
-function removeElementById(elements, id) {
-  let changed = false;
+function normalizeInteractions(raw) {
+  if (!Array.isArray(raw)) return [];
   const out = [];
-  for (const el of elements) {
-    if (el.id === id) {
-      changed = true;
-      continue;
-    }
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = removeElementById(el.children, id);
-      if (kids !== el.children) {
-        changed = true;
-        out.push({ ...el, children: kids });
-        continue;
-      }
-    }
-    out.push(el);
+  for (const item of raw) {
+    if (!isObj(item)) continue;
+    const action = INTERACTION_ACTIONS.includes(item.action) ? item.action : null;
+    if (!action) continue;
+    const next = { trigger: 'click', action };
+    if (action !== 'back') next.targetPageId = str(item.targetPageId, '');
+    out.push(next);
   }
-  return changed ? out : elements;
+  return out;
+}
+
+function normalizePageStates(raw) {
+  const src = isObj(raw) ? raw : {};
+  const pick = (key, fields) => {
+    const value = isObj(src[key]) ? src[key] : {};
+    const out = {};
+    for (const field of fields) out[field] = str(value[field], '');
+    return out;
+  };
+  return {
+    loading: pick('loading', ['text']),
+    empty: pick('empty', ['title', 'desc', 'action']),
+    error: pick('error', ['title', 'desc', 'action']),
+  };
+}
+
+export function emptyDoc() {
+  return { name: '', pages: [], activePageId: null };
+}
+
+export function defaultStateFor(type) {
+  if (type === 'toggle') return 'on';
+  if (type === 'checkbox') return 'unchecked';
+  return 'default';
+}
+
+function ensureElement(raw) {
+  const e = isObj(raw) ? raw : {};
+  const type = ELEMENT_TYPES[e.type] ? e.type : 'text';
+  const [dw, dh] = ELEMENT_TYPES[type];
+  const states = ELEMENT_STATES[type] || ['default'];
+  const out = {
+    id: str(e.id, '') || newId('e'),
+    type,
+    name: str(e.name, ''),
+    x: num(e.x, 0),
+    y: num(e.y, 0),
+    w: Math.max(12, num(e.w, dw)),
+    h: Math.max(8, num(e.h, dh)),
+    hidden: e.hidden === true,
+    locked: e.locked === true,
+    opacity: clamp01(num(e.opacity, 1)),
+    state: states.includes(e.state) ? e.state : defaultStateFor(type),
+    props: isObj(e.props) ? clone(e.props) : {},
+    interactions: normalizeInteractions(e.interactions),
+  };
+  if (isContainerType(type)) {
+    out.children = Array.isArray(e.children) ? e.children.filter(isObj).map(ensureElement) : [];
+  }
+  return out;
+}
+
+function ensurePage(raw) {
+  const p = isObj(raw) ? raw : {};
+  const frame = isObj(p.frame) ? p.frame : {};
+  const preset = PRESETS[frame.preset] ? frame.preset : 'mobile';
+  const size = PRESETS[preset];
+  return {
+    id: str(p.id, '') || newId('p'),
+    name: str(p.name, 'Page'),
+    frame: {
+      w: Math.max(1, num(frame.w, size[0])),
+      h: Math.max(1, num(frame.h, size[1])),
+      preset,
+      background: str(frame.background, '#ffffff'),
+    },
+    states: normalizePageStates(p.states),
+    elements: Array.isArray(p.elements) ? p.elements.filter(isObj).map(ensureElement) : [],
+  };
+}
+
+/** Coerce any stored/raw value into a valid document (drops unknown junk). */
+export function ensureDoc(raw) {
+  const doc = isObj(raw) ? clone(raw) : emptyDoc();
+  doc.pages = Array.isArray(doc.pages) ? doc.pages.filter(isObj).map(ensurePage) : [];
+  doc.name = str(doc.name, '');
+  if (!doc.pages.some((p) => p.id === doc.activePageId)) {
+    doc.activePageId = doc.pages.length ? doc.pages[0].id : null;
+  }
+  return doc;
 }
 
 function clone(x) {
@@ -141,65 +194,6 @@ function clone(x) {
   return JSON.parse(JSON.stringify(x));
 }
 
-export function emptyDoc() {
-  return { name: '', pages: [], activePageId: null };
-}
-
-export function defaultStateFor(type) {
-  if (type === 'toggle') return 'on';
-  if (type === 'checkbox') return 'unchecked';
-  return 'default';
-}
-
-/** Coerce any stored/raw value into a valid document (drops unknown junk). */
-export function ensureDoc(raw) {
-  const doc = isObj(raw) ? clone(raw) : emptyDoc();
-  if (!Array.isArray(doc.pages)) doc.pages = [];
-  doc.pages = doc.pages.filter(isObj).map((p) => {
-    const frame = isObj(p.frame) ? p.frame : {};
-    const preset = PRESETS[frame.preset] ? frame.preset : 'mobile';
-    const size = PRESETS[preset];
-    return {
-      id: str(p.id, '') || newId('p'),
-      name: str(p.name, 'Page'),
-      frame: {
-        w: num(frame.w, size[0]),
-        h: num(frame.h, size[1]),
-        preset,
-        background: str(frame.background, '#ffffff'),
-      },
-      elements: Array.isArray(p.elements) ? p.elements.filter(isObj).map(ensureElement) : [],
-    };
-  });
-  if (typeof doc.name !== 'string') doc.name = '';
-  if (!doc.pages.some((p) => p.id === doc.activePageId)) {
-    doc.activePageId = doc.pages.length ? doc.pages[0].id : null;
-  }
-  return doc;
-}
-
-function ensureElement(e) {
-  const type = ELEMENT_TYPES[e.type] ? e.type : 'text';
-  const [dw, dh] = ELEMENT_TYPES[type];
-  const props = isObj(e.props) ? clone(e.props) : {};
-  const states = ELEMENT_STATES[type] || ['default'];
-  const state = states.includes(e.state) ? e.state : defaultStateFor(type);
-  const out = {
-    id: str(e.id, '') || newId('e'),
-    type,
-    x: num(e.x, 0),
-    y: num(e.y, 0),
-    w: Math.max(12, num(e.w, dw)),
-    h: Math.max(8, num(e.h, dh)),
-    state,
-    props,
-  };
-  if (isContainerType(type)) {
-    out.children = Array.isArray(e.children) ? e.children.filter(isObj).map(ensureElement) : [];
-  }
-  return out;
-}
-
 function findPage(doc, op, opIndex) {
   let page;
   if (op && op.pageId === '@last') {
@@ -209,12 +203,33 @@ function findPage(doc, op, opIndex) {
   } else if (op && op.pageId) {
     page = doc.pages.find((p) => p.id === op.pageId);
   } else {
-    page = doc.pages[0];
+    page = doc.pages.find((p) => p.id === doc.activePageId) || doc.pages[0];
   }
   if (!page) {
     const target = op && op.pageId !== undefined ? `"${op.pageId}"` : String(op && op.pageIndex);
     throw new Error(`op[${opIndex}] references unknown page ${target}; add a page first`);
   }
+  return page;
+}
+
+/**
+ * Ops that address existing elements default to the page that actually holds
+ * them, so a model can edit by id without repeating the page id. Adding
+ * something new still defaults to the active page.
+ */
+function findPageForElement(doc, op, index) {
+  if (op.pageId !== undefined || typeof op.pageIndex === 'number') return findPage(doc, op, index);
+  const ids = op.elementId ? [op.elementId] : Array.isArray(op.elementIds) ? op.elementIds : [];
+  for (const id of ids) {
+    const page = doc.pages.find((p) => !!findElementEntry(p.elements, id));
+    if (page) return page;
+  }
+  return findPage(doc, op, index);
+}
+
+function requirePageById(doc, pageId, opIndex, label) {
+  const page = doc.pages.find((p) => p.id === pageId);
+  if (!page) throw new Error(`op[${opIndex}] ${label}: unknown page "${pageId}"`);
   return page;
 }
 
@@ -230,7 +245,7 @@ function applyOne(doc, op, index, state) {
   if (kind === 'add_page') {
     const preset = PRESETS[op.preset] ? op.preset : 'mobile';
     const size = PRESETS[preset];
-    const page = {
+    const page = ensurePage({
       id: newId('p'),
       name: str(op.name, `Page ${doc.pages.length + 1}`),
       frame: {
@@ -240,10 +255,25 @@ function applyOne(doc, op, index, state) {
         background: str(op.background, '#ffffff'),
       },
       elements: [],
-    };
+    });
     doc.pages.push(page);
-    if (!doc.activePageId) doc.activePageId = page.id;
+    doc.activePageId = page.id;
     return { op: index, kind, pageId: page.id, name: page.name };
+  }
+
+  if (kind === 'duplicate_page') {
+    const source = requirePageById(doc, op.pageId, index, 'duplicate_page');
+    const copy = ensurePage({
+      id: newId('p'),
+      name: str(op.name, `${source.name} copy`),
+      frame: { ...source.frame },
+      states: clone(source.states),
+      elements: source.elements.map((el) => cloneElementDeep(el, () => newId('e'))),
+    });
+    const at = doc.pages.indexOf(source) + 1;
+    doc.pages.splice(at, 0, copy);
+    doc.activePageId = copy.id;
+    return { op: index, kind, pageId: copy.id, name: copy.name };
   }
 
   if (kind === 'delete_page') {
@@ -262,33 +292,39 @@ function applyOne(doc, op, index, state) {
     return { op: index, kind, pageId: page.id };
   }
 
+  if (kind === 'set_active_page') {
+    const page = requirePageById(doc, op.pageId, index, 'set_active_page');
+    doc.activePageId = page.id;
+    return { op: index, kind, pageId: page.id };
+  }
+
   if (kind === 'set_page_frame') {
     const page = findPage(doc, op, index);
     const preset = PRESETS[op.preset] ? op.preset : page.frame.preset;
     const size = PRESETS[preset] || [page.frame.w, page.frame.h];
-    const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
-    const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
-    const ow = page.frame.w;
-    const oh = page.frame.h;
-    if (op.scaleElements !== false && ow > 0 && oh > 0 && (ow !== nw || oh !== nh)) {
-      const b = elementsBounds(page.elements);
-      const hasContent = b && b.w > 0 && b.h > 0;
-      const hasContainer = page.elements.some((e) => isContainerType(e.type));
-      const inconsistent = !hasContainer && hasContent && b.w >= ow * 0.4 && b.w < ow * 0.8;
-      const sx = inconsistent ? nw / b.w : nw / ow;
-      const sy = inconsistent ? nh / b.h : nh / oh;
-      const ox = inconsistent ? b.minX : 0;
-      const oy = inconsistent ? b.minY : 0;
-      const sf = Math.min(sx, sy);
-      page.elements = page.elements.map((e) => scaleElementDeep(e, sx, sy, sf, ox, oy, true));
-    }
+    // Resizing a frame never touches element geometry: layout is owned by the
+    // designer/model, not by a lossy rescale.
     page.frame = {
       preset,
-      w: nw,
-      h: nh,
+      w: Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w)),
+      h: Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h)),
       background: str(op.background, page.frame.background),
     };
-    return { op: index, kind, pageId: page.id, scaled: op.scaleElements !== false };
+    return { op: index, kind, pageId: page.id };
+  }
+
+  if (kind === 'set_page_states') {
+    const page = findPage(doc, op, index);
+    const patch = isObj(op.states) ? op.states : {};
+    const merged = {};
+    for (const key of ['loading', 'empty', 'error']) {
+      merged[key] = {
+        ...((page.states && page.states[key]) || {}),
+        ...(isObj(patch[key]) ? patch[key] : {}),
+      };
+    }
+    page.states = normalizePageStates(merged);
+    return { op: index, kind, pageId: page.id };
   }
 
   if (kind === 'clear_page') {
@@ -314,12 +350,17 @@ function applyOne(doc, op, index, state) {
     const el = ensureElement({
       id: newId('e'),
       type,
+      name: str(op.name, ''),
       x: num(op.x, target ? 16 : fullWidth ? 0 : 24),
       y: num(op.y, 24 + (n % 10) * 18),
       w,
       h: Math.max(8, num(op.h, dh)),
+      hidden: op.hidden === true,
+      locked: op.locked === true,
+      opacity: num(op.opacity, 1),
       state: op.state,
       props: op.props,
+      interactions: op.interactions,
     });
     if (target) target.el.children = [...(target.el.children || []), el];
     else page.elements.push(el);
@@ -339,10 +380,14 @@ function applyOne(doc, op, index, state) {
     const el = ensureElement({
       id: newId('e'),
       type: 'container',
+      name: str(op.name, `Container ${n + 1}`),
       x: num(op.x, Math.min(24, Math.max(0, boundW - 40))),
       y: num(op.y, 24 + (n % 8) * 18),
       w: Math.max(12, num(op.w, Math.min(320, boundW))),
       h: Math.max(8, num(op.h, Math.min(240, boundH))),
+      hidden: op.hidden === true,
+      locked: op.locked === true,
+      opacity: num(op.opacity, 1),
       props: {
         name: str(op.name, `Container ${n + 1}`),
         background: str(op.background, '#ffffff'),
@@ -357,7 +402,7 @@ function applyOne(doc, op, index, state) {
   }
 
   if (kind === 'update_element') {
-    const page = findPage(doc, op, index);
+    const page = findPageForElement(doc, op, index);
     const entry = findElementEntry(page.elements, op.elementId);
     if (!entry) throw new Error(`op[${index}] update_element: unknown element "${op.elementId}"`);
     const el = entry.el;
@@ -365,14 +410,19 @@ function applyOne(doc, op, index, state) {
     if (op.y !== undefined) el.y = num(op.y, el.y);
     if (op.w !== undefined) el.w = Math.max(12, num(op.w, el.w));
     if (op.h !== undefined) el.h = Math.max(8, num(op.h, el.h));
+    if (op.name !== undefined) el.name = str(op.name, el.name);
+    if (op.hidden !== undefined) el.hidden = op.hidden === true;
+    if (op.locked !== undefined) el.locked = op.locked === true;
+    if (op.opacity !== undefined) el.opacity = clamp01(num(op.opacity, el.opacity));
     if (op.state !== undefined && (ELEMENT_STATES[el.type] || []).includes(op.state))
       el.state = op.state;
+    if (op.interactions !== undefined) el.interactions = normalizeInteractions(op.interactions);
     if (isObj(op.props)) el.props = { ...el.props, ...clone(op.props) };
     return { op: index, kind, pageId: page.id, elementId: el.id };
   }
 
   if (kind === 'delete_element') {
-    const page = findPage(doc, op, index);
+    const page = findPageForElement(doc, op, index);
     const before = collectElementEntries(page.elements).length;
     page.elements = removeElementById(page.elements, op.elementId);
     if (collectElementEntries(page.elements).length === before)
@@ -380,8 +430,56 @@ function applyOne(doc, op, index, state) {
     return { op: index, kind, pageId: page.id, elementId: op.elementId };
   }
 
+  if (kind === 'move_element') {
+    const page = findPageForElement(doc, op, index);
+    const entry = findElementEntry(page.elements, op.elementId);
+    if (!entry) throw new Error(`op[${index}] move_element: unknown element "${op.elementId}"`);
+    const containerId = op.containerId === undefined ? null : op.containerId;
+    if (containerId && containerId === op.elementId)
+      throw new Error(`op[${index}] move_element: cannot move an element into itself`);
+    if (containerId && descendantIds(entry.el).includes(containerId))
+      throw new Error(`op[${index}] move_element: cannot move into a descendant`);
+    const absX = entry.absX;
+    const absY = entry.absY;
+    const removed = removeElementById(page.elements, op.elementId);
+    const moved = { ...entry.el, x: 0, y: 0 };
+    if (containerId) {
+      const target = findElementEntry(removed, containerId);
+      if (!target || !isContainerType(target.el.type))
+        throw new Error(`op[${index}] move_element: unknown container "${containerId}"`);
+      moved.x = Math.round(absX - target.absX);
+      moved.y = Math.round(absY - target.absY);
+      const kids = (target.el.children || []).slice();
+      const at = Number.isFinite(op.index)
+        ? Math.max(0, Math.min(kids.length, Number(op.index)))
+        : kids.length;
+      kids.splice(at, 0, moved);
+      target.el.children = kids;
+    } else {
+      moved.x = Math.round(absX);
+      moved.y = Math.round(absY);
+      const at = Number.isFinite(op.index)
+        ? Math.max(0, Math.min(removed.length, Number(op.index)))
+        : removed.length;
+      removed.splice(at, 0, moved);
+    }
+    page.elements = removed;
+    return { op: index, kind, pageId: page.id, elementId: moved.id };
+  }
+
+  if (kind === 'reorder_element') {
+    const page = findPageForElement(doc, op, index);
+    const position = ['front', 'back', 'forward', 'backward'].includes(op.position)
+      ? op.position
+      : 'front';
+    if (!findElementEntry(page.elements, op.elementId))
+      throw new Error(`op[${index}] reorder_element: unknown element "${op.elementId}"`);
+    page.elements = reorderInTree(page.elements, op.elementId, position);
+    return { op: index, kind, pageId: page.id, elementId: op.elementId, position };
+  }
+
   if (kind === 'group_elements') {
-    const page = findPage(doc, op, index);
+    const page = findPageForElement(doc, op, index);
     const ids = Array.isArray(op.elementIds) ? op.elementIds : [];
     if (ids.length < 2) throw new Error(`op[${index}] group_elements: need at least two ids`);
     const entries = ids.map((id) => findElementEntry(page.elements, id));
@@ -396,11 +494,11 @@ function applyOne(doc, op, index, state) {
     const group = ensureElement({
       id: newId('e'),
       type: 'group',
+      name: str(op.name, 'Group'),
       x: bounds.x - parentAbsX,
       y: bounds.y - parentAbsY,
       w: bounds.w,
       h: bounds.h,
-      props: { name: str(op.name, 'Group') },
     });
     group.children = entries.map((entry) => {
       const copy = cloneElementDeep(entry.el);
@@ -418,7 +516,7 @@ function applyOne(doc, op, index, state) {
   }
 
   if (kind === 'ungroup_elements') {
-    const page = findPage(doc, op, index);
+    const page = findPageForElement(doc, op, index);
     const entry = findElementEntry(page.elements, op.elementId);
     if (!entry) throw new Error(`op[${index}] ungroup_elements: unknown element "${op.elementId}"`);
     if (entry.el.type !== 'group')
@@ -440,6 +538,27 @@ function applyOne(doc, op, index, state) {
   throw new Error(`op[${index}] has unknown kind "${kind}"`);
 }
 
+function removeElementById(elements, id) {
+  let changed = false;
+  const out = [];
+  for (const el of elements) {
+    if (el.id === id) {
+      changed = true;
+      continue;
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = removeElementById(el.children, id);
+      if (kids !== el.children) {
+        changed = true;
+        out.push({ ...el, children: kids });
+        continue;
+      }
+    }
+    out.push(el);
+  }
+  return changed ? out : elements;
+}
+
 /**
  * Apply an ordered operation list to a document.
  * @returns {{ doc: object, results: object[] }} the new document and per-op results.
@@ -453,35 +572,6 @@ export function applyOps(rawDoc, ops) {
   const results = ops.map((op, i) => applyOne(doc, op, i, state));
   if (!doc.activePageId && doc.pages.length) doc.activePageId = doc.pages[0].id;
   return { doc, results };
-}
-
-/**
- * Repair pages whose elements are much narrower than their frame (an
- * inconsistent state left by older versions that changed the frame without
- * scaling). Fits such content to the frame once. Idempotent: repaired pages
- * are consistent, so a second call changes nothing.
- * @returns {{ doc: object, changed: boolean }}
- */
-export function repairDoc(rawDoc) {
-  if (!isObj(rawDoc) || !Array.isArray(rawDoc.pages)) return { doc: rawDoc, changed: false };
-  let changed = false;
-  for (const page of rawDoc.pages) {
-    if (!isObj(page) || !Array.isArray(page.elements) || page.elements.length === 0) continue;
-    const frame = isObj(page.frame) ? page.frame : {};
-    const ow = num(frame.w, 390);
-    const oh = num(frame.h, 844);
-    const b = elementsBounds(page.elements);
-    if (!b || b.w <= 0 || b.h <= 0) continue;
-    if (!page.elements.some((e) => isContainerType(e.type)) && b.w >= ow * 0.4 && b.w < ow * 0.8) {
-      const sx = ow / b.w;
-      const sy = oh / b.h;
-      page.elements = page.elements.map((e) =>
-        scaleElementDeep(e, sx, sy, Math.min(sx, sy), b.minX, b.minY, true),
-      );
-      changed = true;
-    }
-  }
-  return { doc: rawDoc, changed };
 }
 
 /** A short human/model-readable summary of a document (for tool output). */
@@ -498,6 +588,7 @@ export function summarizeDoc(rawDoc) {
         frame: `${p.frame.w}×${p.frame.h}`,
         elements: entries.length,
         containers: entries.filter((entry) => isContainerType(entry.el.type)).length,
+        links: entries.filter((entry) => entry.el.interactions?.length).length,
       };
     }),
   };

@@ -117,6 +117,26 @@ describe('客户端从 Host 加载并实时同步', () => {
     expect(pageRows()[1].textContent).toContain('AISecond');
   });
 
+  it('AI 改动可以通过撤销回退', async () => {
+    expect(pageRows()).toHaveLength(1);
+    hostRevision = 2;
+    hostDoc = docWith([page('p1', 'HostPage'), page('p2', 'AISecond')]);
+    await act(async () => {
+      esInstance.onmessage({ data: JSON.stringify({ revision: 2 }) });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(pageRows()).toHaveLength(2);
+
+    const undo = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.getAttribute('title') === '撤销 (⌘Z)',
+    );
+    expect(undo.disabled).toBe(false);
+    await act(async () => {
+      undo.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    expect(pageRows()).toHaveLength(1);
+  });
+
   it('本地编辑会把文档回写 Host（POST /doc）', async () => {
     const addBtn = Array.from(container.querySelectorAll('button')).find(
       (b) => b.getAttribute('title') === '新增页',

@@ -18,6 +18,16 @@ const HANDLES = [
   ['w', 'ew-resize'],
 ];
 
+function textStyle(el) {
+  return {
+    fontSize: (el.props && el.props.fontSize) || 14,
+    fontWeight: (el.props && el.props.fontWeight) || 400,
+    color: (el.props && el.props.color) || '#111827',
+    textAlign: (el.props && el.props.textAlign) || 'left',
+    lineHeight: 1.4,
+  };
+}
+
 export function CanvasView(props) {
   const {
     t,
@@ -37,6 +47,10 @@ export function CanvasView(props) {
     panning,
     guides,
     marquee,
+    hoverId,
+    editing,
+    breadcrumb,
+    overlayPage,
     renderStateFor,
     startDrag,
     startResize,
@@ -47,35 +61,50 @@ export function CanvasView(props) {
     setUi,
     setUiFor,
     activate,
+    setHoverId,
+    onContextMenu,
+    onInteract,
+    onStartTextEdit,
+    onTextChange,
+    onTextCommit,
+    onTextCancel,
+    onCloseOverlay,
   } = props;
 
   const selectedSet = new Set(selIds || []);
 
-  function renderElements(elements, pageId) {
+  function renderElements(elements, pageId, isOverlay) {
     return elements.map((el) => {
+      if (el.hidden) return null;
       const st = renderStateFor(el);
       const u = ui[el.id] || {};
       const info = TYPE_INFO[el.type] || TYPE_INFO.text;
+      const isEditing = !!(editing && editing.id === el.id && !preview);
       const cursor = spaceDown
         ? panning
           ? 'grabbing'
           : 'grab'
         : preview
-          ? info.interactive
+          ? info.interactive || (el.interactions && el.interactions.length)
             ? 'pointer'
             : 'default'
-          : 'move';
+          : el.locked
+            ? 'default'
+            : 'move';
       const isBox = isContainerType(el.type);
-      const selected = selectedSet.has(el.id) && !preview;
+      const selected = selectedSet.has(el.id) && !preview && !isOverlay;
       const style = {
         left: el.x,
         top: el.y,
         width: el.w,
         height: el.h,
         cursor,
+        opacity: el.opacity == null ? 1 : el.opacity,
       };
       let className = 'dpd-el';
       if (selected) className += ' dpd-sel';
+      if (!preview && !isOverlay && hoverId === el.id && !selected) className += ' dpd-hover';
+      if (el.locked) className += ' dpd-locked';
       if (isBox) {
         className += el.type === 'container' ? ' dpd-container' : ' dpd-group';
         if (el.type === 'container') {
@@ -87,27 +116,53 @@ export function CanvasView(props) {
       const handlers = {
         onMouseDown: (ev) => {
           if (ev.button === 1 || spaceRef.current) return;
-          if (preview) {
-            if (el.type === 'button') setUiFor(el.id, { press: true });
+          if (preview || isOverlay) {
+            if (preview && el.type === 'button') setUiFor(el.id, { press: true });
+            return;
+          }
+          ev.stopPropagation();
+          if (el.locked) {
+            setSelId(el.id);
             return;
           }
           startDrag(ev, pageId, el);
         },
         onMouseEnter: () => {
-          if (preview && (el.type === 'button' || el.type === 'card'))
-            setUiFor(el.id, { hover: true });
+          if (preview) {
+            if (el.type === 'button' || el.type === 'card') setUiFor(el.id, { hover: true });
+          } else if (!isOverlay) {
+            setHoverId(el.id);
+          }
         },
         onMouseLeave: () => {
           if (preview) setUiFor(el.id, { hover: false, press: false });
+          else if (!isOverlay && hoverId === el.id) setHoverId(null);
         },
         onMouseUp: () => {
           if (preview && el.type === 'button') setUiFor(el.id, { press: false });
         },
+        onDoubleClick: (ev) => {
+          if (preview || isOverlay) return;
+          if (!info.hasText) return;
+          ev.stopPropagation();
+          setSelId(el.id);
+          onStartTextEdit(el.id, el.props.text || '');
+        },
         onClick: (ev) => {
           if (preview) {
             ev.stopPropagation();
-            activate(el, ev);
+            if (el.interactions && el.interactions.length) onInteract(el);
+            else activate(el, ev);
+          } else if (!isOverlay) {
+            ev.stopPropagation();
+            setSelId(el.id);
           }
+        },
+        onContextMenu: (ev) => {
+          if (preview || isOverlay) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          onContextMenu(ev, el);
         },
       };
       return h(
@@ -117,16 +172,38 @@ export function CanvasView(props) {
           'data-el-id': el.id,
           className,
           style,
-          title: isBox ? el.props.name || t('comp.' + el.type) : undefined,
+          title: el.name || el.props.name || t('comp.' + el.type),
           ...handlers,
         },
-        isBox
-          ? renderElements(el.children || [], pageId)
-          : h(
-              'div',
-              { style: { width: '100%', height: '100%', pointerEvents: 'none' } },
-              renderWidget(el, st, t, { tabsActive: u.tabs, preview }),
-            ),
+        isEditing
+          ? h('textarea', {
+              className: 'dpd-textEditor',
+              value: editing.value,
+              autoFocus: true,
+              spellCheck: false,
+              style: textStyle(el),
+              onMouseDown: (ev) => ev.stopPropagation(),
+              onDoubleClick: (ev) => ev.stopPropagation(),
+              onChange: (ev) => onTextChange(el.id, ev.target.value),
+              onBlur: () => onTextCommit(el.id),
+              onKeyDown: (ev) => {
+                ev.stopPropagation();
+                if (ev.key === 'Escape') {
+                  ev.preventDefault();
+                  onTextCancel();
+                } else if (ev.key === 'Enter' && !ev.shiftKey) {
+                  ev.preventDefault();
+                  onTextCommit(el.id);
+                }
+              },
+            })
+          : isBox
+            ? renderElements(el.children || [], pageId, isOverlay)
+            : h(
+                'div',
+                { style: { width: '100%', height: '100%', pointerEvents: 'none' } },
+                renderWidget(el, st, t, { tabsActive: u.tabs, preview }),
+              ),
       );
     });
   }
@@ -169,6 +246,7 @@ export function CanvasView(props) {
         ? selBoxes.map((box) => {
             const single = selBoxes.length === 1;
             const node = sel;
+            const showHandles = single && node && !node.locked;
             return h(
               'div',
               {
@@ -176,7 +254,7 @@ export function CanvasView(props) {
                 className: 'dpd-selBox' + (single ? '' : ' multi'),
                 style: { left: box.x, top: box.y, width: box.w, height: box.h },
               },
-              single && node
+              showHandles
                 ? HANDLES.map(([dir, cur]) =>
                     h('div', {
                       key: dir,
@@ -234,7 +312,14 @@ export function CanvasView(props) {
           })
         : null;
 
-    const overlay = pageActive && pageState !== 'normal' ? h(PageOverlay, { pageState, t }) : null;
+    const overlay =
+      pageActive && pageState !== 'normal'
+        ? h(PageOverlay, {
+            pageState,
+            content: (p.states && p.states[pageState]) || null,
+            t,
+          })
+        : null;
 
     return h(
       'div',
@@ -255,6 +340,12 @@ export function CanvasView(props) {
             return;
           }
           startMarquee(ev, p);
+        },
+        onContextMenu: (ev) => {
+          if (preview) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          onContextMenu(ev, null);
         },
       },
       els,
@@ -315,6 +406,12 @@ export function CanvasView(props) {
         if (!preview) setSelId(null);
         else setUi({});
       },
+      onContextMenu: (ev) => {
+        if (preview) return;
+        ev.preventDefault();
+        setSelId(null);
+        onContextMenu(ev, null);
+      },
     },
     h(
       'div',
@@ -345,7 +442,81 @@ export function CanvasView(props) {
         ),
       ),
     ),
+    overlayPage
+      ? h(OverlayLayer, {
+          page: overlayPage,
+          t,
+          renderElements,
+          onClose: onCloseOverlay,
+        })
+      : null,
   );
 
-  return canvas;
+  return h(
+    'div',
+    { className: 'dpd-canvasWrap' },
+    !preview && breadcrumb && breadcrumb.length
+      ? h(
+          'div',
+          { className: 'dpd-breadcrumb' },
+          breadcrumb.map((item, i) =>
+            h(
+              'span',
+              { key: item.id || i, style: { display: 'contents' } },
+              i > 0 ? h('span', { className: 'sep' }, '›') : null,
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: i === breadcrumb.length - 1 ? 'cur' : '',
+                  onClick: () => setSelId(item.id),
+                  title: item.label,
+                },
+                item.label,
+              ),
+            ),
+          ),
+        )
+      : null,
+    canvas,
+  );
+}
+
+/** Modal / dialog prototype: a target page rendered on top of the current one. */
+function OverlayLayer(props) {
+  const { page, renderElements, onClose } = props;
+  const frame = page.frame || { w: 390, h: 844 };
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const scale = Math.min(1, (vh * 0.8) / Math.max(1, frame.h), (vw * 0.6) / Math.max(1, frame.w));
+  return h(
+    'div',
+    { className: 'dpd-overlayBackdrop', onMouseDown: onClose },
+    h(
+      'div',
+      {
+        className: 'dpd-overlayFrame',
+        style: {
+          width: Math.round(frame.w * scale),
+          height: Math.round(frame.h * scale),
+          background: frame.background || '#ffffff',
+        },
+        onMouseDown: (ev) => ev.stopPropagation(),
+        onClick: (ev) => ev.stopPropagation(),
+      },
+      h(
+        'div',
+        {
+          style: {
+            width: frame.w,
+            height: frame.h,
+            position: 'relative',
+            transform: 'scale(' + scale + ')',
+            transformOrigin: 'top left',
+          },
+        },
+        renderElements(page.elements || [], page.id, true),
+      ),
+    ),
+  );
 }
