@@ -1,6 +1,6 @@
 {
   "name": "dsh-product-design",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "description": "会话标签页里的「简化版 Figma」产品设计画布：多画板、可交互组件、AI 可编程文档与会话内预览。｜A simplified Figma-style product design canvas as a session tab for DeepSeek Harness: multi-artboard canvas, interactive components, AI-programmable document, and in-chat previews.",
@@ -57,6 +57,7 @@
     "format": "biome format --write src scripts test vitest.config.mjs",
     "check": "node scripts/build.mjs && node --check dist/client.js && node --check dist/index.js && biome check src scripts test vitest.config.mjs && vitest run",
     "screenshots": "node scripts/screenshots.mjs",
+    "prepare": "node scripts/build.mjs",
     "prepack": "node scripts/build.mjs"
   },
   "devDependencies": {

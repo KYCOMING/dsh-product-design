@@ -9,7 +9,8 @@ node_modules/
 .data/
 .state/
 
-# stray build output (the plugin bundles are committed under dist/)
+# build output (generated from src/ by scripts/build.mjs)
+dist/
 lib/
 
 # test / tooling caches

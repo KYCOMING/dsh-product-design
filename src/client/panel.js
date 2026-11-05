@@ -21,7 +21,7 @@ import { useUiPrefs } from './editor/useUiPrefs.js';
 import { useT } from './i18n.js';
 import { uid } from './model.js';
 import { h, useCallback, useEffect, useRef, useState } from './react.js';
-import { useSessionId } from './session.js';
+import { useSessionId, useSessionTitle } from './session.js';
 import { StyleBlock } from './styles.js';
 import { CanvasView } from './ui/canvas.js';
 import { ContextMenu } from './ui/contextmenu.js';
@@ -40,6 +40,7 @@ function ProductDesignPanel(props = {}) {
   const t = useT();
   const adapterSessionId = useSessionId();
   const sessionId = props.sessionId || adapterSessionId;
+  const sessionTitle = useSessionTitle();
   const canvasRef = useRef(null);
   const spaceRef = useRef(false);
   const [layerQuery, setLayerQuery] = useState('');
@@ -50,6 +51,7 @@ function ProductDesignPanel(props = {}) {
   // callbacks need setters that live in later hooks, so route them via refs.
   const resetTransientRef = useRef(() => {});
   const adoptRef = useRef(() => {});
+  const docsRefreshRef = useRef(() => {});
   const {
     doc,
     docId,
@@ -67,9 +69,11 @@ function ProductDesignPanel(props = {}) {
     resolveConflict,
   } = useDocument({
     sessionId,
+    sessionTitle,
     t,
     resetTransient: () => resetTransientRef.current(),
     onAdopt: (next) => adoptRef.current(next),
+    onAutoSeeded: () => docsRefreshRef.current(),
   });
 
   const docs = useDocs({
@@ -80,6 +84,7 @@ function ProductDesignPanel(props = {}) {
     onStatus: (ok, message) =>
       setToast({ ok, message: t(message || (ok ? 'export.done' : 'export.failed')) }),
   });
+  docsRefreshRef.current = docs.refresh;
 
   const prefs = useUiPrefs();
   const activePage = activePageOf(doc);
@@ -501,7 +506,6 @@ function ProductDesignPanel(props = {}) {
             onDuplicateDoc: docs.duplicate,
             onRenameDoc: docs.rename,
             onDeleteDoc: docs.remove,
-            onImportDoc: docs.importFile,
             onExportDoc: docs.exportDoc,
             onRefreshDocs: docs.refresh,
           }),
@@ -626,6 +630,13 @@ function ProductDesignPanel(props = {}) {
           items: menuItems,
           onClose: () => setCtxMenu(null),
         })
+      : null,
+    toast
+      ? h(
+          'div',
+          { className: 'dpd-toast' + (toast.ok === false ? ' err' : ''), role: 'status' },
+          toast.message,
+        )
       : null,
   );
 }

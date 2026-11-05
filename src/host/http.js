@@ -112,7 +112,8 @@ function makeHandler(ctx, stores) {
 
       if (sub === '/docs/duplicate' && req.method === 'POST') {
         const body = await readJson(req);
-        writeJson(res, 200, stores.duplicateDoc(body?.docId, body?.name));
+        const sessionId = body?.sessionId || querySessionId;
+        writeJson(res, 200, stores.duplicateDoc(body?.docId, sessionId, body?.name));
         return;
       }
 
@@ -125,12 +126,6 @@ function makeHandler(ctx, stores) {
       if (sub === '/docs/delete' && req.method === 'POST') {
         const body = await readJson(req);
         writeJson(res, 200, stores.deleteDoc(body?.docId));
-        return;
-      }
-
-      if (sub === '/docs/import' && req.method === 'POST') {
-        const body = await readJson(req);
-        writeJson(res, 200, stores.importDoc(body?.payload, body?.name));
         return;
       }
 

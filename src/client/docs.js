@@ -77,7 +77,7 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ docId }),
+          body: JSON.stringify({ docId, sessionId }),
         },
         sessionId,
       );
@@ -114,6 +114,12 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
 
   const remove = useCallback(
     async (docId) => {
+      // The draft the current Session is showing (the selected one) cannot be
+      // deleted; tell the user instead of silently swapping in a blank draft.
+      if (docId === activeDocId) {
+        if (statusRef.current) statusRef.current(false, 'docs.deleteActive');
+        return false;
+      }
       const res = await apiFetch(
         '/docs/delete',
         {
@@ -127,47 +133,11 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
         setError(tRef.current('docs.deleteFailed'));
         return false;
       }
-      const rebind = (res.body.rebinds || []).find((item) => item.sessionId === sessionId);
-      if (docId === activeDocId) {
-        if (rebind) await switchRef.current(rebind.docId);
-        else await refresh();
-      } else {
-        await refresh();
-      }
+      // Always refresh the library so a deleted row disappears.
+      await refresh();
       return true;
     },
     [activeDocId, refresh, sessionId],
-  );
-
-  const importFile = useCallback(
-    async (file) => {
-      if (!file) return null;
-      let payload = null;
-      try {
-        payload = JSON.parse(await file.text());
-      } catch {
-        setError(tRef.current('docs.invalidFile'));
-        return null;
-      }
-      const res = await apiFetch(
-        '/docs/import',
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionId, payload }),
-        },
-        sessionId,
-      );
-      if (!res || res.status !== 200 || !res.body || !res.body.meta) {
-        setError(tRef.current('docs.importFailed'));
-        return null;
-      }
-      await switchRef.current(res.body.meta.id);
-      await refresh();
-      if (statusRef.current) statusRef.current(true, 'docs.imported');
-      return res.body.meta;
-    },
-    [refresh, sessionId],
   );
 
   const exportDoc = useCallback(
@@ -202,7 +172,6 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
     duplicate,
     rename,
     remove,
-    importFile,
     exportDoc,
   };
 }

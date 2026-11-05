@@ -392,7 +392,7 @@ describe('设计稿库', () => {
     elements: [],
   });
 
-  it('新建 / 列表 / 重命名 / 复制 / 导出 / 导入 / 切换 / 删除', async () => {
+  it('新建 / 列表 / 重命名 / 复制 / 导出 / 切换 / 删除', async () => {
     const sid = 'docs-session';
     const created = await call('POST', '/dsh-product-design/api/docs', {
       sessionId: sid,
@@ -414,9 +414,14 @@ describe('设计稿库', () => {
     });
     expect(renamed.json.name).toBe('Renamed');
 
-    const dup = await call('POST', '/dsh-product-design/api/docs/duplicate', { docId: id });
+    const dup = await call('POST', '/dsh-product-design/api/docs/duplicate', {
+      docId: id,
+      sessionId: sid,
+    });
     expect(dup.json.id).not.toBe(id);
     expect(dup.json.name).toBe('Renamed copy');
+    const listedAfterDup = await call('GET', `/dsh-product-design/api/docs?sessionId=${sid}`);
+    expect(listedAfterDup.json.docs.some((d) => d.id === dup.json.id)).toBe(true);
 
     const exported = await call(
       'GET',
@@ -425,12 +430,6 @@ describe('设计稿库', () => {
     expect(exported.status).toBe(200);
     expect(exported.json.format).toBe('dsh-product-design');
     expect(exported.json.doc.name).toBe('Renamed');
-
-    const imported = await call('POST', '/dsh-product-design/api/docs/import', {
-      payload: exported.json,
-      name: 'Imported',
-    });
-    expect(imported.json.name).toBe('Imported');
 
     const switched = await call('POST', '/dsh-product-design/api/session/doc', {
       sessionId: sid,
@@ -468,5 +467,38 @@ describe('设计稿库', () => {
     expect(stale.status).toBe(409);
     const still = await call('GET', `/dsh-product-design/api/doc?sessionId=${sid}`);
     expect(still.json.doc.name).toBe('Second');
+  });
+
+  it('设计稿按会话隔离：列表只显示当前会话的稿子（一会话对多稿）', async () => {
+    const a = 'owner-session-a';
+    const b = 'owner-session-b';
+    const madeA = await call('POST', '/dsh-product-design/api/docs', {
+      sessionId: a,
+      doc: { name: 'A 稿', activePageId: 'pa', pages: [page('pa', 'A')] },
+    });
+    const madeB = await call('POST', '/dsh-product-design/api/docs', {
+      sessionId: b,
+      doc: { name: 'B 稿', activePageId: 'pb', pages: [page('pb', 'B')] },
+    });
+
+    const listA = await call('GET', `/dsh-product-design/api/docs?sessionId=${a}`);
+    const listB = await call('GET', `/dsh-product-design/api/docs?sessionId=${b}`);
+    expect(listA.json.docs.some((d) => d.id === madeA.json.meta.id)).toBe(true);
+    expect(listA.json.docs.some((d) => d.id === madeB.json.meta.id)).toBe(false);
+    expect(listB.json.docs.some((d) => d.id === madeB.json.meta.id)).toBe(true);
+    expect(listB.json.docs.some((d) => d.id === madeA.json.meta.id)).toBe(false);
+    expect(listA.json.activeDocId).toBe(madeA.json.meta.id);
+    expect(listB.json.activeDocId).toBe(madeB.json.meta.id);
+
+    // A session can own many drafts; a second create for A also shows for A only.
+    const madeA2 = await call('POST', '/dsh-product-design/api/docs', {
+      sessionId: a,
+      doc: { name: 'A 稿 2', activePageId: 'pa2', pages: [page('pa2', 'A2')] },
+    });
+    const listA2 = await call('GET', `/dsh-product-design/api/docs?sessionId=${a}`);
+    expect(listA2.json.docs.some((d) => d.id === madeA2.json.meta.id)).toBe(true);
+    expect(listA2.json.docs.some((d) => d.id === madeA.json.meta.id)).toBe(true);
+    const listB2 = await call('GET', `/dsh-product-design/api/docs?sessionId=${b}`);
+    expect(listB2.json.docs.some((d) => d.id === madeA2.json.meta.id)).toBe(false);
   });
 });

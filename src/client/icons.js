@@ -45,8 +45,6 @@ const IconDesign = () =>
   );
 const IconTrash = () => h(Svg, null, h('path', { d: 'M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4' }));
 const IconDownload = () => h(Svg, null, h('path', { d: 'M8 2v8M4.5 7L8 10.5 11.5 7M2.5 13.5h11' }));
-const IconUpload = () =>
-  h(Svg, null, h('path', { d: 'M8 10.5V2M4.5 5.5L8 2l3.5 3.5M2.5 13.5h11' }));
 const IconCopy = () =>
   h(
     Svg,
@@ -138,7 +136,6 @@ export {
   IconRedo,
   IconTrash,
   IconUndo,
-  IconUpload,
   libGlyph,
   Svg,
 };

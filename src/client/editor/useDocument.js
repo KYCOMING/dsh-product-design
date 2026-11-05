@@ -23,9 +23,26 @@ function sameDoc(a, b) {
   }
 }
 
-export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
+export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitle, onAutoSeeded }) {
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
+  // Latest Session title, used to name drafts this hook auto-creates. A Session
+  // is bound to a document that starts out empty (0 pages); the panel seeds it
+  // on first open, and that seed carries the Session's title as its name.
+  const sessionTitleRef = useRef(sessionTitle);
+  sessionTitleRef.current = sessionTitle;
+  // Notifies the composition root that a draft was auto-created / renamed so
+  // the design-draft library can refresh its listing.
+  const onAutoSeededRef = useRef(onAutoSeeded);
+  onAutoSeededRef.current = onAutoSeeded;
+  // Documents this hook seeded from an empty (0-page) Host document. Only these
+  // are auto-named: docs the user created / duplicated / imported keep their
+  // own naming behaviour.
+  const autoSeededRef = useRef(new Set());
+  // Documents whose seeding is in flight (or done). A delete can make both the
+  // delete response and the SSE stream ask to seed the same fresh document; this
+  // keeps that single-writer, avoiding a duplicate-seed 409 conflict.
+  const seededDocIdsRef = useRef(new Set());
   const [doc, setDocState] = useState(() => loadDoc(sessionId) || defaultDoc(t));
   const [docId, setDocId] = useState('');
   // Latest doc mirrored in a ref so imperative handlers always read the
@@ -204,8 +221,18 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
       return body;
     }
     // A brand-new document has no pages yet: seed the sample so the canvas is
-    // never empty on first open.
+    // never empty on first open. An auto-created draft (first open of a Session
+    // or the replacement after deleting the active one) takes the Session's
+    // title as its name; manual create / duplicate / import never reach here.
+    const seedId = hostRef.current.docId;
+    if (seedId && seededDocIdsRef.current.has(seedId)) return body;
+    if (seedId) seededDocIdsRef.current.add(seedId);
     const seeded = defaultDoc(t);
+    const currentName = body.doc && typeof body.doc.name === 'string' ? body.doc.name.trim() : '';
+    const title = String(sessionTitleRef.current || '').trim();
+    if (currentName) seeded.name = currentName;
+    else if (title) seeded.name = title;
+    autoSeededRef.current.add(seedId);
     hostRef.current.suppressSave = true;
     conflictRef.current = null;
     setSyncState('saving');
@@ -228,7 +255,9 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     if (res && res.status === 200 && res.body) {
       hostRef.current.revision = res.body.revision;
       setSyncState('saved');
+      if (typeof onAutoSeededRef.current === 'function') onAutoSeededRef.current();
     } else {
+      if (seedId) seededDocIdsRef.current.delete(seedId);
       setSyncState(res ? 'offline' : 'local');
     }
     return body;
@@ -248,7 +277,14 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
       sid,
     );
     if (!res || res.status !== 200 || !res.body) return false;
-    const ok = applySnapshot(res.body, { resetHistory: true });
+    let ok = applySnapshot(res.body, { resetHistory: true });
+    if (!ok) {
+      // A brand-new / post-delete document has no pages, which applySnapshot
+      // rejects. Seed it exactly like a first open so the canvas is never stuck
+      // on the previously shown (possibly deleted) document.
+      const reloaded = await refreshFromHost(sid);
+      ok = !!reloaded;
+    }
     if (ok) resetTransient();
     if (!ok) setSyncState('offline');
     return ok;
@@ -384,6 +420,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     setDocState(localDoc);
     resetTransient();
     histRef.current = { past: [], future: [] };
+    autoSeededRef.current = new Set();
+    seededDocIdsRef.current = new Set();
     (async () => {
       const canStream = typeof window.EventSource === 'function';
       const attempts = canStream ? 6 : 1;
@@ -410,13 +448,17 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
           if (!data || typeof data.revision !== 'number') return;
           const docChanged = data.docId && data.docId !== hostRef.current.docId;
           if (!docChanged && data.revision === hostRef.current.revision) return;
-          apiFetch('/doc', undefined, sid).then((snap) => {
+          apiFetch('/doc', undefined, sid).then(async (snap) => {
             if (!snap || snap.status !== 200 || !snap.body || !snap.body.doc) return;
             const nextId = snap.body.docId || '';
             if (nextId && nextId !== hostRef.current.docId) {
               hostRef.current.revision = snap.body.revision;
-              applySnapshot(snap.body, { resetHistory: true });
-              resetTransient();
+              const ok = applySnapshot(snap.body, { resetHistory: true });
+              if (ok) resetTransient();
+              // The Host moved the Session to a fresh 0-page document (e.g. the
+              // active draft was deleted): seed it so the canvas follows the
+              // rebind instead of keeping the deleted document on screen.
+              else await refreshFromHost(sid);
               return;
             }
             const nd = normalizeDoc(snap.body.doc);
@@ -440,6 +482,39 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
       }
     };
   }, [sessionId]);
+
+  // Keep an auto-seeded draft's name in step with the Session title when the
+  // title only becomes available after the draft was seeded (e.g. a brand-new
+  // conversation named after its first message). A user-renamed draft is left
+  // alone because it already has a non-empty name.
+  useEffect(() => {
+    const title = String(sessionTitle || '').trim();
+    const id = hostRef.current.docId;
+    if (!title || !id) return undefined;
+    if (!autoSeededRef.current.has(id)) return undefined;
+    if (docRef.current && docRef.current.name) return undefined;
+    let cancelled = false;
+    apiFetch(
+      '/docs/rename',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ docId: id, name: title }),
+      },
+      sessionIdRef.current,
+    ).then((res) => {
+      if (cancelled || !res || res.status !== 200) return;
+      const current = docRef.current;
+      if (!current || current.name || hostRef.current.docId !== id) return;
+      hostRef.current.suppressSave = true;
+      docRef.current = { ...current, name: title };
+      setDocState(docRef.current);
+      if (typeof onAutoSeededRef.current === 'function') onAutoSeededRef.current();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionTitle]);
 
   return {
     doc,

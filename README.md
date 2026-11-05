@@ -6,7 +6,7 @@
 
 ## 安装
 
-> 目前只通过 GitHub 分发，**未发布 npm**。`package.json` 保留 `private: true` 是故意的，避免误发布；GitHub 安装使用仓库里已提交的构建产物，不需要在本地构建，也不需要批准依赖构建脚本。
+> 目前只通过 GitHub 分发，**未发布 npm**。`package.json` 保留 `private: true` 是故意的，避免误发布；`dist/` **不入库**，安装 / 构建时由 `scripts/build.mjs` 生成（插件管理器准备 checkout 时会 `pnpm install` + `pnpm run build`；本地开发跑 `pnpm run build`）。
 
 ```bash
 # Desktop
@@ -37,7 +37,7 @@ dsh plugin --profile desktop remove dsh-product-design
 ### 权限与数据
 
 - 在 Host 进程内注册同源 HTTP 路由 `/dsh-product-design/api`，提供文档读写与 SSE 变更推送。
-- 设计稿写入 `<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`，会话只记录当前打开的稿子（`sessions/<sessionId>/active.json`）；浏览器端另用 `localStorage`（`doc:v3:<sessionId>`）做缓存/离线兜底。
+- 设计稿写入 `<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`（含所属会话 `owner`），会话记录当前打开的稿子（`sessions/<sessionId>/active.json`）；一个会话拥有多份设计稿，列表只显示当前会话的稿子。浏览器端另用 `localStorage`（`doc:v3:<sessionId>`）做缓存/离线兜底。
 - 注册两个 agent 工具（`product_design_get_document` / `product_design_apply`）、一段系统提示和 `/design` 命令。
 - 不发起外部网络请求，不收集遥测。
 
@@ -80,14 +80,14 @@ dsh plugin --profile desktop remove dsh-product-design
 - **原型交互**：给任意元素配置 `点击 → 跳转页面 / 返回 / 打开为弹层`，预览里可以真的走通一条流程（带返回栈，`Esc` 逐层退出）。
 - **导出**：工具栏「导出」支持三种产物——当前页 PNG（1× / 2×）、单文件可交互 HTML 原型、React + Tailwind 组件文件。全部在浏览器内生成，不上传任何数据。
 - **页面状态变体**：顶部「正常 / 加载中 / 空状态 / 错误」切换的是真实变体页——每个状态有自己的元素树，可以像普通页面一样增删改；预览里也能切换状态，导出 HTML / React 时带上状态切换条。AI 用 `add_page_state` 生成变体。
-- **设计稿库**：左侧「设计稿」列出 Host 上的所有稿子，可新建、重命名、复制、删除、导出 / 导入 JSON；会话只绑定其中一份，换会话不会丢稿。
+- **设计稿库**：左侧「设计稿」只列出**当前会话**的稿子（一个会话对多份稿子），可新建、重命名、复制、删除、导出 JSON；换会话不会丢稿，也不会看到别的会话的稿子。
 - **图片**：「图片」组件支持 URL 或本地文件（2MB 内转 data URL）、三种填充方式（cover / contain / fill），编辑器与三种导出都渲染真实图片。
 - **空会话入口**：还没有消息的会话看不到顶部标签，但输入框旁的「打开产品设计」可以直接进入画布。
 - **网格 + 缩放**：画布小方格网格随缩放变化；`Ctrl/⌘ + 滚轮` 缩放，普通滚轮滚动。
 - **编辑体验**：撤销 / 重做（含 AI 改动）、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
 - **对话内产品预览（Visualize 风格）**：AI 调用 `product_design_apply` 后，聊天回合末尾会出现当前页面的产品缩略卡片，可一键「打开画布」；无需先手动打开画布。
 - **会话标签页**：产品设计是会话顶部的一个视图标签（与 Chat 并列），不再占用侧边栏；画布内可一键「全屏」，全屏模式可「返回会话」。
-- **多会话与设计稿库**：每个会话绑定设计稿库中的一份稿子；切换会话时画布自动切换，互不覆盖；也可以在同一会话里切换不同稿子。
+- **多会话与设计稿库**：一个会话拥有多份设计稿（1 对 N），列表按所属会话过滤；切换会话时画布与列表自动切换到该会话的稿子，互不覆盖、互不可见；也可以在同一会话里切换自己的不同稿子。
 - **保存状态与冲突**：工具栏实时显示 `已保存 / 保存中… / 仅本地 / 同步失败 / 有冲突`；409 不再静默覆盖，顶部出现冲突条，可「保留我的改动」或「使用远端版本」。设计稿持久化在 Host 设计稿库，`localStorage` 只做离线缓存。
 
 ## 导出
@@ -130,7 +130,7 @@ dsh plugin --profile desktop remove dsh-product-design
 
 ## 架构
 
-双半插件：`src/` 是源码，`dist/client.js` / `dist/index.js` 是 esbuild 产出的**可加载单文件**（DSH 客户端只接受单文件模块，git 安装也不会在本地构建）。这两个文件文件头带 `AUTO-GENERATED` 横幅，**不要手改**；改 `src/` 后跑 `pnpm run build`。
+双半插件：`src/` 是源码，`dist/client.js` / `dist/index.js` 是 esbuild 产出的**可加载单文件**（DSH 客户端只接受单文件模块；`dist/` 不入库，由构建生成）。这两个文件文件头带 `AUTO-GENERATED` 横幅，**不要手改**；改 `src/` 后跑 `pnpm run build`。
 
 ```text
 dsh-product-design/
@@ -168,7 +168,7 @@ dsh-product-design/
 │  │  │  └─ exportmenu.js
 │  │  ├─ react.js  constants.js  i18n.js  color.js  icons.js  styles.js
 │  │  ├─ model.js             # 文档归一化 / localStorage / Host API 调用
-│  │  ├─ docs.js              # 设计稿库客户端（列表 / 新建 / 重命名 / 复制 / 导入导出）
+│  │  ├─ docs.js              # 设计稿库客户端（列表 / 新建 / 重命名 / 复制 / 导出）
 │  │  ├─ widgets.js           # 组件渲染
 │  │  ├─ ui/heroEntry.js      # 空会话的「打开产品设计」入口
 │  │  ├─ cards.js             # 对话内产品预览卡片
@@ -188,7 +188,7 @@ dsh-product-design/
 │     ├─ command.js           # /design 命令
 │     └─ model.js             # 文档 reducer（纯函数）
 ├─ scripts/build.mjs          # esbuild：src → dist/client.js + dist/index.js
-├─ dist/client.js  dist/index.js  # 构建产物（提交入库，loader 直接读；勿手改）
+├─ dist/client.js  dist/index.js  # 构建产物（不入库，构建生成；loader 直接读；勿手改）
 ├─ cordis.patch.yml
 ├─ locale/{zh,en}.json
 ├─ icon.svg
@@ -210,12 +210,12 @@ dsh-product-design/
 
 设计稿的所有权在 **Host**，浏览器只是视图，因此模型可以通过工具直接读写画布：
 
-- **数据**：`<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`（默认 `~/.dsh/...`），每份稿子含 `revision` 与 `doc`；`sessions/<sessionId>/active.json` 记录该会话当前打开哪份稿子。
+- **数据**：`<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`（默认 `~/.dsh/...`），每份稿子含 `revision`、`doc` 与所属会话 `owner`；`sessions/<sessionId>/active.json` 记录该会话当前打开哪份稿子。`GET /docs` 只返回当前会话 `owner` 的稿子。
 - **HTTP 路由**（同源，前缀 `/dsh-product-design/api`）：
   - `GET /doc` → `{ docId, revision, doc }`
   - `POST /doc` → `{ baseRevision, docId, doc }`（乐观并发，版本或 docId 不匹配返回 409 + 当前文档）
   - `POST /session/doc` → `{ sessionId, docId }`（切换会话当前稿）
-  - `GET /docs` / `POST /docs` / `POST /docs/rename|duplicate|delete|import` / `GET /docs/export` → 设计稿库
+  - `GET /docs` / `POST /docs` / `POST /docs/rename|duplicate|delete` / `GET /docs/export` → 设计稿库
   - `POST /apply` → `{ operations: [...] }`（服务端 reducer）
   - `GET /events` → SSE，每次变更推送 `{ revision, docId }`
 - **Agent 工具**（`ctx.get('tools').register`）：
@@ -235,13 +235,13 @@ pnpm run lint       # biome 检查 src / scripts / test
 pnpm run check      # build + syntax + lint + test 一次跑完
 ```
 
-> `dist/client.js`、`dist/index.js` 是构建产物，**不要手改**；改 `src/**` 后 `pnpm run build`，刷新页面即可。改了 Host 半（`dist/index.js`）需要重启 Harness 让宿主重新加载。
+> `dist/client.js`、`dist/index.js` 是构建产物（**不入库**，请勿手改）；改 `src/**` 后 `pnpm run build`，刷新页面即可。改了 Host 半（`dist/index.js`）需要重启 Harness 让宿主重新加载。
 
 开发时可以把本目录链接进 profile（`dsh plugin --profile desktop add /absolute/path/to/dsh-product-design`）；公开安装方式见上文「安装」。
 
 ## 数据存储
 
-- **Host 权威**：`<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`（`{ revision, doc }`），设计稿库供 AI 工具读写；`sessions/<sessionId>/active.json` 只记录会话当前稿。
+- **Host 权威**：`<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`（`{ revision, doc, owner }`），设计稿按所属会话归属，一个会话可有多份；`sessions/<sessionId>/active.json` 只记录会话当前稿。
 - `dsh-product-design:doc:v3:<sessionId>`：浏览器端 **按会话缓存/离线兜底**（Host 不可达时使用；首次连接时若 Host 为空则作为种子上报）。
 - `dsh-product-design:ui:v1`：界面偏好（左右侧栏宽度、当前分区、磁吸开关）。
 - 文档格式为 v3；开发阶段不保留旧格式迁移，旧稿不会被读取。

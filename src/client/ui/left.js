@@ -11,7 +11,6 @@ import {
   IconPencil,
   IconPlus,
   IconTrash,
-  IconUpload,
   libGlyph,
   Svg,
 } from '../icons.js';
@@ -42,18 +41,6 @@ function LockGlyph(props) {
 
 function layerLabel(el, t) {
   return el.name || el.props.text || el.props.name || t('comp.' + el.type);
-}
-
-function pickJsonFile(onPick) {
-  if (typeof document === 'undefined') return;
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'application/json,.json';
-  input.addEventListener('change', () => {
-    const file = input.files && input.files[0];
-    if (file) onPick(file);
-  });
-  input.click();
 }
 
 function docTime(ts) {
@@ -95,7 +82,6 @@ export function LeftView(props) {
     onDuplicateDoc,
     onRenameDoc,
     onDeleteDoc,
-    onImportDoc,
     onExportDoc,
     onRefreshDocs,
   } = props;
@@ -233,16 +219,6 @@ export function LeftView(props) {
         h(IconPlus),
         t('docs.add'),
       ),
-      h(
-        'button',
-        {
-          className: 'dpd-btn',
-          type: 'button',
-          onClick: () => pickJsonFile(onImportDoc),
-        },
-        h(IconUpload),
-        t('docs.import'),
-      ),
     ),
     docsError ? h('div', { className: 'dpd-hint' }, docsError) : null,
     !docsReady && !docsError ? h('div', { className: 'dpd-hint' }, t('docs.offline')) : null,
@@ -309,6 +285,12 @@ export function LeftView(props) {
                 docAction(IconCopy, t('docs.duplicate'), () => onDuplicateDoc(item.id)),
                 docAction(IconDownload, t('docs.export'), () => onExportDoc(item.id)),
                 docAction(IconTrash, t('docs.delete'), () => {
+                  // The active (selected) draft is protected — remove() reports
+                  // why instead of asking to confirm an impossible deletion.
+                  if (item.id === activeDocId) {
+                    onDeleteDoc(item.id);
+                    return;
+                  }
                   if (window.confirm(t('docs.deleteConfirm'))) onDeleteDoc(item.id);
                 }),
               ),

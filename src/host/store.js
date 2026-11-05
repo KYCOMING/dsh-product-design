@@ -77,14 +77,19 @@ function metaOf(store, updatedAt) {
   };
 }
 
-function createDocStore(docId, seedDoc) {
+function createDocStore(docId, seedDoc, owner) {
   const file = docFile(docId);
   const stored = readJson(file);
   let revision = 0;
   let doc = emptyDoc();
+  // `ownerId` is the Session that owns this draft (a Session has many drafts).
+  // Legacy files written before ownership existed carry no owner and are
+  // adopted lazily by the Session that is bound to them (see listDocs).
+  let ownerId = owner == null ? '' : String(owner);
   if (stored && typeof stored === 'object' && stored.doc) {
     revision = Number(stored.revision) || 0;
     doc = ensureDoc(stored.doc);
+    if (stored.owner != null) ownerId = String(stored.owner);
   } else if (seedDoc) {
     doc = ensureDoc(seedDoc);
   }
@@ -100,12 +105,21 @@ function createDocStore(docId, seedDoc) {
     }
   }
   function persist() {
-    writeJson(file, { revision, doc });
+    writeJson(file, { revision, doc, owner: ownerId });
   }
   if (!stored) persist();
 
   return {
     id: docId,
+    owner() {
+      return ownerId;
+    },
+    setOwner(next) {
+      const value = next == null ? '' : String(next);
+      if (value === ownerId) return;
+      ownerId = value;
+      persist();
+    },
     snapshot() {
       return { revision, doc };
     },
@@ -156,9 +170,9 @@ function createStores() {
     return docs.get(id);
   }
 
-  function createDoc(seedDoc, name) {
+  function createDoc(seedDoc, name, owner) {
     const id = newDocId();
-    const store = createDocStore(id, seedDoc || emptyDoc());
+    const store = createDocStore(id, seedDoc || emptyDoc(), owner || '');
     if (name != null && String(name) !== '') store.rename(name);
     docs.set(id, store);
     return store;
@@ -234,7 +248,7 @@ function createStores() {
     if (bound && existsSync(docFile(bound))) {
       state.docId = bound;
     } else {
-      const store = createDoc(emptyDoc(), '');
+      const store = createDoc(emptyDoc(), '', state.key);
       state.docId = store.id;
       writeBinding(state, store.id);
     }
@@ -289,7 +303,8 @@ function createStores() {
   }
 
   function listDocs(sessionId) {
-    const active = ensureSession(sessionId).docId;
+    const state = ensureSession(sessionId);
+    const active = state.docId;
     const dir = docsDir();
     let files = [];
     try {
@@ -303,6 +318,26 @@ function createStores() {
       if (!data || typeof data !== 'object' || !data.doc) continue;
       const id = file.slice(0, -5);
       const doc = data.doc;
+      let owner = typeof data.owner === 'string' ? data.owner : '';
+      if (!owner) {
+        // Legacy draft without an owner: adopt it for the Session currently
+        // bound to it, so existing work keeps showing under its Session. Other
+        // unowned files stay hidden rather than leaking across sessions.
+        if (id !== active) continue;
+        owner = state.key;
+        const existing = docs.get(id);
+        if (existing) {
+          existing.setOwner(owner);
+        } else {
+          try {
+            writeJson(join(dir, file), { ...data, owner });
+          } catch {
+            /* best-effort adoption */
+          }
+        }
+      }
+      // One Session owns many drafts; only list the drafts it owns.
+      if (owner !== state.key) continue;
       const pages = Array.isArray(doc.pages) ? doc.pages.filter((page) => !page.variantOf) : [];
       let updatedAt = 0;
       try {
@@ -326,16 +361,18 @@ function createStores() {
   }
 
   function createDocFor({ sessionId, name, doc }) {
-    const store = createDoc(doc || emptyDoc(), name);
+    const owner = sessionId ? safeSessionId(sessionId) : '';
+    const store = createDoc(doc || emptyDoc(), name, owner);
     if (sessionId) bind(sessionId, store.id);
     return { meta: metaOf(store), snapshot: sessionId ? forSession(sessionId).snapshot() : null };
   }
 
-  function duplicateDoc(docId, name) {
+  function duplicateDoc(docId, sessionId, name) {
     const source = loadDoc(docId).snapshot().doc;
     const copy = clone(source);
     copy.name = name != null ? String(name) : source.name ? `${source.name} copy` : '';
-    const store = createDoc(copy);
+    const owner = sessionId ? safeSessionId(sessionId) : '';
+    const store = createDoc(copy, undefined, owner);
     return metaOf(store);
   }
 
@@ -357,7 +394,7 @@ function createStores() {
     const rebinds = [];
     for (const state of sessions.values()) {
       if (state.docId !== id) continue;
-      const store = createDoc(emptyDoc(), '');
+      const store = createDoc(emptyDoc(), '', state.key);
       state.docId = store.id;
       writeBinding(state, store.id);
       attach(state);
@@ -365,17 +402,6 @@ function createStores() {
       rebinds.push({ sessionId: state.key, docId: store.id });
     }
     return { ok: true, rebinds };
-  }
-
-  function importDoc(payload, name) {
-    const raw = payload && typeof payload === 'object' && payload.doc ? payload.doc : payload;
-    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.pages)) {
-      throw new Error('invalid-import');
-    }
-    const doc = ensureDoc(raw);
-    if (name != null) doc.name = String(name).slice(0, 200);
-    const store = createDoc(doc);
-    return metaOf(store);
   }
 
   function exportDoc(docId) {
@@ -394,7 +420,6 @@ function createStores() {
     duplicateDoc,
     exportDoc,
     forSession,
-    importDoc,
     listDocs,
     renameDoc,
   };
