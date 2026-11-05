@@ -28,7 +28,7 @@ const HEARTBEAT_MS = 15000;
 /** Model-facing guidance so the agent knows the canvas and its tools exist. */
 const GUIDANCE = [
   '本机已安装 dsh-product-design 插件：一个「简化版 Figma」产品设计画布，宿主权威。',
-  '打开方式：侧边栏「产品设计」图标，或在对话输入框输入 /canvas。',
+  '打开方式：侧边栏「产品设计」图标；或直接用 /design <需求> 让 AI 绘制。',
   '你可以直接用工具读写画布，不需要用户先打开面板：',
   '  product_design_get_document：读取页面/元素/状态。',
   '  product_design_apply：按操作增删改（add_page / add_container / add_element / update_element / delete_element / group_elements / ungroup_elements / set_page_frame / clear_page / set_document_name 等）。',
@@ -36,7 +36,7 @@ const GUIDANCE = [
   '容器（container）可以嵌套子元素：add_element/add_container 传 containerId 即可放入容器，子元素坐标相对容器左上角；容器支持裁剪内容。',
   'props 常用键：text、color、fontSize、fontWeight、radius；容器还可传 name、background、clipContent。状态见各类型（如 button: default/hover/active/disabled）。',
   '操作里需要页面时可用 pageId，或用 pageId:"@last" / pageIndex（0基）指向同一次 apply 内新建的页面，无需先知道 id。',
-  '当用户提出产品设计/原型需求时：先 get_document，再用一次 apply 批量搭好页面与元素，最后提示用户输入 /canvas 或点侧边栏查看。',
+  '当用户提出产品设计/原型需求时：先 get_document，再用一次 apply 批量搭好页面与元素；结果会自动出现在对话内的产品预览卡片里，用户也可点侧边栏「产品设计」查看完整画布。',
 ].join('\n');
 
 export const inject = ['webServer'];

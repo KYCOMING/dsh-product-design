@@ -78,42 +78,6 @@ export function apply(ctx) {
     ),
   );
 
-  // `/canvas` — open this plugin's panel from the composer. Registering a
-  // client action command through commandUi is the supported "invoke from
-  // the conversation" path: picking it runs ui.run(session) and never
-  // becomes a model message. Selecting the panel flips the shell's shared
-  // central-panel selection onto our `main` key.
-  if (typeof ctx.inject === 'function') {
-    try {
-      ctx.inject(['commandUi'], (scope) => {
-        scope.effect(
-          () =>
-            scope.commandUi.register({
-              name: 'canvas',
-              label: () => pickDict(activeLocale(), 'command.canvas.label'),
-              description: () => pickDict(activeLocale(), 'command.canvas.desc'),
-              available: () => true,
-              ui: {
-                kind: 'action',
-                run: () => {
-                  try {
-                    const layout = ctx.get('layout');
-                    if (layout && typeof layout.selectPanel === 'function')
-                      layout.selectPanel(PANEL_ID);
-                  } catch (e) {
-                    /* layout service unavailable */
-                  }
-                },
-              },
-            }),
-          'dsh-product-design: /canvas command',
-        );
-      });
-    } catch (e) {
-      /* commandUi service unavailable */
-    }
-  }
-
   return () => {
     for (const d of disposers.splice(0)) {
       try {

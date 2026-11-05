@@ -7,8 +7,8 @@
 ## [Unreleased]
 
 ### Added
-- **`/design <需求>` 命令**：Host 命令接收产品设计需求并通过 `agent.followup()` 提交为普通用户消息，由 AI 调用 `product_design_apply` 绘制；`/canvas` 保持打开画布查看的职责。
-- **对话内产品预览（Codex Visualize 风格）**：`product_design_apply` / `product_design_get_document` 的结果附带 `presentationMeta`，客户端在聊天回合末尾渲染当前页面的产品缩略卡片，支持「打开画布」。AI 收到需求并修改文档后，用户无需先输入 `/canvas` 就能看到结果。
+- **`/design <需求>` 命令**：Host 命令接收产品设计需求并通过 `agent.followup()` 提交为普通用户消息，由 AI 调用 `product_design_apply` 绘制。
+- **对话内产品预览（Codex Visualize 风格）**：`product_design_apply` / `product_design_get_document` 的结果附带 `presentationMeta`，客户端在聊天回合末尾渲染当前页面的产品缩略卡片，支持「打开画布」。AI 收到需求并修改文档后，用户无需手动跳转就能看到结果。
 - **右侧属性栏可拖拽调宽 + 收起**：宽度会记忆到 `dsh-product-design:ui:v1`，并限制最大占可用宽度的 36%；标题栏「»」可收起为窄条、「«」展开，避免遮挡画布。
 - **纯净预览**：进入预览时隐藏工具栏与左右侧栏，只保留当前产品画板（无网格/页面标签），支持右上角「退出预览」或 `Esc` 返回。
 - **容器（Container）**：新增 `container` 元素类型，支持嵌套子元素、背景/圆角/裁剪内容；拖动组件进出容器自动重挂载；图层树按层级缩进显示。
@@ -18,7 +18,7 @@
 - **8 向缩放**：选中组件后显示 8 个缩放手柄（原仅右下角），缩放同样支持磁吸。
 - 切换画板尺寸（手机/平板/桌面）时按宽比/高比分别缩放当前页组件（可还原；坐标/宽高/字号/圆角），修复桌面切手机后组件不缩放、溢出画板的问题；Host 的 `set_page_frame` 同样支持（`scaleElements:false` 可关闭）。
 - **宿主权威文档 + AI 可编程画布**：Host 半 (`index.js` + `host-model.js`) 持有设计稿、持久化到 `<DSH_HOME>/storages/dsh-product-design/doc.json`，提供同源 HTTP API（`/doc` GET/POST、`/apply`、`/events` SSE）与两个 agent 工具 `product_design_get_document`、`product_design_apply`（支持 add/update/delete 页面与元素、设置状态与属性）。客户端从 Host 拉取并订阅变更，本地编辑 debounce 回写；Host 不可用时退回 localStorage。另向模型注册一段系统提示，说明画布与工具用法。
-- 新增 `/canvas` 客户端命令：在 composer 通过 `/` 菜单或直接输入 `/canvas` 打开画布（`ctx.commandUi` 动作命令 + `ctx.layout.selectPanel`）。
+- **移除 `/canvas` 客户端命令**：画布不再需要手动跳转，侧边栏入口和 `/design` 已覆盖使用场景。
 - 工程化骨架：git 仓库、`.gitignore` / `.editorconfig` / `.nvmrc`、README / CHANGELOG / CONTRIBUTING / LICENSE。
 - `package.json` 补充 `engines`、`peerDependencies`、`scripts`、`devDependencies`。
 - 行为回归测试入库（vitest + jsdom）：插件注册、整树渲染、撤销/重做、快捷键、拖拽、平移。

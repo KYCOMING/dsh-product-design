@@ -279,8 +279,6 @@ var DICT = {
     "toolbar.redo": "\u91CD\u505A (\u21E7\u2318Z)",
     "toolbar.panHint": "\u7A7A\u683C / \u4E2D\u952E\u62D6\u62FD\u5E73\u79FB\u753B\u5E03",
     "toolbar.snap": "\u78C1\u5438",
-    "command.canvas.label": "\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03",
-    "command.canvas.desc": "\u6253\u5F00\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\uFF0C\u5F00\u59CB\u642D\u539F\u578B",
     "frame.title": "\u753B\u5E03\u5C3A\u5BF8",
     "frame.mobile": "\u624B\u673A 390\xD7844",
     "frame.tablet": "\u5E73\u677F 768\xD71024",
@@ -397,8 +395,6 @@ var DICT = {
     "toolbar.redo": "Redo (\u21E7\u2318Z)",
     "toolbar.panHint": "Hold Space / middle-drag to pan the canvas",
     "toolbar.snap": "Snap",
-    "command.canvas.label": "Product Design Canvas",
-    "command.canvas.desc": "Open the product design canvas to build a prototype",
     "frame.title": "Frame size",
     "frame.mobile": "Phone 390\xD7844",
     "frame.tablet": "Tablet 768\xD71024",
@@ -4430,33 +4426,6 @@ function apply(ctx) {
       )
     )
   );
-  if (typeof ctx.inject === "function") {
-    try {
-      ctx.inject(["commandUi"], (scope) => {
-        scope.effect(
-          () => scope.commandUi.register({
-            name: "canvas",
-            label: () => pickDict(activeLocale(), "command.canvas.label"),
-            description: () => pickDict(activeLocale(), "command.canvas.desc"),
-            available: () => true,
-            ui: {
-              kind: "action",
-              run: () => {
-                try {
-                  const layout = ctx.get("layout");
-                  if (layout && typeof layout.selectPanel === "function")
-                    layout.selectPanel(PANEL_ID);
-                } catch (e) {
-                }
-              }
-            }
-          }),
-          "dsh-product-design: /canvas command"
-        );
-      });
-    } catch (e) {
-    }
-  }
   return () => {
     for (const d of disposers.splice(0)) {
       try {

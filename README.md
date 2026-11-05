@@ -18,7 +18,6 @@
 - **页面状态**：顶部「正常 / 加载中 / 空状态 / 错误」一键切换整页效果。
 - **网格 + 缩放**：画布小方格网格随缩放变化；`Ctrl/⌘ + 滚轮` 缩放，普通滚轮滚动。
 - **编辑体验**：撤销 / 重做、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
-- **`/canvas` 命令**：在对话输入框输入 `/` 后选「产品设计画布」，或直接输入 `/canvas` 回车，即可打开画布（无需鼠标点侧边栏）。
 - **对话内产品预览（Visualize 风格）**：AI 调用 `product_design_apply` 后，聊天回合末尾会出现当前页面的产品缩略卡片，可一键「打开画布」；无需先手动打开画布。
 - **自动保存**：设计稿持久化到 `localStorage`（`doc:v2`，旧 `doc:v1` 自动迁移为第 1 页）。
 
@@ -39,12 +38,9 @@
 
 ## 命令
 
-| 命令      | 作用                                                 |
-| --------- | ---------------------------------------------------- |
-| `/canvas` | 打开产品设计画布（`/` 菜单中显示为「产品设计画布」） |
+| 命令 | 作用 |
+| --- | --- |
 | `/design <需求>` | 提交一条产品设计需求，作为普通用户消息交给 AI，由 AI 调用画布工具生成/修改设计 |
-
-`/canvas` 实现：通过客户端命令面 `ctx.commandUi.register(...)` 注册一个 `kind: 'action'` 的贡献项，执行时调用 `ctx.layout.selectPanel('dsh-product-design')` 选中本插件注册的 `main` 面板。
 
 `/design` 实现：Host 半通过 `ctx.commands.register({ name: 'design', input: { hint: '<需求>' }, ... })` 注册；handler 将 `rawInput` 包装成普通用户消息并通过 `agent.followup()` 提交，因此 AI 会正常走产品设计工具链，而不是由命令直接改文档。
 
@@ -56,7 +52,7 @@
 dsh-product-design/
 ├─ src/
 │  ├─ client/                 # 浏览器半（按职责拆分）
-│  │  ├─ index.js             # 入口：apply(ctx) 注册 slot / locale / /canvas 命令
+│  │  ├─ index.js             # 入口：apply(ctx) 注册 slot / locale / 对话内卡片
 │  │  ├─ react.js             # React 与 h 的极薄适配
 │  │  ├─ constants.js         # NS / PANEL_ID / 存储键 / 组件注册表 / GAP
 │  │  ├─ i18n.js              # DICT + useT / pickDict
