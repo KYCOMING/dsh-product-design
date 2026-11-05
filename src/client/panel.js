@@ -12,6 +12,7 @@ import {
   reorderInTree,
   scaleElementsInTree,
 } from '../shared/elements.js';
+import { reflowDoc, resizeElement, resizePage } from '../shared/layout.js';
 import { SNAP_THRESHOLD, snapMoveBox, snapResizeBox } from '../shared/snapping.js';
 import { API_PREFIX, defaultState, TYPE_INFO } from './constants.js';
 import { useT } from './i18n.js';
@@ -191,7 +192,8 @@ function ProductDesignPanel() {
   // inside ~900ms; anything else = record one history entry.
   const setDoc = useCallback((updater, mode) => {
     const prev = docRef.current;
-    const next = typeof updater === 'function' ? updater(prev) : updater;
+    const raw = typeof updater === 'function' ? updater(prev) : updater;
+    const next = reflowDoc(raw);
     if (next === prev) return;
     if (mode !== false) {
       const h = histRef.current;
@@ -233,7 +235,10 @@ function ProductDesignPanel() {
   const [guides, setGuides] = useState([]);
   const [marquee, setMarquee] = useState(null);
   const [snapEnabled, setSnapEnabled] = useState(() => loadUi().snapEnabled !== false);
-  const [scaleOnResize, setScaleOnResize] = useState(() => loadUi().scaleOnResize !== false);
+  const [resizeMode, setResizeMode] = useState(() => {
+    const mode = loadUi().resizeMode;
+    return mode === 'scale' || mode === 'none' ? mode : 'constraints';
+  });
   const snapRef = useRef(snapEnabled);
   snapRef.current = snapEnabled;
   const zoomRef = useRef(zoom);
@@ -396,9 +401,9 @@ function ProductDesignPanel() {
       rightCollapsed: rightCollapsed,
       section: section,
       snapEnabled: snapEnabled,
-      scaleOnResize: scaleOnResize,
+      resizeMode: resizeMode,
     });
-  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled, scaleOnResize]);
+  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled, resizeMode]);
 
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -996,18 +1001,12 @@ function ProductDesignPanel() {
       ...d,
       pages: d.pages.map((p) => {
         if (p.id !== d.activePageId) return p;
-        const ow = p.frame.w || sz[0];
-        const oh = p.frame.h || sz[1];
-        const nw = sz[0];
-        const nh = sz[1];
-        const elements =
-          scaleOnResize && (ow !== nw || oh !== nh)
-            ? scaleElementsInTree(p.elements, nw / ow, nh / oh, Math.min(nw / ow, nh / oh))
-            : p.elements;
-        return { ...p, frame: { ...p.frame, w: nw, h: nh, preset: key }, elements };
+        const resized = resizePage(p, sz[0], sz[1], resizeMode);
+        return { ...resized, frame: { ...resized.frame, preset: key } };
       }),
     }));
   }
+
   function fitContentToFrame() {
     const page = docRef.current.pages.find((p) => p.id === docRef.current.activePageId);
     if (!page || !page.elements.length) return;
@@ -1244,6 +1243,11 @@ function ProductDesignPanel() {
     setSelIds(ids);
 
     const allEntries = collectElementEntries(page.elements);
+    const primary = allEntries.find((entry) => entry.el.id === el.id);
+    if (primary && ids.length === 1 && primary.parent && primary.parent.layout?.mode === 'stack') {
+      startStackDrag(ev, page, primary, docRef.current);
+      return;
+    }
     const entries = ids.map((id) => allEntries.find((entry) => entry.el.id === id)).filter(Boolean);
     const top = entries.filter((entry) => !isUnderAny(entry, ids));
     if (!top.length) return;
@@ -1337,6 +1341,68 @@ function ProductDesignPanel() {
     window.addEventListener('mouseup', up);
   }
 
+  /**
+   * Dragging a child of an auto-layout container reorders it instead of moving
+   * it freely: the layout owns x/y, the user owns the order.
+   */
+  function startStackDrag(ev, page, entry, before) {
+    const parent = entry.parent;
+    const row = parent.layout.direction === 'row';
+    const startMain = row ? entry.absX + entry.w / 2 : entry.absY + entry.h / 2;
+    const sx = ev.clientX;
+    const sy = ev.clientY;
+    let changed = false;
+    const move = (e2) => {
+      const zoomNow = zoomRef.current || 1;
+      const dx = (e2.clientX - sx) / zoomNow;
+      const dy = (e2.clientY - sy) / zoomNow;
+      const pointer = startMain + (row ? dx : dy);
+      const live = docRef.current.pages.find((p) => p.id === page.id);
+      if (!live) return;
+      const liveParent = findElementEntry(live.elements, parent.id);
+      if (!liveParent) return;
+      const kids = liveParent.el.children || [];
+      const others = kids.filter((kid) => kid.id !== entry.el.id);
+      const parentAbs = row ? liveParent.absX : liveParent.absY;
+      let index = 0;
+      for (const kid of others) {
+        const center = parentAbs + (row ? kid.x + kid.w / 2 : kid.y + kid.h / 2);
+        if (center < pointer) index += 1;
+      }
+      const currentIndex = kids.findIndex((kid) => kid.id === entry.el.id);
+      if (index === currentIndex) return;
+      changed = true;
+      setDoc(
+        (d) => ({
+          ...d,
+          pages: d.pages.map((p) => {
+            if (p.id !== page.id) return p;
+            return {
+              ...p,
+              elements: mapTree(p.elements, (node) => {
+                if (node.id !== parent.id) return node;
+                const list = (node.children || []).slice();
+                const from = list.findIndex((kid) => kid.id === entry.el.id);
+                if (from === -1) return node;
+                const [item] = list.splice(from, 1);
+                list.splice(Math.max(0, Math.min(list.length, index)), 0, item);
+                return { ...node, children: list };
+              }),
+            };
+          }),
+        }),
+        false,
+      );
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      if (changed && docRef.current !== before) pushPastSnapshot(before);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  }
+
   function reparentElement(elId, containerId) {
     let changed = false;
     setDoc((d) => {
@@ -1385,6 +1451,7 @@ function ProductDesignPanel() {
     const oh = entry.h;
     const parentAbsX = absX - el.x;
     const parentAbsY = absY - el.y;
+    const startChildren = Array.isArray(entry.el.children) ? entry.el.children : null;
     const exclude = new Set([el.id, ...descendantIds(el)]);
     const targets = snapTargets(page, exclude);
     let moved = false;
@@ -1419,15 +1486,25 @@ function ProductDesignPanel() {
         setGuides([]);
       }
       moved = true;
+      const nextW = Math.round(next.w);
+      const nextH = Math.round(next.h);
       mapEl(
         el.id,
-        (cur) => ({
-          ...cur,
-          x: Math.round(next.x - parentAbsX),
-          y: Math.round(next.y - parentAbsY),
-          w: Math.round(next.w),
-          h: Math.round(next.h),
-        }),
+        (cur) => {
+          const box = {
+            ...cur,
+            x: Math.round(next.x - parentAbsX),
+            y: Math.round(next.y - parentAbsY),
+            w: nextW,
+            h: nextH,
+          };
+          // A container resize propagates through its children's constraints.
+          if (!startChildren) return box;
+          return {
+            ...box,
+            children: startChildren.map((child) => resizeElement(child, ow, oh, nextW, nextH)),
+          };
+        },
         false,
       );
     };
@@ -1794,8 +1871,8 @@ function ProductDesignPanel() {
             selCount: selEntries.length,
             activePage,
             pageState,
-            scaleOnResize,
-            setScaleOnResize,
+            resizeMode,
+            setResizeMode,
             fitContentToFrame,
             setEl,
             applyAttrs,

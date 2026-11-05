@@ -151,6 +151,156 @@ function scaleElementsInTree(elements, sx, sy, sf, ox = 0, oy = 0, isRoot = true
   });
 }
 
+// src/shared/layout.js
+var H_MODES = ["left", "right", "leftRight", "center", "scale"];
+var V_MODES = ["top", "bottom", "topBottom", "center", "scale"];
+var ALIGN_MODES = ["start", "center", "end", "stretch"];
+var JUSTIFY_MODES = ["start", "center", "end", "between"];
+var DIRECTIONS = ["row", "column"];
+var STRETCH_TYPES = ["navbar", "tabs", "card", "image", "input", "container", "group"];
+function defaultConstraints(type) {
+  return { h: STRETCH_TYPES.includes(type) ? "leftRight" : "left", v: "top" };
+}
+function normalizeConstraints(raw, type) {
+  const fallback = defaultConstraints(type);
+  const src = raw && typeof raw === "object" ? raw : {};
+  return {
+    h: H_MODES.includes(src.h) ? src.h : fallback.h,
+    v: V_MODES.includes(src.v) ? src.v : fallback.v
+  };
+}
+function normalizePadding(raw) {
+  if (typeof raw === "number") {
+    const v = Math.max(0, Math.round(raw));
+    return { t: v, r: v, b: v, l: v };
+  }
+  const src = raw && typeof raw === "object" ? raw : {};
+  const pick = (key) => Math.max(0, Math.round(Number(src[key]) || 0));
+  return { t: pick("t"), r: pick("r"), b: pick("b"), l: pick("l") };
+}
+function normalizeLayout(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const mode = raw.mode === "stack" ? "stack" : null;
+  if (!mode) return null;
+  return {
+    mode,
+    direction: DIRECTIONS.includes(raw.direction) ? raw.direction : "column",
+    gap: Math.max(0, Math.round(Number(raw.gap) || 0)),
+    padding: normalizePadding(raw.padding),
+    align: ALIGN_MODES.includes(raw.align) ? raw.align : "start",
+    justify: JUSTIFY_MODES.includes(raw.justify) ? raw.justify : "start"
+  };
+}
+function solveAxis(pos, size, oldParent, newParent, mode, minSize) {
+  if (oldParent <= 0 || oldParent === newParent) return [pos, size];
+  if (mode === "right" || mode === "bottom") {
+    const edge = oldParent - (pos + size);
+    return [newParent - edge - size, size];
+  }
+  if (mode === "leftRight" || mode === "topBottom") {
+    const start = pos;
+    const end = oldParent - (pos + size);
+    return [start, Math.max(minSize, newParent - start - end)];
+  }
+  if (mode === "center") {
+    const offset = pos + size / 2 - oldParent / 2;
+    return [Math.round(newParent / 2 + offset - size / 2), size];
+  }
+  if (mode === "scale") {
+    const ratio = newParent / oldParent;
+    return [Math.round(pos * ratio), Math.max(minSize, Math.round(size * ratio))];
+  }
+  return [pos, size];
+}
+function resizeElement(el, oldW, oldH, newW, newH) {
+  const c = el.constraints || defaultConstraints(el.type);
+  const [x, w] = solveAxis(el.x, el.w, oldW, newW, c.h, 12);
+  const [y, h] = solveAxis(el.y, el.h, oldH, newH, c.v, 8);
+  const moved = x !== el.x || y !== el.y || w !== el.w || h !== el.h;
+  const out = moved ? { ...el, x, y, w, h } : el;
+  if (!isContainer(el) || !Array.isArray(el.children)) return out;
+  const kids = el.children.map((child) => resizeElement(child, el.w, el.h, w, h));
+  const kidsChanged = kids.some((child, i) => child !== el.children[i]);
+  if (!moved && !kidsChanged) return el;
+  return { ...out, children: kids };
+}
+function layoutChildren(container) {
+  const l = normalizeLayout(container.layout);
+  if (!l || !Array.isArray(container.children)) return container.children;
+  const kids = container.children;
+  if (!kids.length) return kids;
+  const p = l.padding;
+  const row = l.direction === "row";
+  const innerW = Math.max(0, container.w - p.l - p.r);
+  const innerH = Math.max(0, container.h - p.t - p.b);
+  let next = kids;
+  if (l.align === "stretch") {
+    next = kids.map((kid) => {
+      const size = row ? innerH : innerW;
+      const key = row ? "h" : "w";
+      if (kid[key] === size) return kid;
+      return { ...kid, [key]: Math.max(row ? 8 : 12, size) };
+    });
+  }
+  next = next.map((kid, i) => kid !== kids[i] ? reflowElement(kid) : kid);
+  const mainOf = (kid) => row ? kid.w : kid.h;
+  const crossOf = (kid) => row ? kid.h : kid.w;
+  const sum = next.reduce((acc, kid) => acc + mainOf(kid), 0);
+  const innerMain = row ? innerW : innerH;
+  const innerCross = row ? innerH : innerW;
+  let gap = l.gap;
+  let cursor = row ? p.l : p.t;
+  if (l.justify === "center") cursor += (innerMain - (sum + gap * (next.length - 1))) / 2;
+  else if (l.justify === "end") cursor += innerMain - (sum + gap * (next.length - 1));
+  else if (l.justify === "between" && next.length > 1) {
+    gap = Math.max(0, (innerMain - sum) / (next.length - 1));
+  }
+  const placed = next.map((kid) => {
+    let cross = row ? p.t : p.l;
+    if (l.align === "center") cross += (innerCross - crossOf(kid)) / 2;
+    else if (l.align === "end") cross += innerCross - crossOf(kid);
+    const main = Math.round(cursor);
+    cursor += mainOf(kid) + gap;
+    const box = row ? { x: main, y: Math.round(cross) } : { x: Math.round(cross), y: main };
+    if (kid.x === box.x && kid.y === box.y) return kid;
+    return { ...kid, x: box.x, y: box.y };
+  });
+  const placedChanged = placed.some((kid, i) => kid !== next[i]);
+  return placedChanged || next !== kids ? placed : kids;
+}
+function reflowElement(el) {
+  if (!isContainer(el) || !Array.isArray(el.children)) return el;
+  const kids = el.children.map(reflowElement);
+  const kidsChanged = kids.some((kid, i) => kid !== el.children[i]);
+  const base = kidsChanged ? { ...el, children: kids } : el;
+  const laid = layoutChildren(base);
+  if (laid === base.children) return base;
+  return { ...base, children: laid };
+}
+function reflowElements(elements) {
+  const out = elements.map(reflowElement);
+  return out.some((el, i) => el !== elements[i]) ? out : elements;
+}
+function reflowPage(page) {
+  const elements = reflowElements(page.elements || []);
+  return elements === page.elements ? page : { ...page, elements };
+}
+function resizePage(page, newW, newH, mode) {
+  const oldW = page.frame.w;
+  const oldH = page.frame.h;
+  const w = Math.max(1, Math.round(newW));
+  const h = Math.max(1, Math.round(newH));
+  let elements = page.elements;
+  if (oldW !== w || oldH !== h) {
+    if (mode === "scale") {
+      elements = scaleElementsInTree(elements, w / oldW, h / oldH, Math.min(w / oldW, h / oldH));
+    } else if (mode === "constraints") {
+      elements = elements.map((el) => resizeElement(el, oldW, oldH, w, h));
+    }
+  }
+  return reflowPage({ ...page, frame: { ...page.frame, w, h }, elements });
+}
+
 // src/host/model.js
 var ELEMENT_TYPES = {
   container: [320, 240],
@@ -256,9 +406,11 @@ function ensureElement(raw) {
     opacity: clamp01(num(e.opacity, 1)),
     state: states.includes(e.state) ? e.state : defaultStateFor(type),
     props: isObj(e.props) ? clone(e.props) : {},
-    interactions: normalizeInteractions(e.interactions)
+    interactions: normalizeInteractions(e.interactions),
+    constraints: normalizeConstraints(e.constraints, type)
   };
   if (isContainerType(type)) {
+    out.layout = normalizeLayout(e.layout);
     out.children = Array.isArray(e.children) ? e.children.filter(isObj).map(ensureElement) : [];
   }
   return out;
@@ -394,20 +546,16 @@ function applyOne(doc, op, index, state) {
     const size = PRESETS[preset] || [page.frame.w, page.frame.h];
     const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
     const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
-    const ow = page.frame.w;
-    const oh = page.frame.h;
-    if (op.scaleElements !== false && (ow !== nw || oh !== nh)) {
-      const sx = nw / ow;
-      const sy = nh / oh;
-      page.elements = scaleElementsInTree(page.elements, sx, sy, Math.min(sx, sy));
-    }
+    const mode = ["constraints", "scale", "none"].includes(op.resizeMode) ? op.resizeMode : "constraints";
+    const resized = resizePage(page, nw, nh, mode);
+    page.elements = resized.elements;
     page.frame = {
       preset,
       w: nw,
       h: nh,
       background: str(op.background, page.frame.background)
     };
-    return { op: index, kind, pageId: page.id, scaled: op.scaleElements !== false };
+    return { op: index, kind, pageId: page.id, resizeMode: mode };
   }
   if (kind === "set_page_states") {
     const page = findPage(doc, op, index);
@@ -454,7 +602,9 @@ function applyOne(doc, op, index, state) {
       opacity: num(op.opacity, 1),
       state: op.state,
       props: op.props,
-      interactions: op.interactions
+      interactions: op.interactions,
+      constraints: op.constraints,
+      layout: op.layout
     });
     if (target) target.el.children = [...target.el.children || [], el];
     else page.elements.push(el);
@@ -481,6 +631,8 @@ function applyOne(doc, op, index, state) {
       hidden: op.hidden === true,
       locked: op.locked === true,
       opacity: num(op.opacity, 1),
+      constraints: op.constraints,
+      layout: op.layout,
       props: {
         name: str(op.name, `Container ${n + 1}`),
         background: str(op.background, "#ffffff"),
@@ -509,6 +661,9 @@ function applyOne(doc, op, index, state) {
     if (op.state !== void 0 && (ELEMENT_STATES[el.type] || []).includes(op.state))
       el.state = op.state;
     if (op.interactions !== void 0) el.interactions = normalizeInteractions(op.interactions);
+    if (op.constraints !== void 0)
+      el.constraints = normalizeConstraints(op.constraints, el.type);
+    if (op.layout !== void 0) el.layout = normalizeLayout(op.layout);
     if (isObj(op.props)) el.props = { ...el.props, ...clone(op.props) };
     return { op: index, kind, pageId: page.id, elementId: el.id };
   }
@@ -643,6 +798,7 @@ function applyOps(rawDoc, ops) {
   const doc = ensureDoc(rawDoc ?? emptyDoc());
   const state = { lastContainerId: null };
   const results = ops.map((op, i) => applyOne(doc, op, i, state));
+  doc.pages = doc.pages.map(reflowPage);
   if (!doc.activePageId && doc.pages.length) doc.activePageId = doc.pages[0].id;
   return { doc, results };
 }
@@ -679,6 +835,9 @@ var GUIDANCE = [
   "\u5BB9\u5668\uFF08container\uFF09\u53EF\u4EE5\u5D4C\u5957\u5B50\u5143\u7D20\uFF1Aadd_element/add_container \u4F20 containerId \u5373\u53EF\u653E\u5165\u5BB9\u5668\uFF0C\u5B50\u5143\u7D20\u5750\u6807\u76F8\u5BF9\u5BB9\u5668\u5DE6\u4E0A\u89D2\uFF1B\u5BB9\u5668\u652F\u6301\u88C1\u526A\u5185\u5BB9\u3002move_element \u53EF\u628A\u5143\u7D20\u79FB\u5230\u53E6\u4E00\u4E2A\u5BB9\u5668\u3002",
   "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u5BB9\u5668\u8FD8\u53EF\u4F20 name\u3001background\u3001clipContent\u3002\u5143\u7D20\u8FD8\u652F\u6301 name\uFF08\u56FE\u5C42\u540D\uFF09\u3001hidden\u3001locked\u3001opacity\u3001interactions\u3002",
   'interactions \u662F\u539F\u578B\u8FDE\u7EBF\uFF1A[{ action: "navigate"|"back"|"openOverlay", targetPageId }]\u3002\u7ED9\u6309\u94AE\u52A0 navigate \u5C31\u80FD\u5728\u9884\u89C8\u91CC\u8D70\u901A\u6D41\u7A0B\u3002',
+  'constraints \u51B3\u5B9A\u753B\u677F/\u5BB9\u5668\u5C3A\u5BF8\u53D8\u5316\u65F6\u5143\u7D20\u600E\u4E48\u53D8\uFF1A{ h: "left"|"right"|"leftRight"|"center"|"scale", v: "top"|"bottom"|"topBottom"|"center"|"scale" }\u3002\u9ED8\u8BA4 left/top\uFF1Bnavbar\u3001tabs\u3001card\u3001image\u3001input\u3001container\u3001group \u9ED8\u8BA4\u5DE6\u53F3\u62C9\u4F38\u3002',
+  '\u5BB9\u5668\u4E0E\u7F16\u7EC4\u53EF\u4EE5\u5F00\u542F Auto Layout\uFF1Alayout { mode: "stack", direction: "row"|"column", gap, padding, align: "start"|"center"|"end"|"stretch", justify: "start"|"center"|"end"|"between" }\u3002\u5F00\u542F\u540E\u5B50\u5143\u7D20\u7684 x/y \u7531\u5E03\u5C40\u63A5\u7BA1\uFF0C\u987A\u5E8F\u5373\u6570\u7EC4\u987A\u5E8F\u3002',
+  'set_page_frame \u9ED8\u8BA4 resizeMode:"constraints"\uFF08\u6309\u7EA6\u675F\u91CD\u6392\uFF09\uFF1B\u4E5F\u652F\u6301 "scale"\uFF08\u6574\u4F53\u7F29\u653E\uFF09\u4E0E "none"\uFF08\u4FDD\u6301\u4E0D\u53D8\uFF09\u3002',
   "\u9875\u9762\u7EA7\u72B6\u6001\u7528 set_page_states \u5199\u6587\u6848\uFF1Astates.loading.text\u3001states.empty.title/desc/action\u3001states.error.title/desc/action\u3002",
   '\u72B6\u6001\u89C1\u5404\u7C7B\u578B\uFF08\u5982 button: default/hover/active/disabled\uFF09\u3002\u4E0D\u4F20 pageId \u65F6\u9ED8\u8BA4\u4F5C\u7528\u4E8E\u5F53\u524D\u6D3B\u52A8\u9875\uFF1Badd_page / duplicate_page \u4F1A\u628A\u65B0\u9875\u8BBE\u4E3A\u6D3B\u52A8\u9875\uFF0C\u6240\u4EE5\u300C\u5148 add_page \u518D add_element\u300D\u4F1A\u81EA\u7136\u843D\u5728\u65B0\u9875\u3002\u4E5F\u53EF\u7528 pageId:"@last" / pageIndex\uFF080\u57FA\uFF09\u663E\u5F0F\u6307\u5B9A\u3002',
   "\u5F53\u7528\u6237\u63D0\u51FA\u4EA7\u54C1\u8BBE\u8BA1/\u539F\u578B\u9700\u6C42\u65F6\uFF1A\u5148 get_document\uFF0C\u518D\u7528\u4E00\u6B21 apply \u6279\u91CF\u642D\u597D\u9875\u9762\u4E0E\u5143\u7D20\uFF1B\u7ED3\u679C\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u5BF9\u8BDD\u5185\u7684\u4EA7\u54C1\u9884\u89C8\u5361\u7247\u91CC\uFF0C\u7528\u6237\u4E5F\u53EF\u70B9\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u67E5\u770B\u5B8C\u6574\u753B\u5E03\u3002"
@@ -953,17 +1112,19 @@ function applyTool(stores) {
       "add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} \u2192 pageId",
       "duplicate_page {pageId, name?} \u2192 pageId (copies the whole page with fresh element ids)",
       "delete_page {pageId}; rename_page {pageId, name}; set_active_page {pageId}",
-      "set_page_frame {pageId, preset?|width?, height?, background?, scaleElements?} (scales the page content to the new size by default; pass scaleElements:false to keep element geometry); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}",
+      "set_page_frame {pageId, preset?|width?, height?, background?, resizeMode?: constraints|scale|none} (default constraints); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}",
       "clear_page {pageId}",
-      'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?} \u2192 elementId (a frame-like container; pass containerId (or "@last") to nest it)',
+      'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?, constraints?, layout?} \u2192 elementId (a frame-like container; pass containerId (or "@last") to nest it)',
       'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius}, interactions?} \u2192 elementId (containerId also accepts "@last")',
-      "update_element {pageId?, elementId, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?, interactions?}; delete_element {pageId?, elementId}",
+      "update_element {pageId?, elementId, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?, interactions?, constraints?, layout?}; delete_element {pageId?, elementId}",
       "move_element {pageId?, elementId, containerId?: string|null, index?} (reparent without moving on screen); reorder_element {pageId?, elementId, position: front|back|forward|backward}",
       "group_elements {pageId?, elementIds: string[]} \u2192 groupId; ungroup_elements {pageId?, elementId}",
       "set_document_name {name}",
       "Element types: container, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select.",
       "Container children use coordinates relative to the container; containers clip content by default. States: button[default,hover,active,disabled]; input[default,focus,filled,error,disabled]; card[default,hover]; toggle[on,off]; checkbox[unchecked,checked]; select[default,open,disabled]; others default.",
       'interactions: [{ action: "navigate"|"back"|"openOverlay", targetPageId }] \u2014 wire buttons between pages so the prototype can be walked through in preview.',
+      'constraints: { h: "left"|"right"|"leftRight"|"center"|"scale", v: "top"|"bottom"|"topBottom"|"center"|"scale" } control how an element reacts when its parent frame resizes.',
+      'layout (containers/groups): { mode: "stack", direction: "row"|"column", gap, padding: {t,r,b,l}|number, align: "start"|"center"|"end"|"stretch", justify: "start"|"center"|"end"|"between" }. Children x/y are owned by the layout; array order is visual order.',
       'Page targeting: any op that needs a page accepts pageId, or pageId: "@last" for the most recently added page, or pageIndex (0-based). Without pageId the op targets the active page; add_page and duplicate_page make the new page active, so add_page followed by add_element lands on the new page.',
       "Returns generated page/element ids and the new revision. Prefer one apply call with several ops over many calls."
     ].join(" "),

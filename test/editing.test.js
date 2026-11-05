@@ -163,7 +163,7 @@ describe('编辑行为', () => {
     expect(doc().pages[0].elements[6].state).not.toBe(before);
   });
 
-  it('切换画布尺寸按宽高分别缩放，切回可还原', async () => {
+  it('切换画布尺寸按约束重排，切回可还原', async () => {
     const select = container.querySelector('select.dpd-select');
     const setSelect = async (el, value) => {
       await act(async () => {
@@ -187,13 +187,16 @@ describe('编辑行为', () => {
   });
 
   it('「缩放内容以适配画板」把内容拉回铺满', async () => {
-    // 先关掉自动缩放并切到桌面，模拟「内容卡在左上角」的状态
-    const checkbox = Array.from(container.querySelectorAll('.dpd-checkRow input')).find(
-      (input) => input.type === 'checkbox',
-    );
-    await act(async () => {
-      checkbox.click();
-    });
+    const setMode = async (value) => {
+      const mode = container.querySelectorAll('.dpd-right select')[1];
+      await act(async () => {
+        const desc = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+        if (desc?.set) desc.set.call(mode, value);
+        else mode.value = value;
+        mode.dispatchEvent(new window.Event('change', { bubbles: true }));
+      });
+    };
+    await setMode('none');
     const select = container.querySelector('select.dpd-select');
     await act(async () => {
       const desc = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
@@ -212,16 +215,17 @@ describe('编辑行为', () => {
     expect(doc().pages[0].elements[0].w).toBeGreaterThan(before.w);
   });
 
-  it('关闭「缩放内容」后切画板尺寸不改变元素', async () => {
-    const select = container.querySelector('select.dpd-select');
-    const checkbox = Array.from(container.querySelectorAll('.dpd-checkRow input')).find(
-      (input) => input.type === 'checkbox',
-    );
-    expect(checkbox).toBeTruthy();
+  it('尺寸变化设为「保持不变」时切画板不改变元素', async () => {
+    const mode = container.querySelectorAll('.dpd-right select')[1];
+    expect(mode).toBeTruthy();
     await act(async () => {
-      checkbox.click();
+      const desc = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
+      if (desc?.set) desc.set.call(mode, 'none');
+      else mode.value = 'none';
+      mode.dispatchEvent(new window.Event('change', { bubbles: true }));
     });
     const before = doc().pages[0].elements[0];
+    const select = container.querySelector('select.dpd-select');
     await act(async () => {
       const desc = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value');
       if (desc?.set) desc.set.call(select, 'desktop');

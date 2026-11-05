@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+- **约束（Constraints）**：元素新增 `constraints: { h, v }`，支持左/右固定、左右拉伸、居中、按比例；画板与容器尺寸变化时递归求解。默认 `left/top`，导航栏/标签页/卡片/图片/输入框/容器默认左右拉伸。`set_page_frame` 支持 `resizeMode: constraints|scale|none`（默认 constraints）。
+- **Auto Layout**：容器/编组新增 `layout: { mode:'stack', direction, gap, padding, align, justify }`，子元素坐标由布局接管；拖动子元素改为调整顺序。新增 `src/shared/layout.js`，Host reducer 与客户端共用同一套求解与重排逻辑。
 - **原型交互（页面跳转）**：元素支持 `interactions: [{ action: navigate|back|openOverlay, targetPageId }]`，右侧属性面板可增删改；预览里点击即可走通流程，带返回栈与弹层，`Esc` 逐层退出。
 - **双击就地编辑文本**：画布上双击文本类组件直接编辑，`Enter` 提交、`Shift+Enter` 换行、`Esc` 取消，字号/字重/颜色/对齐实时套用。
 - **图层操作**：拖拽排序、拖入容器、显隐、锁定、双击重命名、按名称搜索。
@@ -22,7 +24,7 @@
 ### Changed
 - **文档格式升到 v3（破坏性，不做兼容）**：元素新增 `name / hidden / locked / opacity / interactions`，页面新增 `states`；localStorage 键改为 `dsh-product-design:doc:v3`。移除 v1→v2 迁移、半宽文档自愈 `repairDoc`、旧全局 `doc.json` 迁移等全部兼容代码。
 - **「缩放内容以适配画板」**：右侧「画布设置」新增按钮，把内容按包围盒缩放并平移回铺满画板，用于修复已经卡在角落的设计稿。
-- **切画板尺寸默认缩放内容，可关闭**：`set_page_frame` 与画板预设默认按宽高比例缩放当前页元素（`scaleElements:false` 可保持原位）；右侧「画布设置」新增「切换画板尺寸时缩放内容」开关，记忆到 UI 偏好。
+- **切画板尺寸默认按约束重排**：`set_page_frame` 与画板预设默认使用 `resizeMode: 'constraints'`；右侧「画布设置」可在「按约束 / 整体缩放 / 保持不变」之间切换，记忆到 UI 偏好。
 - **AI 改动可撤销**：Host 通过 SSE 推来的文档变更会作为独立历史步骤记录，`⌘Z` 可回退；自己保存的回声不会产生多余步骤。
 - **图层面板默认行为**：容器子元素按层级缩进，隐藏元素仍可在图层树里选中与恢复。
 - `package.json` 的 `description` 改为中英文双语，与 GitHub About 保持一致。

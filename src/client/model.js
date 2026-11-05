@@ -1,4 +1,10 @@
 import { isContainerType } from '../shared/elements.js';
+import {
+  defaultConstraints,
+  normalizeConstraints,
+  normalizeLayout,
+  reflowPage,
+} from '../shared/layout.js';
 import { API_PREFIX, defaultState, STORAGE_KEY, TYPE_INFO, UI_KEY } from './constants.js';
 
 // ------------------------------------------------------------------
@@ -23,8 +29,12 @@ function makeEl(type, x, y, w, hh, props, state) {
     state: state || defaultState(type),
     props: props || {},
     interactions: [],
+    constraints: defaultConstraints(type),
   };
-  if (isContainerType(type)) el.children = [];
+  if (isContainerType(type)) {
+    el.layout = null;
+    el.children = [];
+  }
   return el;
 }
 
@@ -114,8 +124,10 @@ function normalizeElement(raw) {
     state: raw.state || defaultState(type),
     props: raw.props && typeof raw.props === 'object' ? { ...raw.props } : {},
     interactions: normalizeInteractions(raw.interactions),
+    constraints: normalizeConstraints(raw.constraints, type),
   };
   if (isContainerType(type)) {
+    el.layout = normalizeLayout(raw.layout);
     el.children = Array.isArray(raw.children)
       ? raw.children.map(normalizeElement).filter(Boolean)
       : [];
@@ -150,7 +162,7 @@ function normalizeDoc(doc) {
   const activePageId = pages.some((p) => p.id === doc.activePageId)
     ? doc.activePageId
     : pages[0].id;
-  return { name: doc.name || '', pages, activePageId };
+  return { name: doc.name || '', pages: pages.map(reflowPage), activePageId };
 }
 
 function docStorageKey(sessionId) {

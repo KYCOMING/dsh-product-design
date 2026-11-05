@@ -1,3 +1,5 @@
+import { isContainerType } from '../../shared/elements.js';
+import { H_MODES, V_MODES } from '../../shared/layout.js';
 import { ACCENT, defaultState, TYPE_INFO } from '../constants.js';
 import { IconBack, IconCopy, IconFront, IconTrash } from '../icons.js';
 import { h } from '../react.js';
@@ -16,8 +18,8 @@ export function InspectorView(props) {
     selCount,
     activePage,
     pageState,
-    scaleOnResize,
-    setScaleOnResize,
+    resizeMode,
+    setResizeMode,
     fitContentToFrame,
     setPreset,
     renameActivePage,
@@ -349,6 +351,177 @@ export function InspectorView(props) {
         : null,
       h(
         'div',
+        { className: 'dpd-section' },
+        h('div', { className: 'dpd-panelTitle' }, h('span', null, t('inspector.constraints'))),
+        h(
+          'div',
+          { className: 'dpd-row' },
+          h('label', null, t('inspector.constraintH')),
+          h(
+            'select',
+            {
+              className: 'dpd-select',
+              style: { flex: 1 },
+              title: t('inspector.constraintH'),
+              value: (sel.constraints && sel.constraints.h) || 'left',
+              onChange: (e) =>
+                applyAttrs({
+                  constraints: { ...(sel.constraints || {}), h: e.target.value },
+                }),
+            },
+            H_MODES.map((mode) => h('option', { key: mode, value: mode }, t('constraint.' + mode))),
+          ),
+        ),
+        h(
+          'div',
+          { className: 'dpd-row' },
+          h('label', null, t('inspector.constraintV')),
+          h(
+            'select',
+            {
+              className: 'dpd-select',
+              style: { flex: 1 },
+              title: t('inspector.constraintV'),
+              value: (sel.constraints && sel.constraints.v) || 'top',
+              onChange: (e) =>
+                applyAttrs({
+                  constraints: { ...(sel.constraints || {}), v: e.target.value },
+                }),
+            },
+            V_MODES.map((mode) => h('option', { key: mode, value: mode }, t('constraint.' + mode))),
+          ),
+        ),
+      ),
+      isContainerType(sel.type)
+        ? h(
+            'div',
+            { className: 'dpd-section' },
+            h('div', { className: 'dpd-panelTitle' }, h('span', null, t('inspector.layout'))),
+            h(
+              'div',
+              { className: 'dpd-row' },
+              h('label', null, t('inspector.layoutDirection')),
+              h(
+                'select',
+                {
+                  className: 'dpd-select',
+                  style: { flex: 1 },
+                  title: t('inspector.layoutDirection'),
+                  value: (sel.layout && sel.layout.direction) || 'none',
+                  onChange: (e) => {
+                    const value = e.target.value;
+                    applyAttrs({
+                      layout:
+                        value === 'none'
+                          ? null
+                          : {
+                              ...(sel.layout || {}),
+                              mode: 'stack',
+                              direction: value,
+                              gap: (sel.layout && sel.layout.gap) || 8,
+                              padding: (sel.layout && sel.layout.padding) || 0,
+                              align: (sel.layout && sel.layout.align) || 'start',
+                              justify: (sel.layout && sel.layout.justify) || 'start',
+                            },
+                    });
+                  },
+                },
+                [
+                  h('option', { key: 'none', value: 'none' }, t('layout.none')),
+                  h('option', { key: 'column', value: 'column' }, t('layout.column')),
+                  h('option', { key: 'row', value: 'row' }, t('layout.row')),
+                ],
+              ),
+            ),
+            sel.layout
+              ? h(
+                  'div',
+                  null,
+                  h(
+                    'div',
+                    { className: 'dpd-row' },
+                    h('label', null, t('inspector.gap')),
+                    numInput(sel.layout.gap || 0, (v) =>
+                      applyAttrs(
+                        { layout: { ...sel.layout, gap: Math.max(0, v) } },
+                        'gap:' + sel.id,
+                      ),
+                    ),
+                  ),
+                  h(
+                    'div',
+                    { className: 'dpd-row' },
+                    h('label', null, t('inspector.padding')),
+                    h(
+                      'div',
+                      { className: 'dpd-numPair' },
+                      ['t', 'r', 'b', 'l'].map((side) =>
+                        h(
+                          'div',
+                          { className: 'dpd-field', key: side },
+                          h('span', null, side.toUpperCase()),
+                          numInput((sel.layout.padding && sel.layout.padding[side]) || 0, (v) =>
+                            applyAttrs(
+                              {
+                                layout: {
+                                  ...sel.layout,
+                                  padding: {
+                                    ...(sel.layout.padding || {}),
+                                    [side]: Math.max(0, v),
+                                  },
+                                },
+                              },
+                              'pad:' + side + ':' + sel.id,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  h(
+                    'div',
+                    { className: 'dpd-row' },
+                    h('label', null, t('inspector.layoutAlign')),
+                    h(
+                      'select',
+                      {
+                        className: 'dpd-select',
+                        style: { flex: 1 },
+                        title: t('inspector.layoutAlign'),
+                        value: sel.layout.align || 'start',
+                        onChange: (e) =>
+                          applyAttrs({ layout: { ...sel.layout, align: e.target.value } }),
+                      },
+                      ['start', 'center', 'end', 'stretch'].map((mode) =>
+                        h('option', { key: mode, value: mode }, t('layout.align.' + mode)),
+                      ),
+                    ),
+                  ),
+                  h(
+                    'div',
+                    { className: 'dpd-row' },
+                    h('label', null, t('inspector.justify')),
+                    h(
+                      'select',
+                      {
+                        className: 'dpd-select',
+                        style: { flex: 1 },
+                        title: t('inspector.justify'),
+                        value: sel.layout.justify || 'start',
+                        onChange: (e) =>
+                          applyAttrs({ layout: { ...sel.layout, justify: e.target.value } }),
+                      },
+                      ['start', 'center', 'end', 'between'].map((mode) =>
+                        h('option', { key: mode, value: mode }, t('layout.justify.' + mode)),
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+          )
+        : null,
+      h(
+        'div',
         { className: 'dpd-row' },
         h('label', null, t('inspector.radius')),
         numInput(sel.props.radius != null ? sel.props.radius : 8, (v) =>
@@ -570,14 +743,21 @@ export function InspectorView(props) {
           }),
         ),
         h(
-          'label',
-          { className: 'dpd-checkRow' },
-          h('input', {
-            type: 'checkbox',
-            checked: scaleOnResize !== false,
-            onChange: (e) => setScaleOnResize(e.target.checked),
-          }),
-          t('inspector.scaleOnResize'),
+          'div',
+          { className: 'dpd-row' },
+          h('label', null, t('inspector.resizeMode')),
+          h(
+            'select',
+            {
+              className: 'dpd-select',
+              style: { flex: 1 },
+              value: resizeMode,
+              onChange: (e) => setResizeMode(e.target.value),
+            },
+            ['constraints', 'scale', 'none'].map((mode) =>
+              h('option', { key: mode, value: mode }, t('resizeMode.' + mode)),
+            ),
+          ),
         ),
         h(
           'div',

@@ -23,8 +23,8 @@ import {
   isContainerType,
   moveElementInTree,
   reorderInTree,
-  scaleElementsInTree,
 } from '../shared/elements.js';
+import { normalizeConstraints, normalizeLayout, reflowPage, resizePage } from '../shared/layout.js';
 
 export const ELEMENT_TYPES = {
   container: [320, 240],
@@ -147,8 +147,10 @@ function ensureElement(raw) {
     state: states.includes(e.state) ? e.state : defaultStateFor(type),
     props: isObj(e.props) ? clone(e.props) : {},
     interactions: normalizeInteractions(e.interactions),
+    constraints: normalizeConstraints(e.constraints, type),
   };
   if (isContainerType(type)) {
+    out.layout = normalizeLayout(e.layout);
     out.children = Array.isArray(e.children) ? e.children.filter(isObj).map(ensureElement) : [];
   }
   return out;
@@ -305,20 +307,18 @@ function applyOne(doc, op, index, state) {
     const size = PRESETS[preset] || [page.frame.w, page.frame.h];
     const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
     const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
-    const ow = page.frame.w;
-    const oh = page.frame.h;
-    if (op.scaleElements !== false && (ow !== nw || oh !== nh)) {
-      const sx = nw / ow;
-      const sy = nh / oh;
-      page.elements = scaleElementsInTree(page.elements, sx, sy, Math.min(sx, sy));
-    }
+    const mode = ['constraints', 'scale', 'none'].includes(op.resizeMode)
+      ? op.resizeMode
+      : 'constraints';
+    const resized = resizePage(page, nw, nh, mode);
+    page.elements = resized.elements;
     page.frame = {
       preset,
       w: nw,
       h: nh,
       background: str(op.background, page.frame.background),
     };
-    return { op: index, kind, pageId: page.id, scaled: op.scaleElements !== false };
+    return { op: index, kind, pageId: page.id, resizeMode: mode };
   }
 
   if (kind === 'set_page_states') {
@@ -369,6 +369,8 @@ function applyOne(doc, op, index, state) {
       state: op.state,
       props: op.props,
       interactions: op.interactions,
+      constraints: op.constraints,
+      layout: op.layout,
     });
     if (target) target.el.children = [...(target.el.children || []), el];
     else page.elements.push(el);
@@ -396,6 +398,8 @@ function applyOne(doc, op, index, state) {
       hidden: op.hidden === true,
       locked: op.locked === true,
       opacity: num(op.opacity, 1),
+      constraints: op.constraints,
+      layout: op.layout,
       props: {
         name: str(op.name, `Container ${n + 1}`),
         background: str(op.background, '#ffffff'),
@@ -425,6 +429,9 @@ function applyOne(doc, op, index, state) {
     if (op.state !== undefined && (ELEMENT_STATES[el.type] || []).includes(op.state))
       el.state = op.state;
     if (op.interactions !== undefined) el.interactions = normalizeInteractions(op.interactions);
+    if (op.constraints !== undefined)
+      el.constraints = normalizeConstraints(op.constraints, el.type);
+    if (op.layout !== undefined) el.layout = normalizeLayout(op.layout);
     if (isObj(op.props)) el.props = { ...el.props, ...clone(op.props) };
     return { op: index, kind, pageId: page.id, elementId: el.id };
   }
@@ -578,6 +585,7 @@ export function applyOps(rawDoc, ops) {
   const doc = ensureDoc(rawDoc ?? emptyDoc());
   const state = { lastContainerId: null };
   const results = ops.map((op, i) => applyOne(doc, op, i, state));
+  doc.pages = doc.pages.map(reflowPage);
   if (!doc.activePageId && doc.pages.length) doc.activePageId = doc.pages[0].id;
   return { doc, results };
 }

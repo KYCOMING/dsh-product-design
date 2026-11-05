@@ -544,8 +544,39 @@ var DICT = {
     "inspector.stateTitle": "\u6807\u9898",
     "inspector.stateDesc": "\u8BF4\u660E",
     "inspector.stateAction": "\u6309\u94AE\u6587\u6848",
-    "inspector.scaleOnResize": "\u5207\u6362\u753B\u677F\u5C3A\u5BF8\u65F6\u7F29\u653E\u5185\u5BB9",
     "inspector.fitContent": "\u7F29\u653E\u5185\u5BB9\u4EE5\u9002\u914D\u753B\u677F",
+    "inspector.resizeMode": "\u5C3A\u5BF8\u53D8\u5316\u65F6",
+    "resizeMode.constraints": "\u6309\u7EA6\u675F",
+    "resizeMode.scale": "\u6574\u4F53\u7F29\u653E",
+    "resizeMode.none": "\u4FDD\u6301\u4E0D\u53D8",
+    "inspector.constraints": "\u7EA6\u675F",
+    "inspector.constraintH": "\u6C34\u5E73",
+    "inspector.constraintV": "\u5782\u76F4",
+    "constraint.left": "\u5DE6\u56FA\u5B9A",
+    "constraint.right": "\u53F3\u56FA\u5B9A",
+    "constraint.leftRight": "\u5DE6\u53F3\u62C9\u4F38",
+    "constraint.center": "\u5C45\u4E2D",
+    "constraint.scale": "\u6309\u6BD4\u4F8B",
+    "constraint.top": "\u4E0A\u56FA\u5B9A",
+    "constraint.bottom": "\u4E0B\u56FA\u5B9A",
+    "constraint.topBottom": "\u4E0A\u4E0B\u62C9\u4F38",
+    "inspector.layout": "\u81EA\u52A8\u5E03\u5C40",
+    "inspector.layoutDirection": "\u65B9\u5411",
+    "layout.none": "\u65E0",
+    "layout.row": "\u6A2A\u5411",
+    "layout.column": "\u7EB5\u5411",
+    "inspector.gap": "\u95F4\u8DDD",
+    "inspector.padding": "\u5185\u8FB9\u8DDD",
+    "inspector.layoutAlign": "\u4EA4\u53C9\u8F74",
+    "inspector.justify": "\u4E3B\u8F74",
+    "layout.align.start": "\u8D77\u59CB",
+    "layout.align.center": "\u5C45\u4E2D",
+    "layout.align.end": "\u672B\u5C3E",
+    "layout.align.stretch": "\u62C9\u4F38",
+    "layout.justify.start": "\u8D77\u59CB",
+    "layout.justify.center": "\u5C45\u4E2D",
+    "layout.justify.end": "\u672B\u5C3E",
+    "layout.justify.between": "\u4E24\u7AEF\u5BF9\u9F50",
     "inspector.multiHint": "\u4FEE\u6539\u4F1A\u5E94\u7528\u5230\u5168\u90E8\u9009\u4E2D\u56FE\u5C42",
     "textEdit.hint": "Enter \u6362\u884C \xB7 Esc \u53D6\u6D88",
     "preview.back": "\u8FD4\u56DE",
@@ -704,8 +735,39 @@ var DICT = {
     "inspector.stateTitle": "Title",
     "inspector.stateDesc": "Description",
     "inspector.stateAction": "Button label",
-    "inspector.scaleOnResize": "Scale content when the frame resizes",
     "inspector.fitContent": "Fit content to frame",
+    "inspector.resizeMode": "On resize",
+    "resizeMode.constraints": "Constraints",
+    "resizeMode.scale": "Scale all",
+    "resizeMode.none": "Keep",
+    "inspector.constraints": "Constraints",
+    "inspector.constraintH": "Horizontal",
+    "inspector.constraintV": "Vertical",
+    "constraint.left": "Left",
+    "constraint.right": "Right",
+    "constraint.leftRight": "Left & right",
+    "constraint.center": "Center",
+    "constraint.scale": "Scale",
+    "constraint.top": "Top",
+    "constraint.bottom": "Bottom",
+    "constraint.topBottom": "Top & bottom",
+    "inspector.layout": "Auto layout",
+    "inspector.layoutDirection": "Direction",
+    "layout.none": "None",
+    "layout.row": "Row",
+    "layout.column": "Column",
+    "inspector.gap": "Gap",
+    "inspector.padding": "Padding",
+    "inspector.layoutAlign": "Align",
+    "inspector.justify": "Justify",
+    "layout.align.start": "Start",
+    "layout.align.center": "Center",
+    "layout.align.end": "End",
+    "layout.align.stretch": "Stretch",
+    "layout.justify.start": "Start",
+    "layout.justify.center": "Center",
+    "layout.justify.end": "End",
+    "layout.justify.between": "Space between",
     "inspector.multiHint": "Changes apply to every selected layer",
     "textEdit.hint": "Enter for newline \xB7 Esc to cancel",
     "preview.back": "Back",
@@ -1705,6 +1767,160 @@ function ProductDesignIcon(props) {
   );
 }
 
+// src/shared/layout.js
+var H_MODES = ["left", "right", "leftRight", "center", "scale"];
+var V_MODES = ["top", "bottom", "topBottom", "center", "scale"];
+var ALIGN_MODES = ["start", "center", "end", "stretch"];
+var JUSTIFY_MODES = ["start", "center", "end", "between"];
+var DIRECTIONS = ["row", "column"];
+var STRETCH_TYPES = ["navbar", "tabs", "card", "image", "input", "container", "group"];
+function defaultConstraints(type) {
+  return { h: STRETCH_TYPES.includes(type) ? "leftRight" : "left", v: "top" };
+}
+function normalizeConstraints(raw, type) {
+  const fallback = defaultConstraints(type);
+  const src = raw && typeof raw === "object" ? raw : {};
+  return {
+    h: H_MODES.includes(src.h) ? src.h : fallback.h,
+    v: V_MODES.includes(src.v) ? src.v : fallback.v
+  };
+}
+function normalizePadding(raw) {
+  if (typeof raw === "number") {
+    const v = Math.max(0, Math.round(raw));
+    return { t: v, r: v, b: v, l: v };
+  }
+  const src = raw && typeof raw === "object" ? raw : {};
+  const pick = (key) => Math.max(0, Math.round(Number(src[key]) || 0));
+  return { t: pick("t"), r: pick("r"), b: pick("b"), l: pick("l") };
+}
+function normalizeLayout(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const mode = raw.mode === "stack" ? "stack" : null;
+  if (!mode) return null;
+  return {
+    mode,
+    direction: DIRECTIONS.includes(raw.direction) ? raw.direction : "column",
+    gap: Math.max(0, Math.round(Number(raw.gap) || 0)),
+    padding: normalizePadding(raw.padding),
+    align: ALIGN_MODES.includes(raw.align) ? raw.align : "start",
+    justify: JUSTIFY_MODES.includes(raw.justify) ? raw.justify : "start"
+  };
+}
+function solveAxis(pos, size, oldParent, newParent, mode, minSize) {
+  if (oldParent <= 0 || oldParent === newParent) return [pos, size];
+  if (mode === "right" || mode === "bottom") {
+    const edge = oldParent - (pos + size);
+    return [newParent - edge - size, size];
+  }
+  if (mode === "leftRight" || mode === "topBottom") {
+    const start = pos;
+    const end = oldParent - (pos + size);
+    return [start, Math.max(minSize, newParent - start - end)];
+  }
+  if (mode === "center") {
+    const offset = pos + size / 2 - oldParent / 2;
+    return [Math.round(newParent / 2 + offset - size / 2), size];
+  }
+  if (mode === "scale") {
+    const ratio = newParent / oldParent;
+    return [Math.round(pos * ratio), Math.max(minSize, Math.round(size * ratio))];
+  }
+  return [pos, size];
+}
+function resizeElement(el, oldW, oldH, newW, newH) {
+  const c = el.constraints || defaultConstraints(el.type);
+  const [x, w] = solveAxis(el.x, el.w, oldW, newW, c.h, 12);
+  const [y, h2] = solveAxis(el.y, el.h, oldH, newH, c.v, 8);
+  const moved = x !== el.x || y !== el.y || w !== el.w || h2 !== el.h;
+  const out = moved ? { ...el, x, y, w, h: h2 } : el;
+  if (!isContainer(el) || !Array.isArray(el.children)) return out;
+  const kids = el.children.map((child) => resizeElement(child, el.w, el.h, w, h2));
+  const kidsChanged = kids.some((child, i) => child !== el.children[i]);
+  if (!moved && !kidsChanged) return el;
+  return { ...out, children: kids };
+}
+function layoutChildren(container) {
+  const l = normalizeLayout(container.layout);
+  if (!l || !Array.isArray(container.children)) return container.children;
+  const kids = container.children;
+  if (!kids.length) return kids;
+  const p = l.padding;
+  const row = l.direction === "row";
+  const innerW = Math.max(0, container.w - p.l - p.r);
+  const innerH = Math.max(0, container.h - p.t - p.b);
+  let next = kids;
+  if (l.align === "stretch") {
+    next = kids.map((kid) => {
+      const size = row ? innerH : innerW;
+      const key = row ? "h" : "w";
+      if (kid[key] === size) return kid;
+      return { ...kid, [key]: Math.max(row ? 8 : 12, size) };
+    });
+  }
+  next = next.map((kid, i) => kid !== kids[i] ? reflowElement(kid) : kid);
+  const mainOf = (kid) => row ? kid.w : kid.h;
+  const crossOf = (kid) => row ? kid.h : kid.w;
+  const sum = next.reduce((acc, kid) => acc + mainOf(kid), 0);
+  const innerMain = row ? innerW : innerH;
+  const innerCross = row ? innerH : innerW;
+  let gap = l.gap;
+  let cursor = row ? p.l : p.t;
+  if (l.justify === "center") cursor += (innerMain - (sum + gap * (next.length - 1))) / 2;
+  else if (l.justify === "end") cursor += innerMain - (sum + gap * (next.length - 1));
+  else if (l.justify === "between" && next.length > 1) {
+    gap = Math.max(0, (innerMain - sum) / (next.length - 1));
+  }
+  const placed = next.map((kid) => {
+    let cross = row ? p.t : p.l;
+    if (l.align === "center") cross += (innerCross - crossOf(kid)) / 2;
+    else if (l.align === "end") cross += innerCross - crossOf(kid);
+    const main = Math.round(cursor);
+    cursor += mainOf(kid) + gap;
+    const box = row ? { x: main, y: Math.round(cross) } : { x: Math.round(cross), y: main };
+    if (kid.x === box.x && kid.y === box.y) return kid;
+    return { ...kid, x: box.x, y: box.y };
+  });
+  const placedChanged = placed.some((kid, i) => kid !== next[i]);
+  return placedChanged || next !== kids ? placed : kids;
+}
+function reflowElement(el) {
+  if (!isContainer(el) || !Array.isArray(el.children)) return el;
+  const kids = el.children.map(reflowElement);
+  const kidsChanged = kids.some((kid, i) => kid !== el.children[i]);
+  const base = kidsChanged ? { ...el, children: kids } : el;
+  const laid = layoutChildren(base);
+  if (laid === base.children) return base;
+  return { ...base, children: laid };
+}
+function reflowElements(elements) {
+  const out = elements.map(reflowElement);
+  return out.some((el, i) => el !== elements[i]) ? out : elements;
+}
+function reflowPage(page) {
+  const elements = reflowElements(page.elements || []);
+  return elements === page.elements ? page : { ...page, elements };
+}
+function reflowDoc(doc) {
+  const pages = (doc.pages || []).map(reflowPage);
+  return pages.some((page, i) => page !== doc.pages[i]) ? { ...doc, pages } : doc;
+}
+function resizePage(page, newW, newH, mode) {
+  const oldW = page.frame.w;
+  const oldH = page.frame.h;
+  const w = Math.max(1, Math.round(newW));
+  const h2 = Math.max(1, Math.round(newH));
+  let elements = page.elements;
+  if (oldW !== w || oldH !== h2) {
+    if (mode === "scale") {
+      elements = scaleElementsInTree(elements, w / oldW, h2 / oldH, Math.min(w / oldW, h2 / oldH));
+    } else if (mode === "constraints") {
+      elements = elements.map((el) => resizeElement(el, oldW, oldH, w, h2));
+    }
+  }
+  return reflowPage({ ...page, frame: { ...page.frame, w, h: h2 }, elements });
+}
+
 // src/shared/snapping.js
 var SNAP_THRESHOLD = 5;
 function xCandidates(targets) {
@@ -1854,9 +2070,13 @@ function makeEl(type, x, y, w, hh, props, state) {
     opacity: 1,
     state: state || defaultState(type),
     props: props || {},
-    interactions: []
+    interactions: [],
+    constraints: defaultConstraints(type)
   };
-  if (isContainerType(type)) el.children = [];
+  if (isContainerType(type)) {
+    el.layout = null;
+    el.children = [];
+  }
   return el;
 }
 function emptyStates() {
@@ -1937,9 +2157,11 @@ function normalizeElement(raw) {
     opacity: Number.isFinite(Number(raw.opacity)) ? Math.max(0, Math.min(1, Number(raw.opacity))) : 1,
     state: raw.state || defaultState(type),
     props: raw.props && typeof raw.props === "object" ? { ...raw.props } : {},
-    interactions: normalizeInteractions(raw.interactions)
+    interactions: normalizeInteractions(raw.interactions),
+    constraints: normalizeConstraints(raw.constraints, type)
   };
   if (isContainerType(type)) {
+    el.layout = normalizeLayout(raw.layout);
     el.children = Array.isArray(raw.children) ? raw.children.map(normalizeElement).filter(Boolean) : [];
   }
   return el;
@@ -1966,7 +2188,7 @@ function normalizeDoc(doc) {
   });
   if (!pages.length) return null;
   const activePageId = pages.some((p) => p.id === doc.activePageId) ? doc.activePageId : pages[0].id;
-  return { name: doc.name || "", pages, activePageId };
+  return { name: doc.name || "", pages: pages.map(reflowPage), activePageId };
 }
 function docStorageKey(sessionId) {
   return sessionId ? `${STORAGE_KEY}:${sessionId}` : STORAGE_KEY;
@@ -2769,8 +2991,8 @@ function InspectorView(props) {
     selCount,
     activePage,
     pageState,
-    scaleOnResize,
-    setScaleOnResize,
+    resizeMode,
+    setResizeMode,
     fitContentToFrame,
     setPreset,
     renameActivePage,
@@ -3083,6 +3305,168 @@ function InspectorView(props) {
       ) : null,
       h(
         "div",
+        { className: "dpd-section" },
+        h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.constraints"))),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.constraintH")),
+          h(
+            "select",
+            {
+              className: "dpd-select",
+              style: { flex: 1 },
+              title: t("inspector.constraintH"),
+              value: sel.constraints && sel.constraints.h || "left",
+              onChange: (e) => applyAttrs({
+                constraints: { ...sel.constraints || {}, h: e.target.value }
+              })
+            },
+            H_MODES.map((mode) => h("option", { key: mode, value: mode }, t("constraint." + mode)))
+          )
+        ),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.constraintV")),
+          h(
+            "select",
+            {
+              className: "dpd-select",
+              style: { flex: 1 },
+              title: t("inspector.constraintV"),
+              value: sel.constraints && sel.constraints.v || "top",
+              onChange: (e) => applyAttrs({
+                constraints: { ...sel.constraints || {}, v: e.target.value }
+              })
+            },
+            V_MODES.map((mode) => h("option", { key: mode, value: mode }, t("constraint." + mode)))
+          )
+        )
+      ),
+      isContainerType(sel.type) ? h(
+        "div",
+        { className: "dpd-section" },
+        h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.layout"))),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.layoutDirection")),
+          h(
+            "select",
+            {
+              className: "dpd-select",
+              style: { flex: 1 },
+              title: t("inspector.layoutDirection"),
+              value: sel.layout && sel.layout.direction || "none",
+              onChange: (e) => {
+                const value = e.target.value;
+                applyAttrs({
+                  layout: value === "none" ? null : {
+                    ...sel.layout || {},
+                    mode: "stack",
+                    direction: value,
+                    gap: sel.layout && sel.layout.gap || 8,
+                    padding: sel.layout && sel.layout.padding || 0,
+                    align: sel.layout && sel.layout.align || "start",
+                    justify: sel.layout && sel.layout.justify || "start"
+                  }
+                });
+              }
+            },
+            [
+              h("option", { key: "none", value: "none" }, t("layout.none")),
+              h("option", { key: "column", value: "column" }, t("layout.column")),
+              h("option", { key: "row", value: "row" }, t("layout.row"))
+            ]
+          )
+        ),
+        sel.layout ? h(
+          "div",
+          null,
+          h(
+            "div",
+            { className: "dpd-row" },
+            h("label", null, t("inspector.gap")),
+            numInput(
+              sel.layout.gap || 0,
+              (v) => applyAttrs(
+                { layout: { ...sel.layout, gap: Math.max(0, v) } },
+                "gap:" + sel.id
+              )
+            )
+          ),
+          h(
+            "div",
+            { className: "dpd-row" },
+            h("label", null, t("inspector.padding")),
+            h(
+              "div",
+              { className: "dpd-numPair" },
+              ["t", "r", "b", "l"].map(
+                (side) => h(
+                  "div",
+                  { className: "dpd-field", key: side },
+                  h("span", null, side.toUpperCase()),
+                  numInput(
+                    sel.layout.padding && sel.layout.padding[side] || 0,
+                    (v) => applyAttrs(
+                      {
+                        layout: {
+                          ...sel.layout,
+                          padding: {
+                            ...sel.layout.padding || {},
+                            [side]: Math.max(0, v)
+                          }
+                        }
+                      },
+                      "pad:" + side + ":" + sel.id
+                    )
+                  )
+                )
+              )
+            )
+          ),
+          h(
+            "div",
+            { className: "dpd-row" },
+            h("label", null, t("inspector.layoutAlign")),
+            h(
+              "select",
+              {
+                className: "dpd-select",
+                style: { flex: 1 },
+                title: t("inspector.layoutAlign"),
+                value: sel.layout.align || "start",
+                onChange: (e) => applyAttrs({ layout: { ...sel.layout, align: e.target.value } })
+              },
+              ["start", "center", "end", "stretch"].map(
+                (mode) => h("option", { key: mode, value: mode }, t("layout.align." + mode))
+              )
+            )
+          ),
+          h(
+            "div",
+            { className: "dpd-row" },
+            h("label", null, t("inspector.justify")),
+            h(
+              "select",
+              {
+                className: "dpd-select",
+                style: { flex: 1 },
+                title: t("inspector.justify"),
+                value: sel.layout.justify || "start",
+                onChange: (e) => applyAttrs({ layout: { ...sel.layout, justify: e.target.value } })
+              },
+              ["start", "center", "end", "between"].map(
+                (mode) => h("option", { key: mode, value: mode }, t("layout.justify." + mode))
+              )
+            )
+          )
+        ) : null
+      ) : null,
+      h(
+        "div",
         { className: "dpd-row" },
         h("label", null, t("inspector.radius")),
         numInput(
@@ -3297,14 +3681,21 @@ function InspectorView(props) {
           })
         ),
         h(
-          "label",
-          { className: "dpd-checkRow" },
-          h("input", {
-            type: "checkbox",
-            checked: scaleOnResize !== false,
-            onChange: (e) => setScaleOnResize(e.target.checked)
-          }),
-          t("inspector.scaleOnResize")
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.resizeMode")),
+          h(
+            "select",
+            {
+              className: "dpd-select",
+              style: { flex: 1 },
+              value: resizeMode,
+              onChange: (e) => setResizeMode(e.target.value)
+            },
+            ["constraints", "scale", "none"].map(
+              (mode) => h("option", { key: mode, value: mode }, t("resizeMode." + mode))
+            )
+          )
         ),
         h(
           "div",
@@ -4027,7 +4418,8 @@ function ProductDesignPanel() {
   const HIST_LIMIT = 120;
   const setDoc = useCallback2((updater, mode) => {
     const prev = docRef.current;
-    const next = typeof updater === "function" ? updater(prev) : updater;
+    const raw = typeof updater === "function" ? updater(prev) : updater;
+    const next = reflowDoc(raw);
     if (next === prev) return;
     if (mode !== false) {
       const h2 = histRef.current;
@@ -4069,7 +4461,10 @@ function ProductDesignPanel() {
   const [guides, setGuides] = useState2([]);
   const [marquee, setMarquee] = useState2(null);
   const [snapEnabled, setSnapEnabled] = useState2(() => loadUi().snapEnabled !== false);
-  const [scaleOnResize, setScaleOnResize] = useState2(() => loadUi().scaleOnResize !== false);
+  const [resizeMode, setResizeMode] = useState2(() => {
+    const mode = loadUi().resizeMode;
+    return mode === "scale" || mode === "none" ? mode : "constraints";
+  });
   const snapRef = useRef(snapEnabled);
   snapRef.current = snapEnabled;
   const zoomRef = useRef(zoom);
@@ -4216,9 +4611,9 @@ function ProductDesignPanel() {
       rightCollapsed,
       section,
       snapEnabled,
-      scaleOnResize
+      resizeMode
     });
-  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled, scaleOnResize]);
+  }, [leftWidth, rightWidth, rightCollapsed, section, snapEnabled, resizeMode]);
   const canvasRef = useRef(null);
   useEffect2(() => {
     const el = canvasRef.current;
@@ -4775,12 +5170,8 @@ function ProductDesignPanel() {
       ...d,
       pages: d.pages.map((p) => {
         if (p.id !== d.activePageId) return p;
-        const ow = p.frame.w || sz[0];
-        const oh = p.frame.h || sz[1];
-        const nw = sz[0];
-        const nh = sz[1];
-        const elements = scaleOnResize && (ow !== nw || oh !== nh) ? scaleElementsInTree(p.elements, nw / ow, nh / oh, Math.min(nw / ow, nh / oh)) : p.elements;
-        return { ...p, frame: { ...p.frame, w: nw, h: nh, preset: key }, elements };
+        const resized = resizePage(p, sz[0], sz[1], resizeMode);
+        return { ...resized, frame: { ...resized.frame, preset: key } };
       })
     }));
   }
@@ -5001,6 +5392,11 @@ function ProductDesignPanel() {
     }
     setSelIds(ids);
     const allEntries = collectElementEntries(page.elements);
+    const primary = allEntries.find((entry) => entry.el.id === el.id);
+    if (primary && ids.length === 1 && primary.parent && primary.parent.layout?.mode === "stack") {
+      startStackDrag(ev, page, primary, docRef.current);
+      return;
+    }
     const entries = ids.map((id) => allEntries.find((entry) => entry.el.id === id)).filter(Boolean);
     const top = entries.filter((entry) => !isUnderAny(entry, ids));
     if (!top.length) return;
@@ -5093,6 +5489,63 @@ function ProductDesignPanel() {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   }
+  function startStackDrag(ev, page, entry, before) {
+    const parent = entry.parent;
+    const row = parent.layout.direction === "row";
+    const startMain = row ? entry.absX + entry.w / 2 : entry.absY + entry.h / 2;
+    const sx = ev.clientX;
+    const sy = ev.clientY;
+    let changed = false;
+    const move = (e2) => {
+      const zoomNow = zoomRef.current || 1;
+      const dx = (e2.clientX - sx) / zoomNow;
+      const dy = (e2.clientY - sy) / zoomNow;
+      const pointer = startMain + (row ? dx : dy);
+      const live = docRef.current.pages.find((p) => p.id === page.id);
+      if (!live) return;
+      const liveParent = findElementEntry(live.elements, parent.id);
+      if (!liveParent) return;
+      const kids = liveParent.el.children || [];
+      const others = kids.filter((kid) => kid.id !== entry.el.id);
+      const parentAbs = row ? liveParent.absX : liveParent.absY;
+      let index = 0;
+      for (const kid of others) {
+        const center = parentAbs + (row ? kid.x + kid.w / 2 : kid.y + kid.h / 2);
+        if (center < pointer) index += 1;
+      }
+      const currentIndex = kids.findIndex((kid) => kid.id === entry.el.id);
+      if (index === currentIndex) return;
+      changed = true;
+      setDoc(
+        (d) => ({
+          ...d,
+          pages: d.pages.map((p) => {
+            if (p.id !== page.id) return p;
+            return {
+              ...p,
+              elements: mapTree(p.elements, (node) => {
+                if (node.id !== parent.id) return node;
+                const list = (node.children || []).slice();
+                const from = list.findIndex((kid) => kid.id === entry.el.id);
+                if (from === -1) return node;
+                const [item] = list.splice(from, 1);
+                list.splice(Math.max(0, Math.min(list.length, index)), 0, item);
+                return { ...node, children: list };
+              })
+            };
+          })
+        }),
+        false
+      );
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      if (changed && docRef.current !== before) pushPastSnapshot(before);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  }
   function reparentElement(elId, containerId) {
     let changed = false;
     setDoc((d) => {
@@ -5138,6 +5591,7 @@ function ProductDesignPanel() {
     const oh = entry.h;
     const parentAbsX = absX - el.x;
     const parentAbsY = absY - el.y;
+    const startChildren = Array.isArray(entry.el.children) ? entry.el.children : null;
     const exclude = /* @__PURE__ */ new Set([el.id, ...descendantIds(el)]);
     const targets = snapTargets(page, exclude);
     let moved = false;
@@ -5172,15 +5626,24 @@ function ProductDesignPanel() {
         setGuides([]);
       }
       moved = true;
+      const nextW = Math.round(next.w);
+      const nextH = Math.round(next.h);
       mapEl(
         el.id,
-        (cur) => ({
-          ...cur,
-          x: Math.round(next.x - parentAbsX),
-          y: Math.round(next.y - parentAbsY),
-          w: Math.round(next.w),
-          h: Math.round(next.h)
-        }),
+        (cur) => {
+          const box = {
+            ...cur,
+            x: Math.round(next.x - parentAbsX),
+            y: Math.round(next.y - parentAbsY),
+            w: nextW,
+            h: nextH
+          };
+          if (!startChildren) return box;
+          return {
+            ...box,
+            children: startChildren.map((child) => resizeElement(child, ow, oh, nextW, nextH))
+          };
+        },
         false
       );
     };
@@ -5511,8 +5974,8 @@ function ProductDesignPanel() {
         selCount: selEntries.length,
         activePage,
         pageState,
-        scaleOnResize,
-        setScaleOnResize,
+        resizeMode,
+        setResizeMode,
         fitContentToFrame,
         setEl,
         applyAttrs,

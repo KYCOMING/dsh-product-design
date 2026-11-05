@@ -87,7 +87,7 @@ describe('host 文档 reducer', () => {
     expect(results[3].pageId).toBe(doc.pages[1].id);
   });
 
-  it('set_page_frame 按宽高比例缩放内容，可用 scaleElements 关闭', () => {
+  it('set_page_frame 默认按约束重排，resizeMode:scale 才整体缩放', () => {
     const { doc } = applyOps(emptyDoc(), [
       { kind: 'add_page', preset: 'desktop' },
       {
@@ -99,29 +99,38 @@ describe('host 文档 reducer', () => {
         h: 60,
         props: { fontSize: 20 },
       },
+      { kind: 'add_element', type: 'navbar', x: 0, y: 0, w: 1280, h: 56 },
     ]);
     const pageId = doc.pages[0].id;
-    const before = doc.pages[0].elements[0];
-    const shrunk = applyOps(doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
-    const after = shrunk.pages[0].elements[0];
+    const button = doc.pages[0].elements[0];
+    const nav = doc.pages[0].elements[1];
+
+    const constrained = applyOps(doc, [{ kind: 'set_page_frame', pageId, preset: 'mobile' }]).doc;
+    expect(constrained.pages[0].frame).toMatchObject({ w: 390, h: 844 });
+    // button defaults to left/top: untouched
+    expect(constrained.pages[0].elements[0]).toMatchObject({
+      x: button.x,
+      y: button.y,
+      w: button.w,
+      h: button.h,
+    });
+    // navbar defaults to left/right: stretches with the frame
+    expect(constrained.pages[0].elements[1].w).toBe(390);
+    expect(nav.w).toBe(1280);
+
+    const scaled = applyOps(doc, [
+      { kind: 'set_page_frame', pageId, preset: 'mobile', resizeMode: 'scale' },
+    ]).doc;
     const sx = 390 / 1280;
     const sy = 844 / 800;
-    expect(shrunk.pages[0].frame).toMatchObject({ w: 390, h: 844, preset: 'mobile' });
-    expect(after.w).toBe(Math.max(12, Math.round(before.w * sx)));
-    expect(after.h).toBe(Math.max(8, Math.round(before.h * sy)));
-    expect(after.x).toBe(Math.round(before.x * sx));
-    expect(after.y).toBe(Math.round(before.y * sy));
-    expect(after.props.fontSize).toBe(Math.max(8, Math.round(20 * Math.min(sx, sy))));
+    expect(scaled.pages[0].elements[0].w).toBe(Math.max(12, Math.round(button.w * sx)));
+    expect(scaled.pages[0].elements[0].h).toBe(Math.max(8, Math.round(button.h * sy)));
 
     const kept = applyOps(doc, [
-      { kind: 'set_page_frame', pageId, preset: 'mobile', scaleElements: false },
+      { kind: 'set_page_frame', pageId, preset: 'mobile', resizeMode: 'none' },
     ]).doc;
-    expect(kept.pages[0].elements[0]).toMatchObject({
-      x: before.x,
-      y: before.y,
-      w: before.w,
-      h: before.h,
-    });
+    expect(kept.pages[0].elements[0]).toMatchObject({ x: button.x, w: button.w, h: button.h });
+    expect(kept.pages[0].elements[1].w).toBe(nav.w);
   });
 
   it('duplicate_page 深拷贝并分配新 id', () => {
