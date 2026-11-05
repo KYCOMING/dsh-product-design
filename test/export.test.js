@@ -167,6 +167,16 @@ describe('PNG 渲染输入', () => {
     expect(svg).toContain('欢迎');
   });
 
+  it('SVG 必须是合法 XML（引号/& 不能破坏 style 属性）', () => {
+    const tricky = doc();
+    tricky.pages[0].elements[0].props.text = '引号 " 与 & 与 <b>';
+    const svg = buildSvg(tricky.pages[0], { t }, 2);
+    const dom = new JSDOM();
+    const parsed = new dom.window.DOMParser().parseFromString(svg, 'image/svg+xml');
+    expect(parsed.querySelector('parsererror')).toBeNull();
+    expect(svg).toContain('&amp;');
+  });
+
   it('页面渲染带固定尺寸与背景', () => {
     const html = renderPage(doc().pages[0], { t });
     expect(html).toContain('width:390px');

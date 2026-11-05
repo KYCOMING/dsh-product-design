@@ -409,6 +409,8 @@ var DICT = {
     "export.png2x": "PNG \u56FE\u7247\uFF082\xD7\uFF09",
     "export.html": "HTML \u539F\u578B\uFF08\u5355\u6587\u4EF6\uFF09",
     "export.react": "React + Tailwind",
+    "export.done": "\u5DF2\u5BFC\u51FA",
+    "export.failed": "\u5BFC\u51FA\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5",
     "frame.title": "\u753B\u5E03\u5C3A\u5BF8",
     "frame.mobile": "\u624B\u673A 390\xD7844",
     "frame.tablet": "\u5E73\u677F 768\xD71024",
@@ -605,6 +607,8 @@ var DICT = {
     "export.png2x": "PNG image (2\xD7)",
     "export.html": "HTML prototype (single file)",
     "export.react": "React + Tailwind",
+    "export.done": "Exported",
+    "export.failed": "Export failed, please retry",
     "frame.title": "Frame size",
     "frame.mobile": "Phone 390\xD7844",
     "frame.tablet": "Tablet 768\xD71024",
@@ -3114,13 +3118,13 @@ function box(el, style, inner, attrs = "") {
   return `<div data-el="${escapeHtml(el.id)}"${attrs} style="${css(merged)}">${inner}</div>`;
 }
 function dots() {
-  return '<svg width="18" height="18" viewBox="0 0 16 16" fill="#6b7280" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16" fill="#6b7280" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg>';
 }
 function imageIcon() {
-  return '<svg width="38%" height="38%" viewBox="0 0 24 24" fill="none" stroke="#b3b9c6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="38%" height="38%" viewBox="0 0 24 24" fill="none" stroke="#b3b9c6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>';
 }
 function chevron() {
-  return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6b7280" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6b7280" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>';
 }
 function renderElement(el, ctx) {
   if (!el || el.hidden) return "";
@@ -3253,7 +3257,7 @@ function renderElement(el, ctx) {
   }
   if (el.type === "checkbox") {
     const checked = state === "checked";
-    const inner = `<span class="box" style="width:20px;height:20px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:${checked ? acc : "#fff"};border:1.5px solid ${checked ? acc : "#c9ccd4"}"><svg class="tick" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:${checked ? 1 : 0}"><path d="M2 6l2.5 2.5L10 3"/></svg></span><span style="font-size:13.5px;color:#333a45;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(p.text || t("sample.checkbox"))}</span>`;
+    const inner = `<span class="box" style="width:20px;height:20px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:${checked ? acc : "#fff"};border:1.5px solid ${checked ? acc : "#c9ccd4"}"><svg xmlns="http://www.w3.org/2000/svg" class="tick" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:${checked ? 1 : 0}"><path d="M2 6l2.5 2.5L10 3"/></svg></span><span style="font-size:13.5px;color:#333a45;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(p.text || t("sample.checkbox"))}</span>`;
     return box(
       el,
       { display: "flex", alignItems: "center", gap: "8px", overflow: "hidden", "--on": acc },
@@ -3489,14 +3493,17 @@ function buildHtml(doc, ctx) {
 }
 
 // src/client/export/png.js
-var FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
+var FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
 function buildSvg(page, ctx, scale = 2) {
   const frame = page.frame || { w: 390, h: 844, background: "#ffffff" };
   const w = Math.max(1, Math.round(frame.w));
   const h2 = Math.max(1, Math.round(frame.h));
   const factor = Math.max(1, Math.min(4, Number(scale) || 1));
   const body = renderPageBody(page, { ...ctx, raster: true });
-  const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:${w}px;height:${h2}px;overflow:hidden;background:${escapeHtml(frame.background || "#ffffff")};font-family:${FONT}">${body}</div>`;
+  const style = escapeHtml(
+    `position:relative;width:${w}px;height:${h2}px;overflow:hidden;background:${frame.background || "#ffffff"};font-family:${FONT}`
+  );
+  const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="${style}">${body}</div>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w * factor}" height="${h2 * factor}" viewBox="0 0 ${w} ${h2}"><foreignObject x="0" y="0" width="${w}" height="${h2}">${html}</foreignObject></svg>`;
 }
 async function renderPagePng(page, ctx, scale = 2) {
@@ -3514,7 +3521,12 @@ async function renderPagePng(page, ctx, scale = 2) {
   const svg = buildSvg(page, ctx, factor);
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
   try {
-    const image = await loadImage(url);
+    let image;
+    try {
+      image = await loadImage(url);
+    } catch {
+      image = await loadImage("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg));
+    }
     const canvas = document.createElement("canvas");
     canvas.width = w * factor;
     canvas.height = h2 * factor;
@@ -5086,7 +5098,9 @@ var CSS2 = [
   ".dpd-exportMenu{position:relative;display:inline-flex}",
   ".dpd-exportPop{position:absolute;right:0;top:calc(100% + 6px);z-index:300;min-width:190px;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:9px;box-shadow:0 10px 30px rgba(17,24,39,.16);padding:4px;display:flex;flex-direction:column}",
   ".dpd-exportPop button{border:none;background:transparent;color:var(--dsw-alias-label-primary,#111);font:inherit;font-size:12px;text-align:left;padding:7px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}",
-  ".dpd-exportPop button:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}"
+  ".dpd-exportPop button:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
+  ".dpd-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:500;background:rgba(17,24,39,.88);color:#fff;font-size:12px;padding:8px 14px;border-radius:999px;box-shadow:0 8px 24px rgba(17,24,39,.25);pointer-events:none}",
+  ".dpd-toast.err{background:rgba(229,72,77,.94)}"
 ].join("\n");
 function StyleBlock() {
   return h("style", { dangerouslySetInnerHTML: { __html: CSS2 } });
@@ -6991,6 +7005,7 @@ function ProductDesignPanel() {
   const spaceRef = useRef(false);
   const [layerQuery, setLayerQuery] = useState2("");
   const [ctxMenu, setCtxMenu] = useState2(null);
+  const [toast, setToast] = useState2(null);
   const resetTransientRef = useRef(() => {
   });
   const adoptRef = useRef(() => {
@@ -7016,7 +7031,16 @@ function ProductDesignPanel() {
     setSelIds,
     resizeMode: prefs.resizeMode
   });
-  const exporter = useExport({ doc, activePage, t });
+  const exporter = useExport({
+    doc,
+    activePage,
+    t,
+    onStatus: (ok, error) => setToast({
+      ok,
+      message: t(ok ? "export.done" : "export.failed"),
+      detail: error && error.message
+    })
+  });
   const clipboard = useClipboard({
     docRef,
     setDoc,
@@ -7125,6 +7149,11 @@ function ProductDesignPanel() {
       else exitPreview();
     }
   });
+  useEffect2(() => {
+    if (!toast) return void 0;
+    const timer = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(timer);
+  }, [toast]);
   useEffect2(() => {
     if (!ctxMenu) return void 0;
     const close = () => setCtxMenu(null);

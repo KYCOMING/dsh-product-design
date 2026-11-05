@@ -51,15 +51,15 @@ function box(el, style, inner, attrs = '') {
 }
 
 function dots() {
-  return '<svg width="18" height="18" viewBox="0 0 16 16" fill="#6b7280" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16" fill="#6b7280" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg>';
 }
 
 function imageIcon() {
-  return '<svg width="38%" height="38%" viewBox="0 0 24 24" fill="none" stroke="#b3b9c6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="38%" height="38%" viewBox="0 0 24 24" fill="none" stroke="#b3b9c6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>';
 }
 
 function chevron() {
-  return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6b7280" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6b7280" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>';
 }
 
 /** Render one element (and its subtree) to a positioned HTML fragment. */
@@ -208,7 +208,7 @@ export function renderElement(el, ctx) {
 
   if (el.type === 'checkbox') {
     const checked = state === 'checked';
-    const inner = `<span class="box" style="width:20px;height:20px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:${checked ? acc : '#fff'};border:1.5px solid ${checked ? acc : '#c9ccd4'}"><svg class="tick" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:${checked ? 1 : 0}"><path d="M2 6l2.5 2.5L10 3"/></svg></span><span style="font-size:13.5px;color:#333a45;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(p.text || t('sample.checkbox'))}</span>`;
+    const inner = `<span class="box" style="width:20px;height:20px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:${checked ? acc : '#fff'};border:1.5px solid ${checked ? acc : '#c9ccd4'}"><svg xmlns="http://www.w3.org/2000/svg" class="tick" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:${checked ? 1 : 0}"><path d="M2 6l2.5 2.5L10 3"/></svg></span><span style="font-size:13.5px;color:#333a45;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(p.text || t('sample.checkbox'))}</span>`;
     return box(
       el,
       { display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', '--on': acc },

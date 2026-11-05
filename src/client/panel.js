@@ -35,6 +35,7 @@ function ProductDesignPanel() {
   const spaceRef = useRef(false);
   const [layerQuery, setLayerQuery] = useState('');
   const [ctxMenu, setCtxMenu] = useState(null);
+  const [toast, setToast] = useState(null);
 
   // The document hook owns history + Host sync. Its session-reset / remote
   // callbacks need setters that live in later hooks, so route them via refs.
@@ -66,7 +67,17 @@ function ProductDesignPanel() {
     resizeMode: prefs.resizeMode,
   });
 
-  const exporter = useExport({ doc, activePage, t });
+  const exporter = useExport({
+    doc,
+    activePage,
+    t,
+    onStatus: (ok, error) =>
+      setToast({
+        ok,
+        message: t(ok ? 'export.done' : 'export.failed'),
+        detail: error && error.message,
+      }),
+  });
   const clipboard = useClipboard({
     docRef,
     setDoc,
@@ -181,6 +192,12 @@ function ProductDesignPanel() {
       else exitPreview();
     },
   });
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // Close the context menu on any outside press.
   useEffect(() => {

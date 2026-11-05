@@ -24,6 +24,9 @@
 - **Host 新操作**：`duplicate_page`、`set_active_page`、`set_page_states`、`move_element`（换父容器且保持屏幕位置）、`reorder_element`（front/back/forward/backward）；`update_element` 支持 `name/hidden/locked/opacity/interactions`。
 - 新增回归测试：就地编辑、图层显隐、剪贴板、右键删除、原型跳转/弹层、AI 改动撤销。
 
+### Fixed
+- 修复导出 PNG 无反应：`font-family` 里的双引号破坏了 SVG `style` 属性，导致生成的 SVG 不是合法 XML、图片加载失败且异常被静默吞掉。改为单引号 + 属性转义，补充 SVG XML 合法性回归测试；导出成功/失败现在会显示提示。
+
 ### Changed
 - **清理死代码**：删除 `childrenOf`、`stackParentOf`、`PAGE_STATES`、`RESIZE_MODES`、`sameBox` 等未被引用的声明；把 26 个仅内部使用的导出收口为非导出；清理 30+ 处未使用的 `catch` 绑定、未使用导入/变量与未使用的默认导出。审计结果：无未被引用的文件、i18n key、CSS 选择器或图标。
 - **构建产物标记**：`index.js` / `client.js` 文件头加 `AUTO-GENERATED` 横幅，新增 `.gitattributes` 标记为 generated，避免被误认为手写源码。
