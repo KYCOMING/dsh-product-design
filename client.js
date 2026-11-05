@@ -272,8 +272,6 @@ var DICT = {
     "toolbar.preview": "\u9884\u89C8",
     "toolbar.edit": "\u7F16\u8F91",
     "toolbar.exitPreview": "\u9000\u51FA\u9884\u89C8 (Esc)",
-    "toolbar.reset": "\u91CD\u7F6E",
-    "toolbar.resetConfirm": "\u786E\u5B9A\u91CD\u7F6E\u4E3A\u793A\u4F8B\u8BBE\u8BA1\uFF1F\u5F53\u524D\u6240\u6709\u9875\u9762\u5C06\u88AB\u6E05\u7A7A\u3002",
     "toolbar.saved": "\u5DF2\u81EA\u52A8\u4FDD\u5B58",
     "toolbar.undo": "\u64A4\u9500 (\u2318Z)",
     "toolbar.redo": "\u91CD\u505A (\u21E7\u2318Z)",
@@ -388,8 +386,6 @@ var DICT = {
     "toolbar.preview": "Preview",
     "toolbar.edit": "Edit",
     "toolbar.exitPreview": "Exit preview (Esc)",
-    "toolbar.reset": "Reset",
-    "toolbar.resetConfirm": "Reset to the sample design? All pages will be cleared.",
     "toolbar.saved": "Auto-saved",
     "toolbar.undo": "Undo (\u2318Z)",
     "toolbar.redo": "Redo (\u21E7\u2318Z)",
@@ -1400,7 +1396,6 @@ var IconEye = () => h(
   h("circle", { cx: 8, cy: 8, r: 1.8 })
 );
 var IconPencil = () => h(Svg, null, h("path", { d: "M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z" }));
-var IconReset = () => h(Svg, null, h("path", { d: "M3 8a5 5 0 1 0 1.6-3.7M3 3.2V6h2.8" }));
 var IconTrash = () => h(Svg, null, h("path", { d: "M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4" }));
 var IconCopy = () => h(
   Svg,
@@ -2926,7 +2921,6 @@ function ToolbarView(props) {
     setZoom,
     preview,
     setPreview,
-    resetDoc,
     undo,
     redo,
     canUndo,
@@ -3044,7 +3038,7 @@ function ToolbarView(props) {
     ),
     h(
       "button",
-      { className: "dpd-zoom", type: "button", title: "\u91CD\u7F6E\u4E3A 100%", onClick: () => setZoom(1) },
+      { className: "dpd-zoom", type: "button", title: "\u7F29\u653E\u81F3 100%", onClick: () => setZoom(1) },
       Math.round(zoom * 100) + "%"
     ),
     h(
@@ -3069,11 +3063,6 @@ function ToolbarView(props) {
       },
       h(preview ? IconPencil : IconEye),
       preview ? t("toolbar.edit") : t("toolbar.preview")
-    ),
-    h(
-      "button",
-      { className: "dpd-iconbtn", type: "button", title: t("toolbar.reset"), onClick: resetDoc },
-      h(IconReset)
     ),
     h("span", { className: "dpd-saved" }, t("toolbar.saved"))
   );
@@ -3769,14 +3758,6 @@ function ProductDesignPanel() {
       pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, false) }))
     }));
   }
-  function resetDoc() {
-    if (window.confirm(t("toolbar.resetConfirm"))) {
-      setDoc(defaultDoc(t));
-      setSelIds([]);
-      setPageState("normal");
-      setPreview(false);
-    }
-  }
   function elementsBounds(elements) {
     if (!Array.isArray(elements) || elements.length === 0) return null;
     let minX = Infinity;
@@ -4353,7 +4334,6 @@ function ProductDesignPanel() {
       setZoom,
       preview,
       setPreview,
-      resetDoc,
       undo,
       redo,
       canUndo,

@@ -35,7 +35,6 @@ const IconEye = () =>
     h('circle', { cx: 8, cy: 8, r: 1.8 }),
   );
 const IconPencil = () => h(Svg, null, h('path', { d: 'M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z' }));
-const IconReset = () => h(Svg, null, h('path', { d: 'M3 8a5 5 0 1 0 1.6-3.7M3 3.2V6h2.8' }));
 const IconTrash = () => h(Svg, null, h('path', { d: 'M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4' }));
 const IconCopy = () =>
   h(
@@ -150,7 +149,6 @@ export {
   IconPencil,
   IconPlus,
   IconRedo,
-  IconReset,
   IconTrash,
   IconUndo,
   libGlyph,

@@ -779,14 +779,6 @@ function ProductDesignPanel() {
       pages: d.pages.map((p) => ({ ...p, elements: reorderInTree(p.elements, selId, false) })),
     }));
   }
-  function resetDoc() {
-    if (window.confirm(t('toolbar.resetConfirm'))) {
-      setDoc(defaultDoc(t));
-      setSelIds([]);
-      setPageState('normal');
-      setPreview(false);
-    }
-  }
   /** Bounding box of a page's root elements (empty page → null). */
   function elementsBounds(elements) {
     if (!Array.isArray(elements) || elements.length === 0) return null;
@@ -1403,7 +1395,6 @@ function ProductDesignPanel() {
           setZoom,
           preview,
           setPreview,
-          resetDoc,
           undo,
           redo,
           canUndo,

@@ -5,7 +5,6 @@ import {
   IconPencil,
   IconPlus,
   IconRedo,
-  IconReset,
   IconUndo,
 } from '../icons.js';
 import { h } from '../react.js';
@@ -30,7 +29,6 @@ export function ToolbarView(props) {
     setZoom,
     preview,
     setPreview,
-    resetDoc,
     undo,
     redo,
     canUndo,
@@ -149,7 +147,7 @@ export function ToolbarView(props) {
     ),
     h(
       'button',
-      { className: 'dpd-zoom', type: 'button', title: '重置为 100%', onClick: () => setZoom(1) },
+      { className: 'dpd-zoom', type: 'button', title: '缩放至 100%', onClick: () => setZoom(1) },
       Math.round(zoom * 100) + '%',
     ),
     h(
@@ -174,11 +172,6 @@ export function ToolbarView(props) {
       },
       h(preview ? IconPencil : IconEye),
       preview ? t('toolbar.edit') : t('toolbar.preview'),
-    ),
-    h(
-      'button',
-      { className: 'dpd-iconbtn', type: 'button', title: t('toolbar.reset'), onClick: resetDoc },
-      h(IconReset),
     ),
     h('span', { className: 'dpd-saved' }, t('toolbar.saved')),
   );
