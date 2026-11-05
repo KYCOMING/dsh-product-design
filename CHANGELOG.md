@@ -22,6 +22,7 @@
 - 新增回归测试：就地编辑、图层显隐、剪贴板、右键删除、原型跳转/弹层、AI 改动撤销。
 
 ### Changed
+- **工程结构重构（无行为变化）**：客户端按 `domain/`（纯文档变换，无 React/DOM）→ `editor/`（状态与行为 hooks，一个关注点一个文件）→ `ui/`（纯展示）→ `panel.js`（组合根，1964 → 448 行）分层；Host 拆为 `paths / store / http / tools / preview / prompt / command / model` 八个模块，`index.js` 只做装配。新增的编辑命令按「domain 纯变换 → editor 命令 → ui 调用」添加。
 - **文档格式升到 v3（破坏性，不做兼容）**：元素新增 `name / hidden / locked / opacity / interactions`，页面新增 `states`；localStorage 键改为 `dsh-product-design:doc:v3`。移除 v1→v2 迁移、半宽文档自愈 `repairDoc`、旧全局 `doc.json` 迁移等全部兼容代码。
 - **「缩放内容以适配画板」**：右侧「画布设置」新增按钮，把内容按包围盒缩放并平移回铺满画板，用于修复已经卡在角落的设计稿。
 - **切画板尺寸默认按约束重排**：`set_page_frame` 与画板预设默认使用 `resizeMode: 'constraints'`；右侧「画布设置」可在「按约束 / 整体缩放 / 保持不变」之间切换，记忆到 UI 偏好。

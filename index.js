@@ -1,7 +1,191 @@
-// src/host/index.js
+// src/host/command.js
+function newUserMessage(text) {
+  const id = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `u${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    id,
+    role: "user",
+    content: [{ type: "text", text }],
+    source: { kind: "user" }
+  };
+}
+function registerDesignCommand(ctx) {
+  const install = (scope) => {
+    const commands = scope && scope.commands || ctx.get("commands");
+    if (!commands || typeof commands.register !== "function") return;
+    const register = () => commands.register({
+      name: "design",
+      description: "\u63D0\u4EA4\u4EA7\u54C1\u8BBE\u8BA1\u9700\u6C42\uFF0C\u8BA9 AI \u5728\u753B\u5E03\u4E0A\u751F\u6210\u6216\u4FEE\u6539\u8BBE\u8BA1",
+      input: { hint: "<\u9700\u6C42>" },
+      recordInput: false,
+      handler: ({ agent, rawInput }) => {
+        const text = String(rawInput || "").trim();
+        if (!text) return { kind: "error", text: "\u7528\u6CD5\uFF1A/design <\u4F60\u7684\u4EA7\u54C1\u8BBE\u8BA1\u9700\u6C42>" };
+        if (!agent || typeof agent.followup !== "function") {
+          return { kind: "error", text: "\u5F53\u524D\u4F1A\u8BDD\u4E0D\u652F\u6301\u76F4\u63A5\u63D0\u4EA4\u9700\u6C42\u3002" };
+        }
+        agent.followup(newUserMessage(text));
+        return {
+          kind: "success",
+          text: "\u5DF2\u63D0\u4EA4\u8BBE\u8BA1\u9700\u6C42\uFF0CAI \u4F1A\u5728\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\u4E0A\u5F00\u59CB\u7ED8\u5236\u3002"
+        };
+      }
+    });
+    if (typeof scope.effect === "function") {
+      scope.effect(register, "dsh-product-design: /design command");
+    } else {
+      register();
+    }
+  };
+  if (typeof ctx.inject === "function") ctx.inject(["commands"], install);
+  else install(ctx);
+}
+
+// src/host/http.js
+var API_PREFIX = "/dsh-product-design/api";
+var MAX_BODY = 4 * 1024 * 1024;
+var HEARTBEAT_MS = 15e3;
+function writeJson(res, status, value) {
+  const body = JSON.stringify(value);
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    "content-length": Buffer.byteLength(body)
+  });
+  res.end(body);
+}
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY) {
+        reject(new Error("body-too-large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      const raw = Buffer.concat(chunks).toString("utf8");
+      if (!raw) return resolve({});
+      try {
+        resolve(JSON.parse(raw));
+      } catch {
+        reject(new Error("invalid-json"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+function makeHandler(ctx, stores) {
+  return async function handle(req, res) {
+    try {
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const pathname = url.pathname;
+      if (!pathname.startsWith(API_PREFIX)) {
+        writeJson(res, 404, { ok: false, error: "not-found" });
+        return;
+      }
+      try {
+        const connection = ctx.get("connection");
+        if (connection && typeof connection.requestRejection === "function") {
+          const rejection = connection.requestRejection(req);
+          if (rejection) {
+            res.writeHead(rejection);
+            res.end();
+            return;
+          }
+        }
+      } catch {
+      }
+      const sub = pathname.slice(API_PREFIX.length) || "/";
+      const querySessionId = url.searchParams.get("sessionId") || "";
+      if (sub === "/doc" && req.method === "GET") {
+        writeJson(res, 200, stores.forSession(querySessionId).snapshot());
+        return;
+      }
+      if (sub === "/doc" && req.method === "POST") {
+        const body = await readJson(req);
+        const store = stores.forSession(body?.sessionId || querySessionId);
+        const result = store.setDoc(body?.doc, body?.baseRevision);
+        writeJson(res, result.conflict ? 409 : 200, result);
+        return;
+      }
+      if (sub === "/apply" && req.method === "POST") {
+        const body = await readJson(req);
+        const store = stores.forSession(body?.sessionId || querySessionId);
+        const result = store.apply(body?.operations);
+        writeJson(res, 200, result);
+        return;
+      }
+      if (sub === "/events" && req.method === "GET") {
+        const store = stores.forSession(querySessionId);
+        res.writeHead(200, {
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-cache",
+          connection: "keep-alive"
+        });
+        const push = () => res.write(`data: ${JSON.stringify({ revision: store.snapshot().revision })}
+
+`);
+        const unsubscribe = store.subscribe(push);
+        const heartbeat = setInterval(() => {
+          try {
+            res.write(": ping\n\n");
+          } catch {
+          }
+        }, HEARTBEAT_MS);
+        const close = () => {
+          clearInterval(heartbeat);
+          unsubscribe();
+        };
+        req.once("close", close);
+        res.once("close", close);
+        push();
+        return;
+      }
+      writeJson(res, 404, { ok: false, error: "not-found" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      writeJson(res, message === "body-too-large" ? 413 : 400, { ok: false, error: message });
+    }
+  };
+}
+
+// src/host/prompt.js
+var GUIDANCE = [
+  "\u672C\u673A\u5DF2\u5B89\u88C5 dsh-product-design \u63D2\u4EF6\uFF1A\u4E00\u4E2A\u300C\u7B80\u5316\u7248 Figma\u300D\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\uFF0C\u5BBF\u4E3B\u6743\u5A01\u3002",
+  "\u6253\u5F00\u65B9\u5F0F\uFF1A\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u56FE\u6807\uFF1B\u6216\u76F4\u63A5\u7528 /design <\u9700\u6C42> \u8BA9 AI \u7ED8\u5236\u3002",
+  "\u6BCF\u4E2A\u4F1A\u8BDD\u62E5\u6709\u72EC\u7ACB\u8BBE\u8BA1\u7A3F\uFF1B\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528\u5DE5\u5177\u8BFB\u5199\u5F53\u524D\u4F1A\u8BDD\u7684\u753B\u5E03\uFF0C\u4E0D\u9700\u8981\u7528\u6237\u5148\u6253\u5F00\u9762\u677F\uFF1A",
+  "  product_design_get_document\uFF1A\u8BFB\u53D6\u9875\u9762/\u5143\u7D20/\u72B6\u6001\u3002",
+  "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / duplicate_page / set_active_page / set_page_frame / set_page_states / add_container / add_element / update_element / delete_element / move_element / reorder_element / group_elements / ungroup_elements / clear_page / set_document_name\uFF09\u3002",
+  "\u753B\u5E03\u5750\u6807\u539F\u70B9\u5728\u6BCF\u9875\u5DE6\u4E0A\u89D2\uFF1B\u9ED8\u8BA4\u624B\u673A\u9875 390\xD7844\u3002\u5143\u7D20\u7C7B\u578B\uFF1Acontainer, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select\u3002",
+  "\u5BB9\u5668\uFF08container\uFF09\u53EF\u4EE5\u5D4C\u5957\u5B50\u5143\u7D20\uFF1Aadd_element/add_container \u4F20 containerId \u5373\u53EF\u653E\u5165\u5BB9\u5668\uFF0C\u5B50\u5143\u7D20\u5750\u6807\u76F8\u5BF9\u5BB9\u5668\u5DE6\u4E0A\u89D2\uFF1B\u5BB9\u5668\u652F\u6301\u88C1\u526A\u5185\u5BB9\u3002move_element \u53EF\u628A\u5143\u7D20\u79FB\u5230\u53E6\u4E00\u4E2A\u5BB9\u5668\u3002",
+  "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u5BB9\u5668\u8FD8\u53EF\u4F20 name\u3001background\u3001clipContent\u3002\u5143\u7D20\u8FD8\u652F\u6301 name\uFF08\u56FE\u5C42\u540D\uFF09\u3001hidden\u3001locked\u3001opacity\u3001interactions\u3002",
+  'interactions \u662F\u539F\u578B\u8FDE\u7EBF\uFF1A[{ action: "navigate"|"back"|"openOverlay", targetPageId }]\u3002\u7ED9\u6309\u94AE\u52A0 navigate \u5C31\u80FD\u5728\u9884\u89C8\u91CC\u8D70\u901A\u6D41\u7A0B\u3002',
+  'constraints \u51B3\u5B9A\u753B\u677F/\u5BB9\u5668\u5C3A\u5BF8\u53D8\u5316\u65F6\u5143\u7D20\u600E\u4E48\u53D8\uFF1A{ h: "left"|"right"|"leftRight"|"center"|"scale", v: "top"|"bottom"|"topBottom"|"center"|"scale" }\u3002\u9ED8\u8BA4 left/top\uFF1Bnavbar\u3001tabs\u3001card\u3001image\u3001input\u3001container\u3001group \u9ED8\u8BA4\u5DE6\u53F3\u62C9\u4F38\u3002',
+  '\u5BB9\u5668\u4E0E\u7F16\u7EC4\u53EF\u4EE5\u5F00\u542F Auto Layout\uFF1Alayout { mode: "stack", direction: "row"|"column", gap, padding, align: "start"|"center"|"end"|"stretch", justify: "start"|"center"|"end"|"between" }\u3002\u5F00\u542F\u540E\u5B50\u5143\u7D20\u7684 x/y \u7531\u5E03\u5C40\u63A5\u7BA1\uFF0C\u987A\u5E8F\u5373\u6570\u7EC4\u987A\u5E8F\u3002',
+  'set_page_frame \u9ED8\u8BA4 resizeMode:"constraints"\uFF08\u6309\u7EA6\u675F\u91CD\u6392\uFF09\uFF1B\u4E5F\u652F\u6301 "scale"\uFF08\u6574\u4F53\u7F29\u653E\uFF09\u4E0E "none"\uFF08\u4FDD\u6301\u4E0D\u53D8\uFF09\u3002',
+  "\u9875\u9762\u7EA7\u72B6\u6001\u7528 set_page_states \u5199\u6587\u6848\uFF1Astates.loading.text\u3001states.empty.title/desc/action\u3001states.error.title/desc/action\u3002",
+  '\u72B6\u6001\u89C1\u5404\u7C7B\u578B\uFF08\u5982 button: default/hover/active/disabled\uFF09\u3002\u4E0D\u4F20 pageId \u65F6\u9ED8\u8BA4\u4F5C\u7528\u4E8E\u5F53\u524D\u6D3B\u52A8\u9875\uFF1Badd_page / duplicate_page \u4F1A\u628A\u65B0\u9875\u8BBE\u4E3A\u6D3B\u52A8\u9875\uFF0C\u6240\u4EE5\u300C\u5148 add_page \u518D add_element\u300D\u4F1A\u81EA\u7136\u843D\u5728\u65B0\u9875\u3002\u4E5F\u53EF\u7528 pageId:"@last" / pageIndex\uFF080\u57FA\uFF09\u663E\u5F0F\u6307\u5B9A\u3002',
+  "\u5F53\u7528\u6237\u63D0\u51FA\u4EA7\u54C1\u8BBE\u8BA1/\u539F\u578B\u9700\u6C42\u65F6\uFF1A\u5148 get_document\uFF0C\u518D\u7528\u4E00\u6B21 apply \u6279\u91CF\u642D\u597D\u9875\u9762\u4E0E\u5143\u7D20\uFF1B\u7ED3\u679C\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u5BF9\u8BDD\u5185\u7684\u4EA7\u54C1\u9884\u89C8\u5361\u7247\u91CC\uFF0C\u7528\u6237\u4E5F\u53EF\u70B9\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u67E5\u770B\u5B8C\u6574\u753B\u5E03\u3002"
+].join("\n");
+function registerPrompt(ctx) {
+  if (typeof ctx.inject !== "function") return;
+  ctx.inject(["systemPrompt", "tools"], (scope) => {
+    const prompt = scope && scope.systemPrompt || ctx.get("systemPrompt");
+    if (!prompt || typeof prompt.section !== "function") return;
+    scope.effect(
+      () => prompt.section({ name: "plugin:dsh-product-design", order: 160, text: GUIDANCE }),
+      "dsh-product-design: prompt section"
+    );
+  });
+}
+
+// src/host/store.js
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 // src/shared/elements.js
 var CONTAINER_TYPES = ["container", "group"];
@@ -821,28 +1005,9 @@ function summarizeDoc(rawDoc) {
   };
 }
 
-// src/host/index.js
-var API_PREFIX = "/dsh-product-design/api";
-var MAX_BODY = 4 * 1024 * 1024;
-var HEARTBEAT_MS = 15e3;
-var GUIDANCE = [
-  "\u672C\u673A\u5DF2\u5B89\u88C5 dsh-product-design \u63D2\u4EF6\uFF1A\u4E00\u4E2A\u300C\u7B80\u5316\u7248 Figma\u300D\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\uFF0C\u5BBF\u4E3B\u6743\u5A01\u3002",
-  "\u6253\u5F00\u65B9\u5F0F\uFF1A\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u56FE\u6807\uFF1B\u6216\u76F4\u63A5\u7528 /design <\u9700\u6C42> \u8BA9 AI \u7ED8\u5236\u3002",
-  "\u6BCF\u4E2A\u4F1A\u8BDD\u62E5\u6709\u72EC\u7ACB\u8BBE\u8BA1\u7A3F\uFF1B\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528\u5DE5\u5177\u8BFB\u5199\u5F53\u524D\u4F1A\u8BDD\u7684\u753B\u5E03\uFF0C\u4E0D\u9700\u8981\u7528\u6237\u5148\u6253\u5F00\u9762\u677F\uFF1A",
-  "  product_design_get_document\uFF1A\u8BFB\u53D6\u9875\u9762/\u5143\u7D20/\u72B6\u6001\u3002",
-  "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / duplicate_page / set_active_page / set_page_frame / set_page_states / add_container / add_element / update_element / delete_element / move_element / reorder_element / group_elements / ungroup_elements / clear_page / set_document_name\uFF09\u3002",
-  "\u753B\u5E03\u5750\u6807\u539F\u70B9\u5728\u6BCF\u9875\u5DE6\u4E0A\u89D2\uFF1B\u9ED8\u8BA4\u624B\u673A\u9875 390\xD7844\u3002\u5143\u7D20\u7C7B\u578B\uFF1Acontainer, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select\u3002",
-  "\u5BB9\u5668\uFF08container\uFF09\u53EF\u4EE5\u5D4C\u5957\u5B50\u5143\u7D20\uFF1Aadd_element/add_container \u4F20 containerId \u5373\u53EF\u653E\u5165\u5BB9\u5668\uFF0C\u5B50\u5143\u7D20\u5750\u6807\u76F8\u5BF9\u5BB9\u5668\u5DE6\u4E0A\u89D2\uFF1B\u5BB9\u5668\u652F\u6301\u88C1\u526A\u5185\u5BB9\u3002move_element \u53EF\u628A\u5143\u7D20\u79FB\u5230\u53E6\u4E00\u4E2A\u5BB9\u5668\u3002",
-  "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u5BB9\u5668\u8FD8\u53EF\u4F20 name\u3001background\u3001clipContent\u3002\u5143\u7D20\u8FD8\u652F\u6301 name\uFF08\u56FE\u5C42\u540D\uFF09\u3001hidden\u3001locked\u3001opacity\u3001interactions\u3002",
-  'interactions \u662F\u539F\u578B\u8FDE\u7EBF\uFF1A[{ action: "navigate"|"back"|"openOverlay", targetPageId }]\u3002\u7ED9\u6309\u94AE\u52A0 navigate \u5C31\u80FD\u5728\u9884\u89C8\u91CC\u8D70\u901A\u6D41\u7A0B\u3002',
-  'constraints \u51B3\u5B9A\u753B\u677F/\u5BB9\u5668\u5C3A\u5BF8\u53D8\u5316\u65F6\u5143\u7D20\u600E\u4E48\u53D8\uFF1A{ h: "left"|"right"|"leftRight"|"center"|"scale", v: "top"|"bottom"|"topBottom"|"center"|"scale" }\u3002\u9ED8\u8BA4 left/top\uFF1Bnavbar\u3001tabs\u3001card\u3001image\u3001input\u3001container\u3001group \u9ED8\u8BA4\u5DE6\u53F3\u62C9\u4F38\u3002',
-  '\u5BB9\u5668\u4E0E\u7F16\u7EC4\u53EF\u4EE5\u5F00\u542F Auto Layout\uFF1Alayout { mode: "stack", direction: "row"|"column", gap, padding, align: "start"|"center"|"end"|"stretch", justify: "start"|"center"|"end"|"between" }\u3002\u5F00\u542F\u540E\u5B50\u5143\u7D20\u7684 x/y \u7531\u5E03\u5C40\u63A5\u7BA1\uFF0C\u987A\u5E8F\u5373\u6570\u7EC4\u987A\u5E8F\u3002',
-  'set_page_frame \u9ED8\u8BA4 resizeMode:"constraints"\uFF08\u6309\u7EA6\u675F\u91CD\u6392\uFF09\uFF1B\u4E5F\u652F\u6301 "scale"\uFF08\u6574\u4F53\u7F29\u653E\uFF09\u4E0E "none"\uFF08\u4FDD\u6301\u4E0D\u53D8\uFF09\u3002',
-  "\u9875\u9762\u7EA7\u72B6\u6001\u7528 set_page_states \u5199\u6587\u6848\uFF1Astates.loading.text\u3001states.empty.title/desc/action\u3001states.error.title/desc/action\u3002",
-  '\u72B6\u6001\u89C1\u5404\u7C7B\u578B\uFF08\u5982 button: default/hover/active/disabled\uFF09\u3002\u4E0D\u4F20 pageId \u65F6\u9ED8\u8BA4\u4F5C\u7528\u4E8E\u5F53\u524D\u6D3B\u52A8\u9875\uFF1Badd_page / duplicate_page \u4F1A\u628A\u65B0\u9875\u8BBE\u4E3A\u6D3B\u52A8\u9875\uFF0C\u6240\u4EE5\u300C\u5148 add_page \u518D add_element\u300D\u4F1A\u81EA\u7136\u843D\u5728\u65B0\u9875\u3002\u4E5F\u53EF\u7528 pageId:"@last" / pageIndex\uFF080\u57FA\uFF09\u663E\u5F0F\u6307\u5B9A\u3002',
-  "\u5F53\u7528\u6237\u63D0\u51FA\u4EA7\u54C1\u8BBE\u8BA1/\u539F\u578B\u9700\u6C42\u65F6\uFF1A\u5148 get_document\uFF0C\u518D\u7528\u4E00\u6B21 apply \u6279\u91CF\u642D\u597D\u9875\u9762\u4E0E\u5143\u7D20\uFF1B\u7ED3\u679C\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u5BF9\u8BDD\u5185\u7684\u4EA7\u54C1\u9884\u89C8\u5361\u7247\u91CC\uFF0C\u7528\u6237\u4E5F\u53EF\u70B9\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u67E5\u770B\u5B8C\u6574\u753B\u5E03\u3002"
-].join("\n");
-var inject = ["webServer"];
+// src/host/paths.js
+import { homedir } from "node:os";
+import { join } from "node:path";
 function dshHome() {
   const raw = process.env.DSH_HOME;
   if (typeof raw === "string" && raw.trim() !== "") {
@@ -868,6 +1033,8 @@ function sessionDocFile(sessionId) {
     "doc.json"
   );
 }
+
+// src/host/store.js
 function createStores() {
   const stores = /* @__PURE__ */ new Map();
   return {
@@ -935,114 +1102,8 @@ function createStore(file) {
     }
   };
 }
-function writeJson(res, status, value) {
-  const body = JSON.stringify(value);
-  res.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store",
-    "content-length": Buffer.byteLength(body)
-  });
-  res.end(body);
-}
-function readJson(req) {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks = [];
-    req.on("data", (chunk) => {
-      size += chunk.length;
-      if (size > MAX_BODY) {
-        reject(new Error("body-too-large"));
-        req.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on("end", () => {
-      const raw = Buffer.concat(chunks).toString("utf8");
-      if (!raw) return resolve({});
-      try {
-        resolve(JSON.parse(raw));
-      } catch {
-        reject(new Error("invalid-json"));
-      }
-    });
-    req.on("error", reject);
-  });
-}
-function makeHandler(ctx, stores) {
-  return async function handle(req, res) {
-    try {
-      const url = new URL(req.url ?? "/", "http://localhost");
-      const pathname = url.pathname;
-      if (!pathname.startsWith(API_PREFIX)) {
-        writeJson(res, 404, { ok: false, error: "not-found" });
-        return;
-      }
-      try {
-        const connection = ctx.get("connection");
-        if (connection && typeof connection.requestRejection === "function") {
-          const rejection = connection.requestRejection(req);
-          if (rejection) {
-            res.writeHead(rejection);
-            res.end();
-            return;
-          }
-        }
-      } catch {
-      }
-      const sub = pathname.slice(API_PREFIX.length) || "/";
-      const querySessionId = url.searchParams.get("sessionId") || "";
-      if (sub === "/doc" && req.method === "GET") {
-        writeJson(res, 200, stores.forSession(querySessionId).snapshot());
-        return;
-      }
-      if (sub === "/doc" && req.method === "POST") {
-        const body = await readJson(req);
-        const store = stores.forSession(body?.sessionId || querySessionId);
-        const result = store.setDoc(body?.doc, body?.baseRevision);
-        writeJson(res, result.conflict ? 409 : 200, result);
-        return;
-      }
-      if (sub === "/apply" && req.method === "POST") {
-        const body = await readJson(req);
-        const store = stores.forSession(body?.sessionId || querySessionId);
-        const result = store.apply(body?.operations);
-        writeJson(res, 200, result);
-        return;
-      }
-      if (sub === "/events" && req.method === "GET") {
-        const store = stores.forSession(querySessionId);
-        res.writeHead(200, {
-          "content-type": "text/event-stream; charset=utf-8",
-          "cache-control": "no-cache",
-          connection: "keep-alive"
-        });
-        const push = () => res.write(`data: ${JSON.stringify({ revision: store.snapshot().revision })}
 
-`);
-        const unsubscribe = store.subscribe(push);
-        const heartbeat = setInterval(() => {
-          try {
-            res.write(": ping\n\n");
-          } catch {
-          }
-        }, HEARTBEAT_MS);
-        const close = () => {
-          clearInterval(heartbeat);
-          unsubscribe();
-        };
-        req.once("close", close);
-        res.once("close", close);
-        push();
-        return;
-      }
-      writeJson(res, 404, { ok: false, error: "not-found" });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      writeJson(res, message === "body-too-large" ? 413 : 400, { ok: false, error: message });
-    }
-  };
-}
+// src/host/preview.js
 function productPreviewMeta(store, results) {
   const snapshot = store.snapshot();
   const doc = ensureDoc(snapshot.doc ?? emptyDoc());
@@ -1065,6 +1126,8 @@ function productPreviewMeta(store, results) {
     revision: snapshot.revision
   };
 }
+
+// src/host/tools.js
 function sessionIdOf(exec) {
   return exec?.agent?.session?.header?.id || exec?.agent?.session?.id || exec?.agent?.id || exec?.sessionId || "";
 }
@@ -1158,46 +1221,9 @@ function applyTool(stores) {
     }
   };
 }
-function newUserMessage(text) {
-  const id = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `u${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  return {
-    id,
-    role: "user",
-    content: [{ type: "text", text }],
-    source: { kind: "user" }
-  };
-}
-function registerDesignCommand(ctx) {
-  const install = (scope) => {
-    const commands = scope && scope.commands || ctx.get("commands");
-    if (!commands || typeof commands.register !== "function") return;
-    const register = () => commands.register({
-      name: "design",
-      description: "\u63D0\u4EA4\u4EA7\u54C1\u8BBE\u8BA1\u9700\u6C42\uFF0C\u8BA9 AI \u5728\u753B\u5E03\u4E0A\u751F\u6210\u6216\u4FEE\u6539\u8BBE\u8BA1",
-      input: { hint: "<\u9700\u6C42>" },
-      recordInput: false,
-      handler: ({ agent, rawInput }) => {
-        const text = String(rawInput || "").trim();
-        if (!text) return { kind: "error", text: "\u7528\u6CD5\uFF1A/design <\u4F60\u7684\u4EA7\u54C1\u8BBE\u8BA1\u9700\u6C42>" };
-        if (!agent || typeof agent.followup !== "function") {
-          return { kind: "error", text: "\u5F53\u524D\u4F1A\u8BDD\u4E0D\u652F\u6301\u76F4\u63A5\u63D0\u4EA4\u9700\u6C42\u3002" };
-        }
-        agent.followup(newUserMessage(text));
-        return {
-          kind: "success",
-          text: "\u5DF2\u63D0\u4EA4\u8BBE\u8BA1\u9700\u6C42\uFF0CAI \u4F1A\u5728\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\u4E0A\u5F00\u59CB\u7ED8\u5236\u3002"
-        };
-      }
-    });
-    if (typeof scope.effect === "function") {
-      scope.effect(register, "dsh-product-design: /design command");
-    } else {
-      register();
-    }
-  };
-  if (typeof ctx.inject === "function") ctx.inject(["commands"], install);
-  else install(ctx);
-}
+
+// src/host/index.js
+var inject = ["webServer"];
 function registerTools(ctx, stores) {
   const install = (scope) => {
     const tools = scope && scope.tools || ctx.get("tools");
@@ -1222,17 +1248,6 @@ function registerTools(ctx, stores) {
   } else {
     install(ctx);
   }
-}
-function registerPrompt(ctx) {
-  if (typeof ctx.inject !== "function") return;
-  ctx.inject(["systemPrompt", "tools"], (scope) => {
-    const prompt = scope && scope.systemPrompt || ctx.get("systemPrompt");
-    if (!prompt || typeof prompt.section !== "function") return;
-    scope.effect(
-      () => prompt.section({ name: "plugin:dsh-product-design", order: 160, text: GUIDANCE }),
-      "dsh-product-design: prompt section"
-    );
-  });
 }
 function apply(ctx) {
   const stores = createStores();

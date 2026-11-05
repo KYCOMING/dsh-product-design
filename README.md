@@ -114,32 +114,49 @@ dsh plugin --profile desktop remove dsh-product-design
 ```text
 dsh-product-design/
 ├─ src/
-│  ├─ client/                 # 浏览器半（按职责拆分）
+│  ├─ client/                 # 浏览器半
 │  │  ├─ index.js             # 入口：apply(ctx) 注册 slot / locale / 对话内卡片
-│  │  ├─ react.js             # React 与 h 的极薄适配
-│  │  ├─ constants.js         # NS / PANEL_ID / 存储键 / 组件注册表 / GAP
-│  │  ├─ i18n.js              # DICT + useT / pickDict
-│  │  ├─ color.js             # 颜色工具
-│  │  ├─ widgets.js           # renderWidget：12 类组件 + 容器预览渲染
-│  │  ├─ icons.js             # 图标 + 侧边栏 glyph
-│  │  ├─ styles.js            # 画布 CSS
-│  │  ├─ model.js             # 文档模型 / localStorage / Host API 调用
+│  │  ├─ panel.js             # 组合根：只负责把 hooks 接到展示组件上（~450 行）
+│  │  ├─ domain/              # 纯逻辑：无 React、无 DOM，可单测
+│  │  │  ├─ tree.js           #   元素树不可变操作（增删改、复制、重挂载）
+│  │  │  └─ document.js       #   文档变换（页面/元素/粘贴/对齐/编组/缩放）
+│  │  ├─ editor/              # 行为层：React hooks，一个关注点一个文件
+│  │  │  ├─ useDocument.js    #   文档状态 + 撤销历史 + Host 同步（SSE/POST）
+│  │  │  ├─ useSelection.js   #   选区派生、批量属性、微移
+│  │  │  ├─ useEditorActions.js # 页面/元素/排列命令（调用 domain）
+│  │  │  ├─ useGestures.js    #   拖拽 / 缩放 / 框选 / 平移 / 磁吸 / 堆叠重排
+│  │  │  ├─ usePreview.js     #   预览栈、弹层、页面状态、交互态
+│  │  │  ├─ useClipboard.js   #   内部剪贴板
+│  │  │  ├─ useTextEditing.js #   就地编辑
+│  │  │  ├─ useKeyboard.js    #   全局快捷键映射
+│  │  │  ├─ useUiPrefs.js     #   zoom / 磁吸 / 面板宽度 / 尺寸策略
+│  │  │  └─ contextMenuItems.js # 右键菜单命令表
+│  │  ├─ ui/                  # 展示层：纯渲染 + 回调
+│  │  │  ├─ toolbar.js
+│  │  │  ├─ left.js           #   活动栏 + 页面/组件库/图层
+│  │  │  ├─ canvas.js         #   多画板画布 + 就地编辑器 + 弹层
+│  │  │  ├─ inspector.js      #   右侧属性面板
+│  │  │  └─ contextmenu.js
+│  │  ├─ react.js  constants.js  i18n.js  color.js  icons.js  styles.js
+│  │  ├─ model.js             # 文档归一化 / localStorage / Host API 调用
+│  │  ├─ widgets.js           # 组件渲染
 │  │  ├─ overlay.js           # 页面状态浮层
-│  │  ├─ panel.js             # 编辑器容器：状态 / 撤销历史 / 事件处理
-│  │  ├─ cards.js             # 对话内产品预览卡片（Visualize 风格）
-│  │  ├─ session.js           # 跟随当前会话的 active-session 订阅
-│  │  └─ ui/                  # 展示层子组件（纯渲染 + 回调）
-│  │     ├─ toolbar.js        #   顶部工具栏
-│  │     ├─ left.js           #   活动栏 + 页面/组件库/图层分区
-│  │     ├─ canvas.js         #   多画板画布
-│  │     └─ inspector.js      #   右侧属性面板
+│  │  ├─ cards.js             # 对话内产品预览卡片
+│  │  └─ session.js           # 跟随当前会话
 │  ├─ shared/                 # 浏览器 / Host 共用纯逻辑
-│  │  ├─ elements.js           #   元素树遍历、父子关系、包围盒、深拷贝
-│  │  ├─ layout.js             #   约束求解 + Auto Layout 重排（纯函数、结构共享）
-│  │  └─ snapping.js           #   磁吸几何（边缘/中心吸附 + 参考线）
+│  │  ├─ elements.js          #   元素树遍历、包围盒、深拷贝、缩放
+│  │  ├─ layout.js            #   约束求解 + Auto Layout 重排（结构共享）
+│  │  └─ snapping.js          #   磁吸几何
 │  └─ host/
-│     ├─ index.js             # Host 半：store / HTTP / agent 工具 / prompt
-│     └─ model.js             # Host 文档 reducer（纯函数，可单测）
+│     ├─ index.js             # 装配：注册 HTTP / tools / command / prompt
+│     ├─ paths.js             # 文件系统布局
+│     ├─ store.js             # 会话文档 + revision + 订阅
+│     ├─ http.js              # 同源 API 路由
+│     ├─ tools.js             # agent 工具
+│     ├─ preview.js           # 对话卡片描述
+│     ├─ prompt.js            # 模型提示
+│     ├─ command.js           # /design 命令
+│     └─ model.js             # 文档 reducer（纯函数）
 ├─ scripts/build.mjs          # esbuild：src → client.js + index.js
 ├─ client.js   index.js       # 构建产物（提交入库，loader 直接读；勿手改）
 ├─ cordis.patch.yml
@@ -151,7 +168,13 @@ dsh-product-design/
 
 - `client.js`：esbuild `format=cjs` 打包后，用 `window.__ModuleLoader__.load({ id, factory })` 包装；`react` 保持 external，由 loader 的 `require('react')` 注入。
 - `index.js`：esbuild 打 Node ESM（内联 `src/host/model.js`）。
-- 职责边界：`model.js` 只管文档/持久化；`widgets.js` 纯渲染；`i18n/constants/color` 无副作用；撤销/重做在 `panel.js`（`docRef` + `setDoc(mode)`）；`host/model.js` 是与 UI 无关的纯 reducer。
+- 分层约定：
+  - **domain/**：纯函数，输入输出都是文档对象，不依赖 React / DOM / 存储。改文档语义只改这里。
+  - **editor/**：React hooks，持有状态与副作用（历史、Host 同步、手势、预览），调用 domain。
+  - **ui/**：只接收 props 并渲染，不读文档、不发请求。
+  - **panel.js**：组合根，只做 hook 装配和布局。
+- `model.js` 负责归一化与持久化；`widgets.js` 纯渲染；`i18n/constants/color` 无副作用；`host/model.js` 是与 UI 无关的纯 reducer。
+- 新增一个编辑命令的路径：`domain/document.js` 写纯变换 → `editor/useEditorActions.js` 暴露命令 → `ui/*` 调用。
 
 ## AI 可编程画布（宿主权威）
 

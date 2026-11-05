@@ -21,7 +21,6 @@ import {
   descendantIds,
   findElementEntry,
   isContainerType,
-  moveElementInTree,
   reorderInTree,
 } from '../shared/elements.js';
 import { normalizeConstraints, normalizeLayout, reflowPage, resizePage } from '../shared/layout.js';
