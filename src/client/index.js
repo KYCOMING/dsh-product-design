@@ -3,7 +3,8 @@ import { NS, PANEL_ID } from './constants.js';
 import { activeLocale, DICT, pickDict, setAppCtx } from './i18n.js';
 import { ProductDesignPanel } from './panel.js';
 import { h } from './react.js';
-import { setSessionSource } from './session.js';
+import { setSessionSource, useSessionId } from './session.js';
+import { HeroDesignEntry } from './ui/heroEntry.js';
 
 export const inject = ['slots', 'layout'];
 
@@ -11,6 +12,8 @@ export const inject = ['slots', 'layout'];
 // renders (defining components inside apply would remount the whole editor).
 let openFullScreen = () => {};
 let backToConversation = () => {};
+// The hero button can open the canvas before the Session adapter is readable.
+let pendingSessionId = '';
 
 function ProductDesignView(props) {
   return h(ProductDesignPanel, {
@@ -21,7 +24,12 @@ function ProductDesignView(props) {
 }
 
 function ProductDesignMain() {
-  return h(ProductDesignPanel, { onCollapse: () => backToConversation() });
+  const adapterSessionId = useSessionId();
+  if (adapterSessionId) pendingSessionId = '';
+  return h(ProductDesignPanel, {
+    sessionId: adapterSessionId || pendingSessionId,
+    onCollapse: () => backToConversation(),
+  });
 }
 
 export function apply(ctx) {
@@ -111,6 +119,27 @@ export function apply(ctx) {
           key: PANEL_ID,
         },
         ProductDesignMain,
+      ),
+    ),
+  );
+
+  disposers.push(
+    slots.inject('conversation.hero.options', () =>
+      slots.register(
+        {
+          name: 'conversation.hero.options',
+          id: 'dsh-product-design.hero',
+          order: 10,
+          locale: NS,
+          inject: (sessionId) => ({
+            sessionId,
+            open: () => {
+              pendingSessionId = sessionId || '';
+              openFullScreen();
+            },
+          }),
+        },
+        HeroDesignEntry,
       ),
     ),
   );

@@ -44,7 +44,7 @@ function registerDesignCommand(ctx) {
 
 // src/host/http.js
 var API_PREFIX = "/dsh-product-design/api";
-var MAX_BODY = 4 * 1024 * 1024;
+var MAX_BODY = 16 * 1024 * 1024;
 var HEARTBEAT_MS = 15e3;
 function writeJson(res, status, value) {
   const body = JSON.stringify(value);
@@ -109,9 +109,59 @@ function makeHandler(ctx, stores) {
       }
       if (sub === "/doc" && req.method === "POST") {
         const body = await readJson(req);
-        const store = stores.forSession(body?.sessionId || querySessionId);
-        const result = store.setDoc(body?.doc, body?.baseRevision);
+        const sessionId = body?.sessionId || querySessionId;
+        const result = stores.forSession(sessionId).setDoc(body?.doc, body?.baseRevision, body?.docId);
         writeJson(res, result.conflict ? 409 : 200, result);
+        return;
+      }
+      if (sub === "/session/doc" && req.method === "POST") {
+        const body = await readJson(req);
+        const sessionId = body?.sessionId || querySessionId;
+        writeJson(res, 200, stores.forSession(sessionId).selectDoc(body?.docId));
+        return;
+      }
+      if (sub === "/docs" && req.method === "GET") {
+        writeJson(res, 200, stores.listDocs(querySessionId));
+        return;
+      }
+      if (sub === "/docs" && req.method === "POST") {
+        const body = await readJson(req);
+        const sessionId = body?.sessionId || querySessionId;
+        writeJson(res, 200, stores.createDocFor({ sessionId, name: body?.name, doc: body?.doc }));
+        return;
+      }
+      if (sub === "/docs/duplicate" && req.method === "POST") {
+        const body = await readJson(req);
+        writeJson(res, 200, stores.duplicateDoc(body?.docId, body?.name));
+        return;
+      }
+      if (sub === "/docs/rename" && req.method === "POST") {
+        const body = await readJson(req);
+        writeJson(res, 200, stores.renameDoc(body?.docId, body?.name));
+        return;
+      }
+      if (sub === "/docs/delete" && req.method === "POST") {
+        const body = await readJson(req);
+        writeJson(res, 200, stores.deleteDoc(body?.docId));
+        return;
+      }
+      if (sub === "/docs/import" && req.method === "POST") {
+        const body = await readJson(req);
+        writeJson(res, 200, stores.importDoc(body?.payload, body?.name));
+        return;
+      }
+      if (sub === "/docs/export" && req.method === "GET") {
+        const docId = url.searchParams.get("docId") || "";
+        const payload = stores.exportDoc(docId);
+        const body = JSON.stringify(payload);
+        const safeName = String(payload.doc?.name || "design").replace(/[^a-zA-Z0-9._\-\u4e00-\u9fa5 ]/g, "_").trim().slice(0, 60) || "design";
+        res.writeHead(200, {
+          "content-type": "application/json; charset=utf-8",
+          "content-disposition": `attachment; filename="${safeName}.json"`,
+          "cache-control": "no-store",
+          "content-length": Buffer.byteLength(body)
+        });
+        res.end(body);
         return;
       }
       if (sub === "/apply" && req.method === "POST") {
@@ -128,7 +178,7 @@ function makeHandler(ctx, stores) {
           "cache-control": "no-cache",
           connection: "keep-alive"
         });
-        const push = () => res.write(`data: ${JSON.stringify({ revision: store.snapshot().revision })}
+        const push = (revision, docId) => res.write(`data: ${JSON.stringify({ revision, docId })}
 
 `);
         const unsubscribe = store.subscribe(push);
@@ -144,7 +194,8 @@ function makeHandler(ctx, stores) {
         };
         req.once("close", close);
         res.once("close", close);
-        push();
+        const snap = store.snapshot();
+        push(snap.revision, snap.docId);
         return;
       }
       writeJson(res, 404, { ok: false, error: "not-found" });
@@ -158,20 +209,20 @@ function makeHandler(ctx, stores) {
 // src/host/prompt.js
 var GUIDANCE = [
   "\u672C\u673A\u5DF2\u5B89\u88C5 dsh-product-design \u63D2\u4EF6\uFF1A\u4E00\u4E2A\u300C\u7B80\u5316\u7248 Figma\u300D\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03\uFF0C\u5BBF\u4E3B\u6743\u5A01\u3002",
-  "\u6253\u5F00\u65B9\u5F0F\uFF1A\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u56FE\u6807\uFF1B\u6216\u76F4\u63A5\u7528 /design <\u9700\u6C42> \u8BA9 AI \u7ED8\u5236\u3002",
-  "\u6BCF\u4E2A\u4F1A\u8BDD\u62E5\u6709\u72EC\u7ACB\u8BBE\u8BA1\u7A3F\uFF1B\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528\u5DE5\u5177\u8BFB\u5199\u5F53\u524D\u4F1A\u8BDD\u7684\u753B\u5E03\uFF0C\u4E0D\u9700\u8981\u7528\u6237\u5148\u6253\u5F00\u9762\u677F\uFF1A",
+  "\u6253\u5F00\u65B9\u5F0F\uFF1A\u4F1A\u8BDD\u9876\u90E8\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u6807\u7B7E\uFF1B\u7A7A\u4F1A\u8BDD\u53EF\u7528\u8F93\u5165\u6846\u65C1\u7684\u300C\u6253\u5F00\u4EA7\u54C1\u8BBE\u8BA1\u300D\u5165\u53E3\uFF1B\u6216\u76F4\u63A5\u7528 /design <\u9700\u6C42> \u8BA9 AI \u7ED8\u5236\u3002",
+  "\u6BCF\u4E2A\u4F1A\u8BDD\u7ED1\u5B9A\u8BBE\u8BA1\u7A3F\u5E93\u4E2D\u7684\u4E00\u4EFD\u8BBE\u8BA1\u7A3F\uFF1B\u4F60\u53EF\u4EE5\u76F4\u63A5\u7528\u5DE5\u5177\u8BFB\u5199\u5F53\u524D\u4F1A\u8BDD\u7684\u753B\u5E03\uFF0C\u4E0D\u9700\u8981\u7528\u6237\u5148\u6253\u5F00\u9762\u677F\uFF1A",
   "  product_design_get_document\uFF1A\u8BFB\u53D6\u9875\u9762/\u5143\u7D20/\u72B6\u6001\u3002",
-  "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / duplicate_page / set_active_page / set_page_frame / set_page_states / add_container / add_element / update_element / delete_element / move_element / reorder_element / group_elements / ungroup_elements / clear_page / set_document_name\uFF09\u3002",
+  "  product_design_apply\uFF1A\u6309\u64CD\u4F5C\u589E\u5220\u6539\uFF08add_page / duplicate_page / set_active_page / set_page_frame / add_page_state / delete_page_state / add_container / add_element / update_element / delete_element / move_element / reorder_element / group_elements / ungroup_elements / clear_page / set_document_name\uFF09\u3002",
   "\u753B\u5E03\u5750\u6807\u539F\u70B9\u5728\u6BCF\u9875\u5DE6\u4E0A\u89D2\uFF1B\u9ED8\u8BA4\u624B\u673A\u9875 390\xD7844\u3002\u5143\u7D20\u7C7B\u578B\uFF1Acontainer, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select\u3002",
   "\u5BB9\u5668\uFF08container\uFF09\u53EF\u4EE5\u5D4C\u5957\u5B50\u5143\u7D20\uFF1Aadd_element/add_container \u4F20 containerId \u5373\u53EF\u653E\u5165\u5BB9\u5668\uFF0C\u5B50\u5143\u7D20\u5750\u6807\u76F8\u5BF9\u5BB9\u5668\u5DE6\u4E0A\u89D2\uFF1B\u5BB9\u5668\u652F\u6301\u88C1\u526A\u5185\u5BB9\u3002move_element \u53EF\u628A\u5143\u7D20\u79FB\u5230\u53E6\u4E00\u4E2A\u5BB9\u5668\u3002",
-  "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u5BB9\u5668\u8FD8\u53EF\u4F20 name\u3001background\u3001clipContent\u3002\u5143\u7D20\u8FD8\u652F\u6301 name\uFF08\u56FE\u5C42\u540D\uFF09\u3001hidden\u3001locked\u3001opacity\u3001interactions\u3002",
+  "props \u5E38\u7528\u952E\uFF1Atext\u3001color\u3001fontSize\u3001fontWeight\u3001radius\uFF1B\u56FE\u7247\uFF08image\uFF09\u7528 src\uFF08http(s) \u6216 data URL\uFF09+ fit\uFF08cover/contain/fill\uFF09\uFF1B\u5BB9\u5668\u8FD8\u53EF\u4F20 name\u3001background\u3001clipContent\u3002\u5143\u7D20\u8FD8\u652F\u6301 name\uFF08\u56FE\u5C42\u540D\uFF09\u3001hidden\u3001locked\u3001opacity\u3001interactions\u3002",
   'interactions \u662F\u539F\u578B\u8FDE\u7EBF\uFF1A[{ action: "navigate"|"back"|"openOverlay", targetPageId }]\u3002\u7ED9\u6309\u94AE\u52A0 navigate \u5C31\u80FD\u5728\u9884\u89C8\u91CC\u8D70\u901A\u6D41\u7A0B\u3002',
   'constraints \u51B3\u5B9A\u753B\u677F/\u5BB9\u5668\u5C3A\u5BF8\u53D8\u5316\u65F6\u5143\u7D20\u600E\u4E48\u53D8\uFF1A{ h: "left"|"right"|"leftRight"|"center"|"scale", v: "top"|"bottom"|"topBottom"|"center"|"scale" }\u3002\u9ED8\u8BA4 left/top\uFF1Bnavbar\u3001tabs\u3001card\u3001image\u3001input\u3001container\u3001group \u9ED8\u8BA4\u5DE6\u53F3\u62C9\u4F38\u3002',
   '\u5BB9\u5668\u4E0E\u7F16\u7EC4\u53EF\u4EE5\u5F00\u542F Auto Layout\uFF1Alayout { mode: "stack", direction: "row"|"column", gap, padding, align: "start"|"center"|"end"|"stretch", justify: "start"|"center"|"end"|"between" }\u3002\u5F00\u542F\u540E\u5B50\u5143\u7D20\u7684 x/y \u7531\u5E03\u5C40\u63A5\u7BA1\uFF0C\u987A\u5E8F\u5373\u6570\u7EC4\u987A\u5E8F\u3002',
   'set_page_frame \u9ED8\u8BA4 resizeMode:"constraints"\uFF08\u6309\u7EA6\u675F\u91CD\u6392\uFF09\uFF1B\u4E5F\u652F\u6301 "scale"\uFF08\u6574\u4F53\u7F29\u653E\uFF09\u4E0E "none"\uFF08\u4FDD\u6301\u4E0D\u53D8\uFF09\u3002',
-  "\u9875\u9762\u7EA7\u72B6\u6001\u7528 set_page_states \u5199\u6587\u6848\uFF1Astates.loading.text\u3001states.empty.title/desc/action\u3001states.error.title/desc/action\u3002",
+  "\u9875\u9762\u72B6\u6001\uFF08\u52A0\u8F7D/\u7A7A/\u9519\u8BEF\uFF09\u662F\u771F\u5B9E\u7684\u53D8\u4F53\u9875\u9762\uFF1A\u7528 add_page_state {pageId, key} \u590D\u5236\u57FA\u7840\u9875\u751F\u6210\uFF0C\u8FD4\u56DE\u7684 pageId \u5C31\u662F\u53D8\u4F53\u9875\uFF0C\u50CF\u666E\u901A\u9875\u4E00\u6837\u589E\u5220\u5143\u7D20\uFF1Bdelete_page_state \u5220\u9664\u3002\u57FA\u7840\u9875\u7684 states \u8BB0\u5F55\u5404\u72B6\u6001\u5BF9\u5E94\u7684\u53D8\u4F53\u9875 id\u3002",
   '\u72B6\u6001\u89C1\u5404\u7C7B\u578B\uFF08\u5982 button: default/hover/active/disabled\uFF09\u3002\u4E0D\u4F20 pageId \u65F6\u9ED8\u8BA4\u4F5C\u7528\u4E8E\u5F53\u524D\u6D3B\u52A8\u9875\uFF1Badd_page / duplicate_page \u4F1A\u628A\u65B0\u9875\u8BBE\u4E3A\u6D3B\u52A8\u9875\uFF0C\u6240\u4EE5\u300C\u5148 add_page \u518D add_element\u300D\u4F1A\u81EA\u7136\u843D\u5728\u65B0\u9875\u3002\u4E5F\u53EF\u7528 pageId:"@last" / pageIndex\uFF080\u57FA\uFF09\u663E\u5F0F\u6307\u5B9A\u3002',
-  "\u5F53\u7528\u6237\u63D0\u51FA\u4EA7\u54C1\u8BBE\u8BA1/\u539F\u578B\u9700\u6C42\u65F6\uFF1A\u5148 get_document\uFF0C\u518D\u7528\u4E00\u6B21 apply \u6279\u91CF\u642D\u597D\u9875\u9762\u4E0E\u5143\u7D20\uFF1B\u7ED3\u679C\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u5BF9\u8BDD\u5185\u7684\u4EA7\u54C1\u9884\u89C8\u5361\u7247\u91CC\uFF0C\u7528\u6237\u4E5F\u53EF\u70B9\u4FA7\u8FB9\u680F\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u67E5\u770B\u5B8C\u6574\u753B\u5E03\u3002"
+  "\u5F53\u7528\u6237\u63D0\u51FA\u4EA7\u54C1\u8BBE\u8BA1/\u539F\u578B\u9700\u6C42\u65F6\uFF1A\u5148 get_document\uFF0C\u518D\u7528\u4E00\u6B21 apply \u6279\u91CF\u642D\u597D\u9875\u9762\u4E0E\u5143\u7D20\uFF1B\u7ED3\u679C\u4F1A\u81EA\u52A8\u51FA\u73B0\u5728\u5BF9\u8BDD\u5185\u7684\u4EA7\u54C1\u9884\u89C8\u5361\u7247\u91CC\uFF0C\u7528\u6237\u4E5F\u53EF\u70B9\u4F1A\u8BDD\u9876\u90E8\u300C\u4EA7\u54C1\u8BBE\u8BA1\u300D\u6807\u7B7E\u67E5\u770B\u5B8C\u6574\u753B\u5E03\u3002"
 ].join("\n");
 function registerPrompt(ctx) {
   if (typeof ctx.inject !== "function") return;
@@ -186,8 +237,17 @@ function registerPrompt(ctx) {
 }
 
 // src/host/store.js
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync
+} from "node:fs";
+import { dirname, join as join2 } from "node:path";
 
 // src/shared/elements.js
 var CONTAINER_TYPES = ["container", "group"];
@@ -487,6 +547,227 @@ function resizePage(page, newW, newH, mode) {
   return reflowPage({ ...page, frame: { ...page.frame, w, h }, elements });
 }
 
+// src/shared/page-states.js
+var PAGE_STATE_KEYS = ["loading", "empty", "error"];
+var seq = 0;
+function defaultId(prefix) {
+  seq += 1;
+  const rnd = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8) : Math.random().toString(36).slice(2, 10);
+  return prefix + Date.now().toString(36) + seq.toString(36) + rnd;
+}
+function isVariant(page) {
+  return !!(page && page.variantOf && PAGE_STATE_KEYS.includes(page.stateKey));
+}
+function normalizeStateLinks(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const key of PAGE_STATE_KEYS) {
+    if (typeof raw[key] === "string" && raw[key]) out[key] = raw[key];
+  }
+  return out;
+}
+function basePages(doc) {
+  return (doc.pages || []).filter((page) => !isVariant(page));
+}
+function basePageOf(doc, pageId) {
+  const page = (doc.pages || []).find((candidate) => candidate.id === pageId);
+  if (!page) return null;
+  if (!isVariant(page)) return page;
+  return (doc.pages || []).find((candidate) => candidate.id === page.variantOf) || null;
+}
+function stateVariantsOf(doc, baseId) {
+  return (doc.pages || []).filter(
+    (page) => page.variantOf === baseId && PAGE_STATE_KEYS.includes(page.stateKey)
+  );
+}
+function statePageId(doc, baseId, key) {
+  const base = (doc.pages || []).find((page2) => page2.id === baseId);
+  const id = base && base.states ? base.states[key] : "";
+  if (!id) return "";
+  const page = (doc.pages || []).find((candidate) => candidate.id === id);
+  return page && page.variantOf === baseId && page.stateKey === key ? id : "";
+}
+function repairPageStates(doc) {
+  const pages = doc.pages || [];
+  const byId = new Map(pages.map((page) => [page.id, page]));
+  for (const page of pages) {
+    if (!page.variantOf) continue;
+    const base = byId.get(page.variantOf);
+    if (!base || !PAGE_STATE_KEYS.includes(page.stateKey)) {
+      delete page.variantOf;
+      delete page.stateKey;
+      page.states = {};
+    }
+  }
+  for (const page of pages) {
+    if (page.variantOf) {
+      page.states = {};
+      continue;
+    }
+    const links = normalizeStateLinks(page.states);
+    const valid = {};
+    for (const key of PAGE_STATE_KEYS) {
+      const target = links[key] ? byId.get(links[key]) : null;
+      if (target && target.variantOf === page.id && target.stateKey === key) {
+        valid[key] = target.id;
+      }
+    }
+    page.states = valid;
+  }
+  for (const page of pages) {
+    if (!page.variantOf) continue;
+    const base = byId.get(page.variantOf);
+    if (!base) continue;
+    if (base.states[page.stateKey] && base.states[page.stateKey] !== page.id) {
+      delete page.variantOf;
+      delete page.stateKey;
+      page.states = {};
+      continue;
+    }
+    base.states[page.stateKey] = page.id;
+  }
+  return doc;
+}
+function addStateVariant(doc, pageId, key, options = {}) {
+  if (!PAGE_STATE_KEYS.includes(key)) return { doc, pageId: "", created: false };
+  const base = basePageOf(doc, pageId);
+  if (!base) return { doc, pageId: "", created: false };
+  const existing = statePageId(doc, base.id, key);
+  if (existing) return { doc, pageId: existing, created: false };
+  const id = options.id || defaultId;
+  const variant = {
+    id: id("p"),
+    name: options.name || `${base.name} \xB7 ${key}`,
+    frame: { ...base.frame },
+    states: {},
+    variantOf: base.id,
+    stateKey: key,
+    elements: cloneElementDeep(
+      { id: "root", type: "group", x: 0, y: 0, w: 0, h: 0, children: base.elements || [] },
+      () => id("e")
+    ).children
+  };
+  const pages = doc.pages.filter((page) => !(page.variantOf === base.id && page.stateKey === key));
+  let at = pages.findIndex((page) => page.id === base.id) + 1;
+  while (at < pages.length && pages[at].variantOf === base.id) at += 1;
+  pages.splice(at, 0, variant);
+  const next = pages.map(
+    (page) => page.id === base.id ? { ...page, states: { ...page.states || {}, [key]: variant.id } } : page
+  );
+  return {
+    doc: { ...doc, pages: next, activePageId: variant.id },
+    pageId: variant.id,
+    created: true
+  };
+}
+function removeStateVariant(doc, pageId, key) {
+  const base = basePageOf(doc, pageId);
+  if (!base) return { doc, removedId: "" };
+  let id = statePageId(doc, base.id, key);
+  if (!id) {
+    const orphan = doc.pages.find((page) => page.variantOf === base.id && page.stateKey === key);
+    id = orphan ? orphan.id : "";
+  }
+  if (!id) return { doc, removedId: "" };
+  const pages = doc.pages.filter((page) => page.id !== id).map((page) => {
+    if (page.id !== base.id) return page;
+    const states = { ...page.states || {} };
+    delete states[key];
+    return { ...page, states };
+  });
+  const activePageId = doc.activePageId === id ? base.id : doc.activePageId;
+  return { doc: { ...doc, pages, activePageId }, removedId: id };
+}
+function removePageDeep(doc, pageId) {
+  const page = (doc.pages || []).find((candidate) => candidate.id === pageId);
+  if (!page) return doc;
+  const base = page.variantOf ? basePageOf(doc, pageId) : page;
+  const family = base ? [base.id, ...stateVariantsOf(doc, base.id).map((item) => item.id)] : [];
+  const removing = new Set(page.variantOf ? [pageId] : family.length ? family : [pageId]);
+  const remaining = doc.pages.filter((candidate) => !removing.has(candidate.id));
+  if (!remaining.some((candidate) => !isVariant(candidate))) return doc;
+  let activePageId = doc.activePageId;
+  if (removing.has(activePageId)) {
+    activePageId = base && !removing.has(base.id) ? base.id : remaining[0]?.id || null;
+  }
+  const pages = remaining.map((candidate) => {
+    if (!base || candidate.id !== base.id) return candidate;
+    const states = { ...candidate.states || {} };
+    for (const key of PAGE_STATE_KEYS) {
+      if (states[key] && removing.has(states[key])) delete states[key];
+    }
+    return { ...candidate, states };
+  });
+  return { ...doc, pages, activePageId };
+}
+function duplicatePageDeep(doc, pageId, options = {}) {
+  const source = (doc.pages || []).find((candidate) => candidate.id === pageId);
+  if (!source) return doc;
+  const base = source.variantOf ? basePageOf(doc, pageId) : source;
+  if (!base) return doc;
+  const variants = stateVariantsOf(doc, base.id);
+  const id = options.id || defaultId;
+  const suffix = options.suffix || "copy";
+  const pageIdMap = /* @__PURE__ */ new Map();
+  pageIdMap.set(base.id, id("p"));
+  for (const variant of variants) pageIdMap.set(variant.id, id("p"));
+  const clonePage = (page, extra) => {
+    const copy = {
+      ...page,
+      id: pageIdMap.get(page.id),
+      name: page.id === base.id ? `${page.name} ${suffix}` : page.name,
+      frame: { ...page.frame },
+      states: {},
+      elements: cloneElementDeep(
+        { id: "root", type: "group", x: 0, y: 0, w: 0, h: 0, children: page.elements || [] },
+        () => id("e")
+      ).children,
+      ...extra
+    };
+    if (!extra) {
+      delete copy.variantOf;
+      delete copy.stateKey;
+    }
+    return copy;
+  };
+  const baseCopy = clonePage(base);
+  baseCopy.states = {};
+  const copies = [baseCopy];
+  for (const variant of variants) {
+    const copy = clonePage(variant, { variantOf: baseCopy.id, stateKey: variant.stateKey });
+    baseCopy.states[variant.stateKey] = copy.id;
+    copies.push(copy);
+  }
+  const remap = (elements) => {
+    for (const el of elements) {
+      if (Array.isArray(el.interactions)) {
+        el.interactions = el.interactions.map(
+          (link) => link.targetPageId && pageIdMap.has(link.targetPageId) ? { ...link, targetPageId: pageIdMap.get(link.targetPageId) } : link
+        );
+      }
+      if (Array.isArray(el.children)) remap(el.children);
+    }
+  };
+  for (const copy of copies) remap(copy.elements);
+  const pages = doc.pages.slice();
+  const lastIndex = Math.max(
+    ...[base, ...variants].map((page) => pages.findIndex((item) => item.id === page.id))
+  );
+  pages.splice(lastIndex + 1, 0, ...copies);
+  return { ...doc, pages, activePageId: baseCopy.id };
+}
+function resizePageFamily(doc, pageId, width, height, mode, preset) {
+  const base = basePageOf(doc, pageId);
+  if (!base) return doc;
+  const family = /* @__PURE__ */ new Set([base.id, ...stateVariantsOf(doc, base.id).map((page) => page.id)]);
+  const pages = doc.pages.map((page) => {
+    if (!family.has(page.id)) return page;
+    const resized = resizePage(page, width, height, mode);
+    return preset ? { ...resized, frame: { ...resized.frame, preset } } : resized;
+  });
+  return { ...doc, pages };
+}
+
 // src/host/model.js
 var ELEMENT_TYPES = {
   container: [320, 240],
@@ -526,11 +807,11 @@ var PRESETS = {
   desktop: [1280, 800]
 };
 var INTERACTION_ACTIONS = ["navigate", "back", "openOverlay"];
-var seq = 0;
+var seq2 = 0;
 function newId(prefix) {
-  seq += 1;
+  seq2 += 1;
   const rnd = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8) : Math.random().toString(36).slice(2, 10);
-  return prefix + Date.now().toString(36) + seq.toString(36) + rnd;
+  return prefix + Date.now().toString(36) + seq2.toString(36) + rnd;
 }
 var isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
 var num = (v, d) => {
@@ -551,20 +832,6 @@ function normalizeInteractions(raw) {
     out.push(next);
   }
   return out;
-}
-function normalizePageStates(raw) {
-  const src = isObj(raw) ? raw : {};
-  const pick = (key, fields) => {
-    const value = isObj(src[key]) ? src[key] : {};
-    const out = {};
-    for (const field of fields) out[field] = str(value[field], "");
-    return out;
-  };
-  return {
-    loading: pick("loading", ["text"]),
-    empty: pick("empty", ["title", "desc", "action"]),
-    error: pick("error", ["title", "desc", "action"])
-  };
 }
 function emptyDoc() {
   return { name: "", pages: [], activePageId: null };
@@ -606,7 +873,7 @@ function ensurePage(raw) {
   const frame = isObj(p.frame) ? p.frame : {};
   const preset = PRESETS[frame.preset] ? frame.preset : "mobile";
   const size = PRESETS[preset];
-  return {
+  const out = {
     id: str(p.id, "") || newId("p"),
     name: str(p.name, "Page"),
     frame: {
@@ -615,14 +882,24 @@ function ensurePage(raw) {
       preset,
       background: str(frame.background, "#ffffff")
     },
-    states: normalizePageStates(p.states),
+    states: {},
     elements: Array.isArray(p.elements) ? p.elements.filter(isObj).map(ensureElement) : []
   };
+  const variantOf = str(p.variantOf, "");
+  const stateKey = PAGE_STATE_KEYS.includes(p.stateKey) ? p.stateKey : "";
+  if (variantOf && stateKey) {
+    out.variantOf = variantOf;
+    out.stateKey = stateKey;
+  } else {
+    out.states = normalizeStateLinks(p.states);
+  }
+  return out;
 }
 function ensureDoc(raw) {
   const doc = isObj(raw) ? clone(raw) : emptyDoc();
   doc.pages = Array.isArray(doc.pages) ? doc.pages.filter(isObj).map(ensurePage) : [];
   doc.name = str(doc.name, "");
+  repairPageStates(doc);
   if (!doc.pages.some((p) => p.id === doc.activePageId)) {
     doc.activePageId = doc.pages.length ? doc.pages[0].id : null;
   }
@@ -680,7 +957,7 @@ function applyOne(doc, op, index, state) {
     const size = PRESETS[preset];
     const page = ensurePage({
       id: newId("p"),
-      name: str(op.name, `Page ${doc.pages.length + 1}`),
+      name: str(op.name, `Page ${basePages(doc).length + 1}`),
       frame: {
         w: Math.max(1, num(op.width, size[0])),
         h: Math.max(1, num(op.height, size[1])),
@@ -695,26 +972,22 @@ function applyOne(doc, op, index, state) {
   }
   if (kind === "duplicate_page") {
     const source = requirePageById(doc, op.pageId, index, "duplicate_page");
-    const copy = ensurePage({
-      id: newId("p"),
-      name: str(op.name, `${source.name} copy`),
-      frame: { ...source.frame },
-      states: clone(source.states),
-      elements: source.elements.map((el) => cloneElementDeep(el, () => newId("e")))
-    });
-    const at = doc.pages.indexOf(source) + 1;
-    doc.pages.splice(at, 0, copy);
-    doc.activePageId = copy.id;
-    return { op: index, kind, pageId: copy.id, name: copy.name };
+    const out = duplicatePageDeep(doc, source.id, { suffix: "copy", id: newId });
+    doc.pages = out.pages;
+    doc.activePageId = out.activePageId;
+    const copy = doc.pages.find((page) => page.id === out.activePageId);
+    if (copy && op.name !== void 0) copy.name = str(op.name, copy.name);
+    return { op: index, kind, pageId: copy ? copy.id : "", name: copy ? copy.name : "" };
   }
   if (kind === "delete_page") {
-    const idx = doc.pages.findIndex((p) => p.id === op.pageId);
-    if (idx === -1) throw new Error(`op[${index}] delete_page: unknown page "${op.pageId}"`);
-    if (doc.pages.length <= 1)
+    const page = doc.pages.find((p) => p.id === op.pageId);
+    if (!page) throw new Error(`op[${index}] delete_page: unknown page "${op.pageId}"`);
+    const out = removePageDeep(doc, page.id);
+    if (out.pages.length === doc.pages.length)
       throw new Error(`op[${index}] delete_page: cannot delete the last page`);
-    doc.pages.splice(idx, 1);
-    if (doc.activePageId === op.pageId) doc.activePageId = doc.pages[0]?.id ?? null;
-    return { op: index, kind, pageId: op.pageId };
+    doc.pages = out.pages;
+    doc.activePageId = out.activePageId;
+    return { op: index, kind, pageId: page.id };
   }
   if (kind === "rename_page") {
     const page = findPage(doc, op, index);
@@ -733,28 +1006,43 @@ function applyOne(doc, op, index, state) {
     const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
     const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
     const mode = ["constraints", "scale", "none"].includes(op.resizeMode) ? op.resizeMode : "constraints";
-    const resized = resizePage(page, nw, nh, mode);
-    page.elements = resized.elements;
-    page.frame = {
-      preset,
-      w: nw,
-      h: nh,
-      background: str(op.background, page.frame.background)
-    };
-    return { op: index, kind, pageId: page.id, resizeMode: mode };
-  }
-  if (kind === "set_page_states") {
-    const page = findPage(doc, op, index);
-    const patch = isObj(op.states) ? op.states : {};
-    const merged = {};
-    for (const key of ["loading", "empty", "error"]) {
-      merged[key] = {
-        ...page.states && page.states[key] || {},
-        ...isObj(patch[key]) ? patch[key] : {}
+    const resized = resizePageFamily(doc, page.id, nw, nh, mode, preset);
+    doc.pages = resized.pages;
+    const target = doc.pages.find((candidate) => candidate.id === page.id);
+    if (target) {
+      target.frame = {
+        ...target.frame,
+        background: str(op.background, target.frame.background)
       };
     }
-    page.states = normalizePageStates(merged);
-    return { op: index, kind, pageId: page.id };
+    return { op: index, kind, pageId: page.id, resizeMode: mode };
+  }
+  if (kind === "add_page_state") {
+    const page = findPage(doc, op, index);
+    const key = PAGE_STATE_KEYS.includes(op.key) ? op.key : null;
+    if (!key) throw new Error(`op[${index}] add_page_state: unknown state "${op.key}"`);
+    const out = addStateVariant(doc, page.id, key, { name: str(op.name, ""), id: newId });
+    if (!out.pageId) throw new Error(`op[${index}] add_page_state: no base page for "${page.id}"`);
+    doc.pages = out.doc.pages;
+    doc.activePageId = out.doc.activePageId;
+    const base = basePageOf(doc, out.pageId);
+    return {
+      op: index,
+      kind,
+      pageId: out.pageId,
+      basePageId: base ? base.id : "",
+      created: out.created
+    };
+  }
+  if (kind === "delete_page_state") {
+    const page = findPage(doc, op, index);
+    const key = PAGE_STATE_KEYS.includes(op.key) ? op.key : null;
+    if (!key) throw new Error(`op[${index}] delete_page_state: unknown state "${op.key}"`);
+    const out = removeStateVariant(doc, page.id, key);
+    if (!out.removedId) throw new Error(`op[${index}] delete_page_state: no such variant`);
+    doc.pages = out.doc.pages;
+    doc.activePageId = out.doc.activePageId;
+    return { op: index, kind, pageId: out.removedId };
   }
   if (kind === "clear_page") {
     const page = findPage(doc, op, index);
@@ -993,7 +1281,7 @@ function summarizeDoc(rawDoc) {
   return {
     name: doc.name,
     activePageId: doc.activePageId,
-    pages: doc.pages.map((p) => {
+    pages: basePages(doc).map((p) => {
       const entries = collectElementEntries(p.elements);
       return {
         id: p.id,
@@ -1001,9 +1289,11 @@ function summarizeDoc(rawDoc) {
         frame: `${p.frame.w}\xD7${p.frame.h}`,
         elements: entries.length,
         containers: entries.filter((entry) => isContainerType(entry.el.type)).length,
-        links: entries.filter((entry) => entry.el.interactions?.length).length
+        links: entries.filter((entry) => entry.el.interactions?.length).length,
+        states: PAGE_STATE_KEYS.filter((key) => statePageId(doc, p.id, key))
       };
-    })
+    }),
+    variants: doc.pages.length - basePages(doc).length
   };
 }
 
@@ -1020,43 +1310,90 @@ function dshHome() {
   }
   return join(homedir(), ".dsh");
 }
-function safeSessionId(sessionId) {
-  const value = String(sessionId || "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
-  if (!value || /^\.+$/.test(value)) return "default";
-  return value;
+function safeSegment(value, fallback) {
+  const out = String(value || "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  if (!out || /^\.+$/.test(out)) return fallback;
+  return out;
 }
-function sessionDocFile(sessionId) {
+function safeSessionId(sessionId) {
+  return safeSegment(sessionId, "default");
+}
+function safeDocId(docId) {
+  return safeSegment(docId, "");
+}
+function docsDir() {
+  return join(dshHome(), "storages", "dsh-product-design", "docs");
+}
+function docFile(docId) {
+  const id = safeDocId(docId);
+  if (!id) throw new Error("invalid-doc-id");
+  return join(docsDir(), `${id}.json`);
+}
+function sessionBindingFile(sessionId) {
   return join(
     dshHome(),
     "storages",
     "dsh-product-design",
     "sessions",
     safeSessionId(sessionId),
-    "doc.json"
+    "active.json"
   );
 }
 
 // src/host/store.js
-function createStores() {
-  const stores = /* @__PURE__ */ new Map();
-  return {
-    forSession(sessionId) {
-      const key = safeSessionId(sessionId || "default");
-      if (!stores.has(key)) stores.set(key, createStore(sessionDocFile(key)));
-      return stores.get(key);
+function newDocId() {
+  const rnd = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 12) : Math.random().toString(36).slice(2, 14);
+  return `d${Date.now().toString(36)}${rnd}`;
+}
+function clone2(value) {
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch {
     }
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+function readJson2(file) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+function writeJson2(file, value) {
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+    writeFileSync(tmp, JSON.stringify(value), "utf8");
+    renameSync(tmp, file);
+  } catch {
+  }
+}
+function metaOf(store, updatedAt) {
+  const { doc } = store.snapshot();
+  const pages = Array.isArray(doc.pages) ? doc.pages.filter((page) => !page.variantOf) : [];
+  return {
+    id: store.id,
+    name: typeof doc.name === "string" ? doc.name : "",
+    pages: pages.length,
+    elements: pages.reduce(
+      (total, page) => total + (Array.isArray(page.elements) ? page.elements.length : 0),
+      0
+    ),
+    updatedAt: updatedAt || Date.now()
   };
 }
-function createStore(file) {
+function createDocStore(docId, seedDoc) {
+  const file = docFile(docId);
+  const stored = readJson2(file);
   let revision = 0;
-  let doc = null;
-  try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
-    if (parsed && typeof parsed === "object") {
-      revision = Number(parsed.revision) || 0;
-      doc = parsed.doc ?? null;
-    }
-  } catch {
+  let doc = emptyDoc();
+  if (stored && typeof stored === "object" && stored.doc) {
+    revision = Number(stored.revision) || 0;
+    doc = ensureDoc(stored.doc);
+  } else if (seedDoc) {
+    doc = ensureDoc(seedDoc);
   }
   const subscribers = /* @__PURE__ */ new Set();
   function notify() {
@@ -1068,15 +1405,11 @@ function createStore(file) {
     }
   }
   function persist() {
-    try {
-      mkdirSync(dirname(file), { recursive: true });
-      const tmp = `${file}.${process.pid}.tmp`;
-      writeFileSync(tmp, JSON.stringify({ revision, doc }), "utf8");
-      renameSync(tmp, file);
-    } catch {
-    }
+    writeJson2(file, { revision, doc });
   }
+  if (!stored) persist();
   return {
+    id: docId,
     snapshot() {
       return { revision, doc };
     },
@@ -1085,7 +1418,7 @@ function createStore(file) {
         return { ok: false, conflict: true, revision, doc };
       }
       revision += 1;
-      doc = nextDoc ?? emptyDoc();
+      doc = ensureDoc(nextDoc ?? emptyDoc());
       persist();
       notify();
       return { ok: true, revision, doc };
@@ -1098,10 +1431,251 @@ function createStore(file) {
       notify();
       return { ok: true, revision, doc, results: out.results };
     },
+    rename(name) {
+      doc = { ...doc, name: String(name == null ? "" : name).slice(0, 200) };
+      revision += 1;
+      persist();
+      notify();
+      return { revision, doc };
+    },
     subscribe(fn) {
       subscribers.add(fn);
       return () => subscribers.delete(fn);
     }
+  };
+}
+function createStores() {
+  const docs = /* @__PURE__ */ new Map();
+  const sessions = /* @__PURE__ */ new Map();
+  function loadDoc(docId) {
+    const id = safeDocId(docId);
+    if (!id) throw new Error("invalid-doc-id");
+    if (!docs.has(id)) {
+      if (!existsSync(docFile(id))) throw new Error(`unknown-doc:${id}`);
+      docs.set(id, createDocStore(id));
+    }
+    return docs.get(id);
+  }
+  function createDoc(seedDoc, name) {
+    const id = newDocId();
+    const store = createDocStore(id, seedDoc || emptyDoc());
+    if (name != null && String(name) !== "") store.rename(name);
+    docs.set(id, store);
+    return store;
+  }
+  function sessionState(sessionId) {
+    const key = safeSessionId(sessionId || "default");
+    let state = sessions.get(key);
+    if (!state) {
+      state = { key, docId: "", listeners: /* @__PURE__ */ new Set(), unsubscribe: null };
+      sessions.set(key, state);
+    }
+    return state;
+  }
+  function readBinding(state) {
+    const data = readJson2(sessionBindingFile(state.key));
+    return data && typeof data.docId === "string" ? safeDocId(data.docId) : "";
+  }
+  function writeBinding(state, docId) {
+    writeJson2(sessionBindingFile(state.key), { docId });
+  }
+  function notifySession(state) {
+    if (!state.docId) return;
+    let revision = 0;
+    try {
+      revision = loadDoc(state.docId).snapshot().revision;
+    } catch {
+      return;
+    }
+    for (const fn of state.listeners) {
+      try {
+        fn(revision, state.docId);
+      } catch {
+      }
+    }
+  }
+  function attach(state) {
+    if (state.unsubscribe) {
+      try {
+        state.unsubscribe();
+      } catch {
+      }
+    }
+    state.unsubscribe = null;
+    if (!state.docId) return;
+    let store;
+    try {
+      store = loadDoc(state.docId);
+    } catch {
+      return;
+    }
+    state.unsubscribe = store.subscribe((revision) => {
+      for (const fn of state.listeners) {
+        try {
+          fn(revision, state.docId);
+        } catch {
+        }
+      }
+    });
+  }
+  function ensureSession(sessionId) {
+    const state = sessionState(sessionId);
+    if (state.docId) return state;
+    const bound = readBinding(state);
+    if (bound && existsSync(docFile(bound))) {
+      state.docId = bound;
+    } else {
+      const store = createDoc(emptyDoc(), "");
+      state.docId = store.id;
+      writeBinding(state, store.id);
+    }
+    attach(state);
+    return state;
+  }
+  function bind(sessionId, docId) {
+    const state = sessionState(sessionId);
+    const id = safeDocId(docId);
+    if (!id) throw new Error("invalid-doc-id");
+    loadDoc(id);
+    if (state.docId === id) return state;
+    state.docId = id;
+    writeBinding(state, id);
+    attach(state);
+    notifySession(state);
+    return state;
+  }
+  function snapshotOf(state) {
+    const store = loadDoc(state.docId);
+    const snap = store.snapshot();
+    return { docId: state.docId, revision: snap.revision, doc: snap.doc };
+  }
+  function forSession(sessionId) {
+    const state = ensureSession(sessionId);
+    return {
+      docId: state.docId,
+      snapshot() {
+        return snapshotOf(state);
+      },
+      setDoc(nextDoc, baseRevision, docId) {
+        if (docId && safeDocId(docId) !== state.docId) {
+          return { ok: false, conflict: true, ...snapshotOf(state) };
+        }
+        return { ...loadDoc(state.docId).setDoc(nextDoc, baseRevision), docId: state.docId };
+      },
+      apply(operations) {
+        return { ...loadDoc(state.docId).apply(operations), docId: state.docId };
+      },
+      subscribe(fn) {
+        state.listeners.add(fn);
+        return () => state.listeners.delete(fn);
+      },
+      selectDoc(docId) {
+        bind(state.key, docId);
+        return snapshotOf(state);
+      }
+    };
+  }
+  function listDocs(sessionId) {
+    const active = ensureSession(sessionId).docId;
+    const dir = docsDir();
+    let files = [];
+    try {
+      files = readdirSync(dir).filter((name) => name.endsWith(".json"));
+    } catch {
+      files = [];
+    }
+    const out = [];
+    for (const file of files) {
+      const data = readJson2(join2(dir, file));
+      if (!data || typeof data !== "object" || !data.doc) continue;
+      const id = file.slice(0, -5);
+      const doc = data.doc;
+      const pages = Array.isArray(doc.pages) ? doc.pages.filter((page) => !page.variantOf) : [];
+      let updatedAt = 0;
+      try {
+        updatedAt = statSync(join2(dir, file)).mtimeMs;
+      } catch {
+        updatedAt = 0;
+      }
+      out.push({
+        id,
+        name: typeof doc.name === "string" ? doc.name : "",
+        pages: pages.length,
+        elements: pages.reduce(
+          (total, page) => total + (Array.isArray(page.elements) ? page.elements.length : 0),
+          0
+        ),
+        updatedAt
+      });
+    }
+    out.sort((a, b) => b.updatedAt - a.updatedAt);
+    return { docs: out, activeDocId: active };
+  }
+  function createDocFor({ sessionId, name, doc }) {
+    const store = createDoc(doc || emptyDoc(), name);
+    if (sessionId) bind(sessionId, store.id);
+    return { meta: metaOf(store), snapshot: sessionId ? forSession(sessionId).snapshot() : null };
+  }
+  function duplicateDoc(docId, name) {
+    const source = loadDoc(docId).snapshot().doc;
+    const copy = clone2(source);
+    copy.name = name != null ? String(name) : source.name ? `${source.name} copy` : "";
+    const store = createDoc(copy);
+    return metaOf(store);
+  }
+  function renameDoc(docId, name) {
+    const store = loadDoc(docId);
+    store.rename(name);
+    return metaOf(store);
+  }
+  function deleteDoc(docId) {
+    const id = safeDocId(docId);
+    loadDoc(id);
+    try {
+      unlinkSync(docFile(id));
+    } catch {
+    }
+    docs.delete(id);
+    const rebinds = [];
+    for (const state of sessions.values()) {
+      if (state.docId !== id) continue;
+      const store = createDoc(emptyDoc(), "");
+      state.docId = store.id;
+      writeBinding(state, store.id);
+      attach(state);
+      notifySession(state);
+      rebinds.push({ sessionId: state.key, docId: store.id });
+    }
+    return { ok: true, rebinds };
+  }
+  function importDoc(payload, name) {
+    const raw = payload && typeof payload === "object" && payload.doc ? payload.doc : payload;
+    if (!raw || typeof raw !== "object" || !Array.isArray(raw.pages)) {
+      throw new Error("invalid-import");
+    }
+    const doc = ensureDoc(raw);
+    if (name != null) doc.name = String(name).slice(0, 200);
+    const store = createDoc(doc);
+    return metaOf(store);
+  }
+  function exportDoc(docId) {
+    const snap = loadDoc(docId).snapshot();
+    return {
+      format: "dsh-product-design",
+      version: 1,
+      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      doc: snap.doc
+    };
+  }
+  return {
+    createDocFor,
+    deleteDoc,
+    duplicateDoc,
+    exportDoc,
+    forSession,
+    importDoc,
+    listDocs,
+    renameDoc
   };
 }
 
@@ -1123,7 +1697,7 @@ function productPreviewMeta(store, results) {
     title: page.name || "Product design",
     pageId: page.id,
     pageIndex: index,
-    pageCount: doc.pages.length,
+    pageCount: basePages(doc).length,
     page: { id: page.id, name: page.name, frame: page.frame, elements: page.elements },
     revision: snapshot.revision
   };
@@ -1160,6 +1734,7 @@ function getDocumentTool(stores) {
       const snap = store.snapshot();
       return {
         ok: true,
+        docId: snap.docId,
         revision: snap.revision,
         doc: snap.doc,
         summary: summarizeDoc(snap.doc),
@@ -1177,10 +1752,11 @@ function applyTool(stores) {
       "add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} \u2192 pageId",
       "duplicate_page {pageId, name?} \u2192 pageId (copies the whole page with fresh element ids)",
       "delete_page {pageId}; rename_page {pageId, name}; set_active_page {pageId}",
-      "set_page_frame {pageId, preset?|width?, height?, background?, resizeMode?: constraints|scale|none} (default constraints); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}",
+      "set_page_frame {pageId, preset?|width?, height?, background?, resizeMode?: constraints|scale|none} (default constraints)",
+      "add_page_state {pageId, key: loading|empty|error, name?} \u2192 pageId (creates a real variant page by copying the base page; edit it like any page); delete_page_state {pageId, key}",
       "clear_page {pageId}",
       'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?, constraints?, layout?} \u2192 elementId (a frame-like container; pass containerId (or "@last") to nest it)',
-      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius}, interactions?} \u2192 elementId (containerId also accepts "@last")',
+      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius,src,fit}, interactions?} \u2192 elementId (containerId also accepts "@last")',
       "update_element {pageId?, elementId, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?, interactions?, constraints?, layout?}; delete_element {pageId?, elementId}",
       "move_element {pageId?, elementId, containerId?: string|null, index?} (reparent without moving on screen); reorder_element {pageId?, elementId, position: front|back|forward|backward}",
       "group_elements {pageId?, elementIds: string[]} \u2192 groupId; ungroup_elements {pageId?, elementId}",
@@ -1215,6 +1791,7 @@ function applyTool(stores) {
       const result = store.apply(args?.operations);
       return {
         ok: result.ok,
+        docId: result.docId,
         revision: result.revision,
         results: result.results,
         summary: summarizeDoc(result.doc),

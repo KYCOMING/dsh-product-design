@@ -1,7 +1,12 @@
 /**
- * Filesystem locations for the per-session documents.
+ * Filesystem layout for the design-document library.
  *
- * `<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`
+ *   <DSH_HOME>/storages/dsh-product-design/docs/<docId>.json
+ *   <DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/active.json
+ *
+ * A design document is a first-class object; a Session only points at the
+ * document it currently shows. That is what lets a draft survive the Session
+ * it was created in.
  */
 
 import { homedir } from 'node:os';
@@ -18,26 +23,44 @@ function dshHome() {
   return join(homedir(), '.dsh');
 }
 
-/** Keep session ids usable as one path segment without losing uniqueness. */
-function safeSessionId(sessionId) {
-  const value = String(sessionId || '')
+/** Keep an id usable as one path segment without losing uniqueness. */
+function safeSegment(value, fallback) {
+  const out = String(value || '')
     .replace(/[^a-zA-Z0-9._-]/g, '_')
     .slice(0, 120);
   // `.` and `..` survive the character filter but are path segments, not names;
-  // letting them through would write outside the sessions directory.
-  if (!value || /^\.+$/.test(value)) return 'default';
-  return value;
+  // letting them through would write outside the storage directory.
+  if (!out || /^\.+$/.test(out)) return fallback;
+  return out;
 }
 
-function sessionDocFile(sessionId) {
+function safeSessionId(sessionId) {
+  return safeSegment(sessionId, 'default');
+}
+
+function safeDocId(docId) {
+  return safeSegment(docId, '');
+}
+
+function docsDir() {
+  return join(dshHome(), 'storages', 'dsh-product-design', 'docs');
+}
+
+function docFile(docId) {
+  const id = safeDocId(docId);
+  if (!id) throw new Error('invalid-doc-id');
+  return join(docsDir(), `${id}.json`);
+}
+
+function sessionBindingFile(sessionId) {
   return join(
     dshHome(),
     'storages',
     'dsh-product-design',
     'sessions',
     safeSessionId(sessionId),
-    'doc.json',
+    'active.json',
   );
 }
 
-export { safeSessionId, sessionDocFile };
+export { docFile, docsDir, safeDocId, safeSessionId, sessionBindingFile };

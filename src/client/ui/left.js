@@ -3,15 +3,19 @@ import { defaultState, LIB_ORDER } from '../constants.js';
 import {
   IconComponents,
   IconCopy,
+  IconDesign,
+  IconDownload,
   IconEye,
   IconLayers,
   IconPages,
+  IconPencil,
   IconPlus,
   IconTrash,
+  IconUpload,
   libGlyph,
   Svg,
 } from '../icons.js';
-import { h, useState } from '../react.js';
+import { h, useEffect, useState } from '../react.js';
 import { renderWidget } from '../widgets.js';
 
 function LockGlyph(props) {
@@ -40,6 +44,27 @@ function layerLabel(el, t) {
   return el.name || el.props.text || el.props.name || t('comp.' + el.type);
 }
 
+function pickJsonFile(onPick) {
+  if (typeof document === 'undefined') return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    if (file) onPick(file);
+  });
+  input.click();
+}
+
+function docTime(ts) {
+  if (!ts) return '';
+  try {
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
 export function LeftView(props) {
   const {
     t,
@@ -61,52 +86,76 @@ export function LeftView(props) {
     onLayerMove,
     layerQuery,
     setLayerQuery,
+    docs,
+    docsReady,
+    docsError,
+    activeDocId,
+    onOpenDoc,
+    onCreateDoc,
+    onDuplicateDoc,
+    onRenameDoc,
+    onDeleteDoc,
+    onImportDoc,
+    onExportDoc,
+    onRefreshDocs,
   } = props;
 
   const [dragId, setDragId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null); // { id, position }
   const [renaming, setRenaming] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [renamingDoc, setRenamingDoc] = useState(null);
+  const [docNameValue, setDocNameValue] = useState('');
+
+  useEffect(() => {
+    if (section === 'docs' && onRefreshDocs) onRefreshDocs();
+  }, [section, onRefreshDocs]);
 
   // -------------------------------------------------- left: pages + library
-  const pageRows = doc.pages.map((p) =>
-    h(
-      'div',
-      {
-        key: p.id,
-        className: 'dpd-pageRow' + (p.id === activePage.id ? ' active' : ''),
-        onClick: () => setActivePage(p.id),
-      },
-      h('span', { className: 'nm' }, p.name),
-      h('span', { className: 'sz' }, p.frame.w + '×' + p.frame.h),
-      h(
-        'button',
+  const pageRows = doc.pages
+    .filter((p) => !p.variantOf)
+    .map((p) => {
+      const stateActive = activePage && activePage.variantOf === p.id;
+      return h(
+        'div',
         {
-          className: 'dpd-mini',
-          type: 'button',
-          title: t('pages.duplicate'),
-          onClick: (e) => {
-            e.stopPropagation();
-            duplicatePage(p.id);
-          },
+          key: p.id,
+          className: 'dpd-pageRow' + (p.id === activePage.id || stateActive ? ' active' : ''),
+          onClick: () => setActivePage(p.id),
         },
-        h(IconCopy),
-      ),
-      h(
-        'button',
-        {
-          className: 'dpd-mini',
-          type: 'button',
-          title: t('pages.delete'),
-          onClick: (e) => {
-            e.stopPropagation();
-            deletePage(p.id);
+        h('span', { className: 'nm' }, p.name),
+        h('span', { className: 'sz' }, p.frame.w + '×' + p.frame.h),
+        h(
+          'button',
+          {
+            className: 'dpd-mini',
+            type: 'button',
+            title: t('pages.duplicate'),
+            onClick: (e) => {
+              e.stopPropagation();
+              duplicatePage(p.id);
+            },
           },
-        },
-        h(IconTrash),
-      ),
-    ),
-  );
+          h(IconCopy),
+        ),
+        h(
+          'button',
+          {
+            className: 'dpd-mini',
+            type: 'button',
+            title: t('pages.delete'),
+            onClick: (e) => {
+              e.stopPropagation();
+              deletePage(p.id);
+            },
+          },
+          h(IconTrash),
+        ),
+        stateActive && activePage && activePage.stateKey
+          ? h('span', { className: 'sz' }, t('state.' + activePage.stateKey))
+          : null,
+      );
+    });
 
   const activeElements = (activePage && activePage.elements) || [];
   const query = (layerQuery || '').trim().toLowerCase();
@@ -139,6 +188,134 @@ export function LeftView(props) {
       },
       h(icon),
     );
+
+  const commitDocRename = (item) => {
+    const value = docNameValue.trim();
+    setRenamingDoc(null);
+    if (value && value !== (item.name || '')) onRenameDoc(item.id, value);
+  };
+
+  const docAction = (icon, title, onClick) =>
+    h(
+      'button',
+      {
+        className: 'dpd-mini',
+        type: 'button',
+        title,
+        'aria-label': title,
+        onClick: (e) => {
+          e.stopPropagation();
+          onClick();
+        },
+      },
+      h(icon, { size: 12 }),
+    );
+
+  const docsBody = h(
+    'div',
+    { className: 'dpd-sectionBody' },
+    h(
+      'div',
+      { className: 'dpd-panelTitle' },
+      h('span', null, t('docs.title')),
+      h(
+        'span',
+        { style: { textTransform: 'none', letterSpacing: 0 } },
+        String((docs || []).length),
+      ),
+    ),
+    h(
+      'div',
+      { className: 'dpd-docBar' },
+      h(
+        'button',
+        { className: 'dpd-btn', type: 'button', onClick: onCreateDoc },
+        h(IconPlus),
+        t('docs.add'),
+      ),
+      h(
+        'button',
+        {
+          className: 'dpd-btn',
+          type: 'button',
+          onClick: () => pickJsonFile(onImportDoc),
+        },
+        h(IconUpload),
+        t('docs.import'),
+      ),
+    ),
+    docsError ? h('div', { className: 'dpd-hint' }, docsError) : null,
+    !docsReady && !docsError ? h('div', { className: 'dpd-hint' }, t('docs.offline')) : null,
+    h(
+      'div',
+      { className: 'dpd-docs' },
+      (docs || []).length === 0
+        ? h('div', { className: 'dpd-empty' }, t('docs.empty'))
+        : (docs || []).map((item) => {
+            const active = item.id === activeDocId;
+            const name = item.name || t('docs.untitled');
+            return h(
+              'div',
+              {
+                key: item.id,
+                className: 'dpd-docRow' + (active ? ' active' : ''),
+                onClick: () => onOpenDoc(item.id),
+              },
+              h('span', { className: 'dot' }, h(IconDesign, { size: 13 })),
+              h(
+                'div',
+                { className: 'dpd-docMain' },
+                renamingDoc === item.id
+                  ? h('input', {
+                      className: 'nmInput',
+                      value: docNameValue,
+                      autoFocus: true,
+                      onClick: (e) => e.stopPropagation(),
+                      onChange: (e) => setDocNameValue(e.target.value),
+                      onBlur: () => commitDocRename(item),
+                      onKeyDown: (e) => {
+                        e.stopPropagation();
+                        if (e.key === 'Enter') commitDocRename(item);
+                        else if (e.key === 'Escape') setRenamingDoc(null);
+                      },
+                    })
+                  : h(
+                      'span',
+                      {
+                        className: 'nm',
+                        title: t('docs.rename'),
+                        onDoubleClick: (e) => {
+                          e.stopPropagation();
+                          setRenamingDoc(item.id);
+                          setDocNameValue(item.name || '');
+                        },
+                      },
+                      name,
+                    ),
+                h(
+                  'span',
+                  { className: 'meta' },
+                  `${item.pages} ${t('docs.pages')}` +
+                    (item.updatedAt ? ` · ${docTime(item.updatedAt)}` : ''),
+                ),
+              ),
+              h(
+                'div',
+                { className: 'dpd-docActions' },
+                docAction(IconPencil, t('docs.rename'), () => {
+                  setRenamingDoc(item.id);
+                  setDocNameValue(item.name || '');
+                }),
+                docAction(IconCopy, t('docs.duplicate'), () => onDuplicateDoc(item.id)),
+                docAction(IconDownload, t('docs.export'), () => onExportDoc(item.id)),
+                docAction(IconTrash, t('docs.delete'), () => {
+                  if (window.confirm(t('docs.deleteConfirm'))) onDeleteDoc(item.id);
+                }),
+              ),
+            );
+          }),
+    ),
+  );
 
   const pagesBody = h(
     'div',
@@ -376,13 +553,15 @@ export function LeftView(props) {
   );
 
   const sectionContent =
-    section === 'pages'
-      ? pagesBody
-      : section === 'components'
-        ? componentsBody
-        : section === 'layers'
-          ? layersBody
-          : null;
+    section === 'docs'
+      ? docsBody
+      : section === 'pages'
+        ? pagesBody
+        : section === 'components'
+          ? componentsBody
+          : section === 'layers'
+            ? layersBody
+            : null;
 
   const left = h(
     'div',
@@ -390,6 +569,7 @@ export function LeftView(props) {
     h(
       'div',
       { className: 'dpd-rail' },
+      railBtn('docs', IconDesign, t('docs.title')),
       railBtn('pages', IconPages, t('pages.title')),
       railBtn('components', IconComponents, t('library.title')),
       railBtn('layers', IconLayers, t('layers.title')),

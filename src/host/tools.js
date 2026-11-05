@@ -44,6 +44,7 @@ function getDocumentTool(stores) {
       const snap = store.snapshot();
       return {
         ok: true,
+        docId: snap.docId,
         revision: snap.revision,
         doc: snap.doc,
         summary: summarizeDoc(snap.doc),
@@ -62,10 +63,11 @@ function applyTool(stores) {
       'add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} → pageId',
       'duplicate_page {pageId, name?} → pageId (copies the whole page with fresh element ids)',
       'delete_page {pageId}; rename_page {pageId, name}; set_active_page {pageId}',
-      'set_page_frame {pageId, preset?|width?, height?, background?, resizeMode?: constraints|scale|none} (default constraints); set_page_states {pageId, states: {loading?: {text}, empty?: {title,desc,action}, error?: {title,desc,action}}}',
+      'set_page_frame {pageId, preset?|width?, height?, background?, resizeMode?: constraints|scale|none} (default constraints)',
+      'add_page_state {pageId, key: loading|empty|error, name?} → pageId (creates a real variant page by copying the base page; edit it like any page); delete_page_state {pageId, key}',
       'clear_page {pageId}',
       'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?, constraints?, layout?} → elementId (a frame-like container; pass containerId (or "@last") to nest it)',
-      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius}, interactions?} → elementId (containerId also accepts "@last")',
+      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius,src,fit}, interactions?} → elementId (containerId also accepts "@last")',
       'update_element {pageId?, elementId, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?, interactions?, constraints?, layout?}; delete_element {pageId?, elementId}',
       'move_element {pageId?, elementId, containerId?: string|null, index?} (reparent without moving on screen); reorder_element {pageId?, elementId, position: front|back|forward|backward}',
       'group_elements {pageId?, elementIds: string[]} → groupId; ungroup_elements {pageId?, elementId}',
@@ -100,6 +102,7 @@ function applyTool(stores) {
       const result = store.apply(args?.operations);
       return {
         ok: result.ok,
+        docId: result.docId,
         revision: result.revision,
         results: result.results,
         summary: summarizeDoc(result.doc),

@@ -3,7 +3,13 @@
  * Each one is a thin wrapper around a pure transform in `domain/document.js`.
  */
 
-import { boundsOfEntries, cloneElementDeep, isContainerType } from '../../shared/elements.js';
+import { boundsOfEntries, isContainerType } from '../../shared/elements.js';
+import {
+  basePages,
+  duplicatePageDeep,
+  removePageDeep,
+  resizePageFamily,
+} from '../../shared/page-states.js';
 import { TYPE_INFO } from '../constants.js';
 import {
   addElement,
@@ -13,18 +19,14 @@ import {
   duplicateElements,
   fitContent,
   groupEntries,
-  insertPageAfter,
   moveElementTo,
   patchFrame,
-  patchPageStates,
   removeElements,
-  removePage,
   renamePage,
   reorderElements,
-  resizePageTo,
   ungroupEntry,
 } from '../domain/document.js';
-import { emptyStates, makeEl, uid } from '../model.js';
+import { makeEl, uid } from '../model.js';
 
 export function useEditorActions({
   doc,
@@ -41,14 +43,14 @@ export function useEditorActions({
     const base = activePage;
     const page = {
       id: uid(),
-      name: t('pages.default') + ' ' + (doc.pages.length + 1),
+      name: t('pages.default') + ' ' + (basePages(doc).length + 1),
       frame: {
         w: base ? base.frame.w : 390,
         h: base ? base.frame.h : 844,
         preset: base ? base.frame.preset : 'mobile',
         background: '#ffffff',
       },
-      states: emptyStates(),
+      states: {},
       elements: [],
     };
     setDoc((current) => addPage(current, page));
@@ -58,24 +60,16 @@ export function useEditorActions({
   function duplicatePage(id) {
     const source = doc.pages.find((candidate) => candidate.id === id);
     if (!source) return;
-    const copy = {
-      id: uid(),
-      name: source.name + ' ' + t('pages.copySuffix'),
-      frame: { ...source.frame },
-      states: JSON.parse(JSON.stringify(source.states || emptyStates())),
-      elements: cloneElementDeep(
-        { id: 'root', type: 'group', x: 0, y: 0, w: 0, h: 0, children: source.elements },
-        () => uid(),
-      ).children,
-    };
-    setDoc((current) => insertPageAfter(current, id, copy));
+    setDoc((current) => duplicatePageDeep(current, id, { suffix: t('pages.copySuffix'), id: uid }));
     setSelIds([]);
   }
 
   function deletePage(id) {
-    if (doc.pages.length <= 1) return;
+    const source = doc.pages.find((candidate) => candidate.id === id);
+    if (!source) return;
+    if (!source.variantOf && basePages(doc).length <= 1) return;
     if (!window.confirm(t('pages.deleteConfirm'))) return;
-    setDoc((current) => removePage(current, id));
+    setDoc((current) => removePageDeep(current, id));
     setSelIds([]);
   }
 
@@ -158,7 +152,9 @@ export function useEditorActions({
     const sizes = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
     const size = sizes[key];
     if (!size || !activePage) return;
-    setDoc((current) => resizePageTo(current, activePage.id, size[0], size[1], resizeMode, key));
+    setDoc((current) =>
+      resizePageFamily(current, activePage.id, size[0], size[1], resizeMode, key),
+    );
   }
 
   function fitContentToFrame() {
@@ -177,11 +173,6 @@ export function useEditorActions({
   function renameActivePage(name) {
     if (!activePage) return;
     setDoc((current) => renamePage(current, activePage.id, name), 'pagename:' + activePage.id);
-  }
-
-  function patchStates(key, patch) {
-    if (!activePage) return;
-    setDoc((current) => patchPageStates(current, activePage.id, key, patch), 'pstate:' + key);
   }
 
   function groupSelection() {
@@ -243,7 +234,6 @@ export function useEditorActions({
     fitContentToFrame,
     patchActiveFrame,
     renameActivePage,
-    patchStates,
     groupSelection,
     ungroupSelection,
     alignSelection,

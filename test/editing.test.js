@@ -154,13 +154,16 @@ describe('编辑行为', () => {
     expect(canvas.scrollTop).toBe(120);
   });
 
-  it('预览模式下开关可切换状态', async () => {
+  it('预览模式下开关可切换，且不写回设计稿', async () => {
     await click(btnText('预览'));
     const els = container.querySelectorAll('.dpd-el');
     const toggle = els[6];
     const before = doc().pages[0].elements[6].state;
+    const markupBefore = toggle.innerHTML;
     await click(toggle);
-    expect(doc().pages[0].elements[6].state).not.toBe(before);
+    expect(toggle.innerHTML).not.toBe(markupBefore);
+    // Preview interaction is transient: the document must not change.
+    expect(doc().pages[0].elements[6].state).toBe(before);
   });
 
   it('切换画布尺寸按约束重排，切回可还原', async () => {

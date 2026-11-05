@@ -238,6 +238,15 @@ export function renderElement(el, ctx) {
   }
 
   if (el.type === 'image') {
+    if (p.src) {
+      const fit = ['cover', 'contain', 'fill'].includes(p.fit) ? p.fit : 'cover';
+      return box(
+        el,
+        { borderRadius: px(p.radius != null ? p.radius : 10), overflow: 'hidden' },
+        `<img src="${escapeHtml(p.src)}" alt="${escapeHtml(p.alt || '')}" style="display:block;width:100%;height:100%;object-fit:${fit}" />`,
+        attrs,
+      );
+    }
     return box(
       el,
       {
@@ -290,5 +299,8 @@ export function renderPageBody(page, ctx) {
 /** A single page as a self-contained, clipped frame. */
 export function renderPage(page, ctx) {
   const frame = page.frame || { w: 390, h: 844, background: '#ffffff' };
-  return `<div class="dpd-page" data-page="${escapeHtml(page.id)}" style="position:relative;width:${px(frame.w)};height:${px(frame.h)};background:${frame.background || '#ffffff'};overflow:hidden">${renderPageBody(page, ctx)}</div>`;
+  const variant = page.variantOf
+    ? ` data-variant-of="${escapeHtml(page.variantOf)}" data-state-key="${escapeHtml(page.stateKey || '')}"`
+    : '';
+  return `<div class="dpd-page" data-page="${escapeHtml(page.id)}"${variant} style="position:relative;width:${px(frame.w)};height:${px(frame.h)};background:${frame.background || '#ffffff'};overflow:hidden">${renderPageBody(page, ctx)}</div>`;
 }

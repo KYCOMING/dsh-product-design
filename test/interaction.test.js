@@ -182,24 +182,54 @@ describe('就地编辑与图层', () => {
 });
 
 describe('属性面板', () => {
-  it('空状态下可编辑页面状态文案', async () => {
+  it('空状态会创建真实变体页，可回到正常页并复用同一变体', async () => {
     await mountWith({
       name: '',
       activePageId: 'p1',
       pages: [page('p1', 'P', [el({ props: { text: 'Hi' } })])],
     });
     await click(btnText('空状态'));
-    const inputs = Array.from(container.querySelectorAll('.dpd-right input[type="text"]'));
-    expect(container.textContent).toContain('页面状态文案');
-    const title = inputs[inputs.length - 3];
-    await act(async () => {
-      const desc = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-      if (desc?.set) desc.set.call(title, '还没有项目');
-      else title.value = '还没有项目';
-      title.dispatchEvent(new window.Event('input', { bubbles: true }));
-    });
-    expect(doc().pages[0].states.empty.title).toBe('还没有项目');
-    expect(container.textContent).toContain('还没有项目');
+    let current = doc();
+    expect(current.pages).toHaveLength(2);
+    const base = current.pages.find((p) => !p.variantOf);
+    const variant = current.pages.find((p) => p.variantOf);
+    expect(base.states.empty).toBe(variant.id);
+    expect(variant.stateKey).toBe('empty');
+    expect(variant.elements).toHaveLength(1);
+    expect(current.activePageId).toBe(variant.id);
+    expect(container.textContent).toContain('正在编辑状态变体');
+
+    await click(btnText('回到正常页面'));
+    expect(doc().activePageId).toBe(base.id);
+
+    await click(btnText('空状态'));
+    current = doc();
+    expect(current.pages).toHaveLength(2);
+    expect(current.activePageId).toBe(variant.id);
+  });
+
+  it('预览里可以在基础页与状态变体之间切换', async () => {
+    const base = page('p1', '首页', [el({ id: 'a', props: { text: '正常内容' } })]);
+    base.states = { empty: 'v1' };
+    const variant = {
+      ...page('v1', '空状态页', [el({ id: 'b', props: { text: '还没有内容' } })]),
+      variantOf: 'p1',
+      stateKey: 'empty',
+    };
+    await mountWith({ name: '', activePageId: 'p1', pages: [base, variant] });
+    await click(btnText('预览'));
+    const bar = one('.dpd-stateBar');
+    expect(bar).toBeTruthy();
+    expect(container.textContent).toContain('正常内容');
+
+    const stateButton = (text) =>
+      Array.from(bar.querySelectorAll('button')).find((b) => b.textContent.trim() === text);
+    await click(stateButton('空状态'));
+    expect(container.textContent).toContain('还没有内容');
+    expect(container.textContent).not.toContain('正常内容');
+
+    await click(stateButton('正常'));
+    expect(container.textContent).toContain('正常内容');
   });
 
   it('多选后可批量改颜色', async () => {

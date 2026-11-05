@@ -23,7 +23,11 @@ export function useUiPrefs() {
   const [rightCollapsed, setRightCollapsed] = useState(() => loadUi().rightCollapsed === true);
   const [section, setSection] = useState(() => {
     const value = loadUi().section;
-    return value === null || value === 'pages' || value === 'components' || value === 'layers'
+    return value === null ||
+      value === 'docs' ||
+      value === 'pages' ||
+      value === 'components' ||
+      value === 'layers'
       ? value
       : 'pages';
   });

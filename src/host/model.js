@@ -23,7 +23,20 @@ import {
   isContainerType,
   reorderInTree,
 } from '../shared/elements.js';
-import { normalizeConstraints, normalizeLayout, reflowPage, resizePage } from '../shared/layout.js';
+import { normalizeConstraints, normalizeLayout, reflowPage } from '../shared/layout.js';
+import {
+  addStateVariant,
+  basePageOf,
+  basePages,
+  duplicatePageDeep,
+  normalizeStateLinks,
+  PAGE_STATE_KEYS,
+  removePageDeep,
+  removeStateVariant,
+  repairPageStates,
+  resizePageFamily,
+  statePageId,
+} from '../shared/page-states.js';
 
 const ELEMENT_TYPES = {
   container: [320, 240],
@@ -99,21 +112,6 @@ function normalizeInteractions(raw) {
   return out;
 }
 
-function normalizePageStates(raw) {
-  const src = isObj(raw) ? raw : {};
-  const pick = (key, fields) => {
-    const value = isObj(src[key]) ? src[key] : {};
-    const out = {};
-    for (const field of fields) out[field] = str(value[field], '');
-    return out;
-  };
-  return {
-    loading: pick('loading', ['text']),
-    empty: pick('empty', ['title', 'desc', 'action']),
-    error: pick('error', ['title', 'desc', 'action']),
-  };
-}
-
 export function emptyDoc() {
   return { name: '', pages: [], activePageId: null };
 }
@@ -157,7 +155,7 @@ function ensurePage(raw) {
   const frame = isObj(p.frame) ? p.frame : {};
   const preset = PRESETS[frame.preset] ? frame.preset : 'mobile';
   const size = PRESETS[preset];
-  return {
+  const out = {
     id: str(p.id, '') || newId('p'),
     name: str(p.name, 'Page'),
     frame: {
@@ -166,9 +164,18 @@ function ensurePage(raw) {
       preset,
       background: str(frame.background, '#ffffff'),
     },
-    states: normalizePageStates(p.states),
+    states: {},
     elements: Array.isArray(p.elements) ? p.elements.filter(isObj).map(ensureElement) : [],
   };
+  const variantOf = str(p.variantOf, '');
+  const stateKey = PAGE_STATE_KEYS.includes(p.stateKey) ? p.stateKey : '';
+  if (variantOf && stateKey) {
+    out.variantOf = variantOf;
+    out.stateKey = stateKey;
+  } else {
+    out.states = normalizeStateLinks(p.states);
+  }
+  return out;
 }
 
 /** Coerce any stored/raw value into a valid document (drops unknown junk). */
@@ -176,6 +183,7 @@ export function ensureDoc(raw) {
   const doc = isObj(raw) ? clone(raw) : emptyDoc();
   doc.pages = Array.isArray(doc.pages) ? doc.pages.filter(isObj).map(ensurePage) : [];
   doc.name = str(doc.name, '');
+  repairPageStates(doc);
   if (!doc.pages.some((p) => p.id === doc.activePageId)) {
     doc.activePageId = doc.pages.length ? doc.pages[0].id : null;
   }
@@ -246,7 +254,7 @@ function applyOne(doc, op, index, state) {
     const size = PRESETS[preset];
     const page = ensurePage({
       id: newId('p'),
-      name: str(op.name, `Page ${doc.pages.length + 1}`),
+      name: str(op.name, `Page ${basePages(doc).length + 1}`),
       frame: {
         w: Math.max(1, num(op.width, size[0])),
         h: Math.max(1, num(op.height, size[1])),
@@ -262,27 +270,23 @@ function applyOne(doc, op, index, state) {
 
   if (kind === 'duplicate_page') {
     const source = requirePageById(doc, op.pageId, index, 'duplicate_page');
-    const copy = ensurePage({
-      id: newId('p'),
-      name: str(op.name, `${source.name} copy`),
-      frame: { ...source.frame },
-      states: clone(source.states),
-      elements: source.elements.map((el) => cloneElementDeep(el, () => newId('e'))),
-    });
-    const at = doc.pages.indexOf(source) + 1;
-    doc.pages.splice(at, 0, copy);
-    doc.activePageId = copy.id;
-    return { op: index, kind, pageId: copy.id, name: copy.name };
+    const out = duplicatePageDeep(doc, source.id, { suffix: 'copy', id: newId });
+    doc.pages = out.pages;
+    doc.activePageId = out.activePageId;
+    const copy = doc.pages.find((page) => page.id === out.activePageId);
+    if (copy && op.name !== undefined) copy.name = str(op.name, copy.name);
+    return { op: index, kind, pageId: copy ? copy.id : '', name: copy ? copy.name : '' };
   }
 
   if (kind === 'delete_page') {
-    const idx = doc.pages.findIndex((p) => p.id === op.pageId);
-    if (idx === -1) throw new Error(`op[${index}] delete_page: unknown page "${op.pageId}"`);
-    if (doc.pages.length <= 1)
+    const page = doc.pages.find((p) => p.id === op.pageId);
+    if (!page) throw new Error(`op[${index}] delete_page: unknown page "${op.pageId}"`);
+    const out = removePageDeep(doc, page.id);
+    if (out.pages.length === doc.pages.length)
       throw new Error(`op[${index}] delete_page: cannot delete the last page`);
-    doc.pages.splice(idx, 1);
-    if (doc.activePageId === op.pageId) doc.activePageId = doc.pages[0]?.id ?? null;
-    return { op: index, kind, pageId: op.pageId };
+    doc.pages = out.pages;
+    doc.activePageId = out.activePageId;
+    return { op: index, kind, pageId: page.id };
   }
 
   if (kind === 'rename_page') {
@@ -306,29 +310,45 @@ function applyOne(doc, op, index, state) {
     const mode = ['constraints', 'scale', 'none'].includes(op.resizeMode)
       ? op.resizeMode
       : 'constraints';
-    const resized = resizePage(page, nw, nh, mode);
-    page.elements = resized.elements;
-    page.frame = {
-      preset,
-      w: nw,
-      h: nh,
-      background: str(op.background, page.frame.background),
-    };
+    const resized = resizePageFamily(doc, page.id, nw, nh, mode, preset);
+    doc.pages = resized.pages;
+    const target = doc.pages.find((candidate) => candidate.id === page.id);
+    if (target) {
+      target.frame = {
+        ...target.frame,
+        background: str(op.background, target.frame.background),
+      };
+    }
     return { op: index, kind, pageId: page.id, resizeMode: mode };
   }
 
-  if (kind === 'set_page_states') {
+  if (kind === 'add_page_state') {
     const page = findPage(doc, op, index);
-    const patch = isObj(op.states) ? op.states : {};
-    const merged = {};
-    for (const key of ['loading', 'empty', 'error']) {
-      merged[key] = {
-        ...((page.states && page.states[key]) || {}),
-        ...(isObj(patch[key]) ? patch[key] : {}),
-      };
-    }
-    page.states = normalizePageStates(merged);
-    return { op: index, kind, pageId: page.id };
+    const key = PAGE_STATE_KEYS.includes(op.key) ? op.key : null;
+    if (!key) throw new Error(`op[${index}] add_page_state: unknown state "${op.key}"`);
+    const out = addStateVariant(doc, page.id, key, { name: str(op.name, ''), id: newId });
+    if (!out.pageId) throw new Error(`op[${index}] add_page_state: no base page for "${page.id}"`);
+    doc.pages = out.doc.pages;
+    doc.activePageId = out.doc.activePageId;
+    const base = basePageOf(doc, out.pageId);
+    return {
+      op: index,
+      kind,
+      pageId: out.pageId,
+      basePageId: base ? base.id : '',
+      created: out.created,
+    };
+  }
+
+  if (kind === 'delete_page_state') {
+    const page = findPage(doc, op, index);
+    const key = PAGE_STATE_KEYS.includes(op.key) ? op.key : null;
+    if (!key) throw new Error(`op[${index}] delete_page_state: unknown state "${op.key}"`);
+    const out = removeStateVariant(doc, page.id, key);
+    if (!out.removedId) throw new Error(`op[${index}] delete_page_state: no such variant`);
+    doc.pages = out.doc.pages;
+    doc.activePageId = out.doc.activePageId;
+    return { op: index, kind, pageId: out.removedId };
   }
 
   if (kind === 'clear_page') {
@@ -592,7 +612,7 @@ export function summarizeDoc(rawDoc) {
   return {
     name: doc.name,
     activePageId: doc.activePageId,
-    pages: doc.pages.map((p) => {
+    pages: basePages(doc).map((p) => {
       const entries = collectElementEntries(p.elements);
       return {
         id: p.id,
@@ -601,7 +621,9 @@ export function summarizeDoc(rawDoc) {
         elements: entries.length,
         containers: entries.filter((entry) => isContainerType(entry.el.type)).length,
         links: entries.filter((entry) => entry.el.interactions?.length).length,
+        states: PAGE_STATE_KEYS.filter((key) => statePageId(doc, p.id, key)),
       };
     }),
+    variants: doc.pages.length - basePages(doc).length,
   };
 }

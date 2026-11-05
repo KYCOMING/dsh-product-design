@@ -20,6 +20,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC
 #bar button{border:1px solid #d6d9e2;background:#fff;color:#374151;border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
 #bar button.active{background:#6366f1;border-color:transparent;color:#fff}
 #bar .spacer{width:8px}
+#statebar{display:none;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap;padding:4px 16px 0}
+#statebar button{border:1px solid #d6d9e2;background:#fff;color:#6b7280;border-radius:999px;padding:3px 10px;font:inherit;font-size:11px;cursor:pointer}
+#statebar button.active{background:#111827;border-color:transparent;color:#fff}
+#statebar button:disabled{opacity:.35;cursor:default}
 #overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:50}
 #overlay.open{display:flex}
 #overlayBackdrop{position:absolute;inset:0;background:rgba(17,24,39,.38)}
@@ -45,16 +49,41 @@ const RUNTIME = `
   var stack = [];
   var overlay = document.getElementById('overlay');
   var overlayHost = document.getElementById('overlayHost');
+  var statebar = document.getElementById('statebar');
+
+  function baseIdOf(page){
+    return page.getAttribute('data-variant-of') || page.getAttribute('data-page');
+  }
+  function statePage(base, key){
+    if(key === 'normal') return byId[base] || null;
+    for(var i=0;i<pages.length;i++){
+      if(pages[i].getAttribute('data-variant-of') === base && pages[i].getAttribute('data-state-key') === key) return pages[i];
+    }
+    return null;
+  }
+  function refreshStateBar(page){
+    if(!statebar) return;
+    var base = baseIdOf(page);
+    var key = page.getAttribute('data-state-key') || 'normal';
+    var buttons = statebar.querySelectorAll('button[data-state]');
+    for(var i=0;i<buttons.length;i++){
+      var state = buttons[i].getAttribute('data-state');
+      buttons[i].classList.toggle('active', state === key);
+      buttons[i].disabled = statePage(base, state) === null;
+    }
+  }
 
   function show(id, push){
     var page = byId[id];
     if(!page) return;
     pages.forEach(function(candidate){ candidate.classList.toggle('active', candidate === page); });
     if(push) stack.push(id);
+    var base = baseIdOf(page);
     var buttons = document.querySelectorAll('#bar button[data-go]');
     for(var i=0;i<buttons.length;i++){
-      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-go') === id);
+      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-go') === base);
     }
+    refreshStateBar(page);
   }
   function back(){
     if(stack.length > 1){ stack.pop(); show(stack[stack.length-1], false); }
@@ -81,6 +110,15 @@ const RUNTIME = `
 
   document.addEventListener('click', function(event){
     var target = event.target;
+    var stateBtn = target.closest('#statebar [data-state]');
+    if(stateBtn && !stateBtn.disabled){
+      var activePage = document.querySelector('#pages .dpd-page.active');
+      if(activePage){
+        var next = statePage(baseIdOf(activePage), stateBtn.getAttribute('data-state'));
+        if(next) show(next.getAttribute('data-page'), false);
+      }
+      return;
+    }
     var nav = target.closest('[data-nav]');
     if(nav){ show(nav.getAttribute('data-nav'), true); return; }
     var backEl = target.closest('[data-back]');
@@ -146,7 +184,9 @@ const RUNTIME = `
     if(reset && stack.length){ show(stack[0], false); stack = [stack[0]]; }
   });
 
-  if(pages.length){ stack = [pages[0].getAttribute('data-page')]; show(stack[0], false); }
+  var first = pages.filter(function(page){ return !page.getAttribute('data-variant-of'); })[0] || pages[0];
+  if(first){ stack = [first.getAttribute('data-page')]; show(stack[0], false); }
+  if(statebar && pages.some(function(page){ return !!page.getAttribute('data-variant-of'); })) statebar.style.display = 'flex';
 })();
 `;
 
@@ -155,9 +195,16 @@ export function buildHtml(doc, ctx) {
   const title = escapeHtml(doc.name || ctx.t('app.title'));
   const pages = (doc.pages || []).map((page) => renderPage(page, ctx)).join('');
   const buttons = (doc.pages || [])
+    .filter((page) => !page.variantOf)
     .map(
       (page) =>
         `<button type="button" data-go="${escapeHtml(page.id)}">${escapeHtml(page.name)}</button>`,
+    )
+    .join('');
+  const stateBar = ['normal', 'loading', 'empty', 'error']
+    .map(
+      (key) =>
+        `<button type="button" data-state="${key}">${escapeHtml(ctx.t('state.' + key))}</button>`,
     )
     .join('');
   return `<!doctype html>
@@ -171,6 +218,7 @@ export function buildHtml(doc, ctx) {
 <body>
 <main id="stage"><div id="pages">${pages}</div></main>
 <div id="overlay"><div id="overlayBackdrop"></div><div id="overlayHost"></div></div>
+<div id="statebar">${stateBar}</div>
 <nav id="bar">${buttons}<span class="spacer"></span><button type="button" data-reset="1">↺</button></nav>
 <script>${RUNTIME}</script>
 </body>

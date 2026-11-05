@@ -15,7 +15,8 @@ import {
   reorderInTree,
   scaleElementsInTree,
 } from '../../shared/elements.js';
-import { reflowPage, resizePage } from '../../shared/layout.js';
+import { reflowPage } from '../../shared/layout.js';
+import { removePageDeep } from '../../shared/page-states.js';
 import { uid } from '../model.js';
 import { appendToContainer, duplicateInTree, mapTree, removeFromTree } from './tree.js';
 
@@ -38,24 +39,8 @@ export function addPage(doc, page) {
   return { ...doc, pages: [...doc.pages, page], activePageId: page.id };
 }
 
-export function insertPageAfter(doc, afterId, page) {
-  const index = doc.pages.findIndex((candidate) => candidate.id === afterId);
-  if (index === -1) return doc;
-  const pages = doc.pages.slice();
-  pages.splice(index + 1, 0, page);
-  return { ...doc, pages, activePageId: page.id };
-}
-
 export function removePage(doc, pageId) {
-  if (doc.pages.length <= 1) return doc;
-  const index = doc.pages.findIndex((page) => page.id === pageId);
-  if (index === -1) return doc;
-  const pages = doc.pages.filter((page) => page.id !== pageId);
-  const activePageId =
-    doc.activePageId === pageId
-      ? pages[Math.max(0, Math.min(pages.length - 1, index - 1))].id
-      : doc.activePageId;
-  return { ...doc, pages, activePageId };
+  return removePageDeep(doc, pageId);
 }
 
 export function renamePage(doc, pageId, name) {
@@ -64,23 +49,6 @@ export function renamePage(doc, pageId, name) {
 
 export function patchFrame(doc, pageId, patch) {
   return mapPage(doc, pageId, (page) => ({ ...page, frame: { ...page.frame, ...patch } }));
-}
-
-export function resizePageTo(doc, pageId, width, height, mode, preset) {
-  return mapPage(doc, pageId, (page) => {
-    const resized = resizePage(page, width, height, mode);
-    return preset ? { ...resized, frame: { ...resized.frame, preset } } : resized;
-  });
-}
-
-export function patchPageStates(doc, pageId, key, patch) {
-  return mapPage(doc, pageId, (page) => ({
-    ...page,
-    states: {
-      ...(page.states || {}),
-      [key]: { ...((page.states || {})[key] || {}), ...patch },
-    },
-  }));
 }
 
 /** Scale the page content's bounding box so it fills the frame. */

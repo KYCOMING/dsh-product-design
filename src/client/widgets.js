@@ -398,6 +398,21 @@ function renderWidget(el, state, t, opts) {
   }
 
   if (el.type === 'image') {
+    if (p.src) {
+      return h('img', {
+        src: p.src,
+        alt: p.alt || '',
+        draggable: false,
+        style: {
+          width: '100%',
+          height: '100%',
+          display: 'block',
+          objectFit: p.fit || 'cover',
+          borderRadius: p.radius != null ? p.radius : 10,
+          pointerEvents: 'none',
+        },
+      });
+    }
     return h(
       'div',
       {

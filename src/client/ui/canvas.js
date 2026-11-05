@@ -1,6 +1,5 @@
 import { isContainerType } from '../../shared/elements.js';
 import { TYPE_INFO } from '../constants.js';
-import { PageOverlay } from '../overlay.js';
 import { h } from '../react.js';
 import { renderWidget } from '../widgets.js';
 
@@ -39,7 +38,6 @@ export function CanvasView(props) {
     multiBounds,
     sel,
     preview,
-    pageState,
     ui,
     canvasRef,
     spaceRef,
@@ -312,15 +310,6 @@ export function CanvasView(props) {
           })
         : null;
 
-    const overlay =
-      pageActive && pageState !== 'normal'
-        ? h(PageOverlay, {
-            pageState,
-            content: (p.states && p.states[pageState]) || null,
-            t,
-          })
-        : null;
-
     return h(
       'div',
       {
@@ -353,7 +342,6 @@ export function CanvasView(props) {
       multiSelection,
       guideNodes,
       marqueeNode,
-      overlay,
     );
   });
 

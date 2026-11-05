@@ -3,13 +3,12 @@
  * transient hover/focus state used to fake component interaction.
  */
 
+import { statePageId } from '../../shared/page-states.js';
 import { defaultState } from '../constants.js';
-import { patchElement } from '../domain/document.js';
 import { useState } from '../react.js';
 
-export function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
+export function usePreview({ docRef, setSelIds, setEditing, t }) {
   const [preview, setPreview] = useState(false);
-  const [pageState, setPageState] = useState('normal');
   const [ui, setUi] = useState({}); // per-element transient preview state
   const [previewStack, setPreviewStack] = useState([]);
   const [previewOverlay, setPreviewOverlay] = useState(null);
@@ -22,6 +21,7 @@ export function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
     setPreview(false);
     setPreviewStack([]);
     setPreviewOverlay(null);
+    setUi({});
   }
   function togglePreview() {
     if (preview) {
@@ -30,6 +30,7 @@ export function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
     }
     setPreviewStack([docRef.current.activePageId]);
     setPreviewOverlay(null);
+    setUi({});
     setSelIds([]);
     setEditing(null);
     setPreview(true);
@@ -39,6 +40,22 @@ export function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
   }
   function closeOverlay() {
     setPreviewOverlay(null);
+  }
+
+  /** Switch the previewed page to one state variant (or back to the base page). */
+  function showState(key) {
+    setPreviewStack((stack) => {
+      if (!stack.length) return stack;
+      const current = docRef.current.pages.find((page) => page.id === stack[stack.length - 1]);
+      if (!current) return stack;
+      const base = current.variantOf
+        ? docRef.current.pages.find((page) => page.id === current.variantOf)
+        : current;
+      if (!base) return stack;
+      const target = key === 'normal' ? base.id : statePageId(docRef.current, base.id, key);
+      if (!target) return stack;
+      return [...stack.slice(0, -1), target];
+    });
   }
 
   function interact(el) {
@@ -62,6 +79,7 @@ export function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
     const base = el.state || defaultState(el.type);
     if (!preview) return base;
     const transient = ui[el.id] || {};
+    if (transient.state) return transient.state;
     if (el.type === 'button') {
       if (base === 'disabled') return 'disabled';
       if (transient.press) return 'active';
@@ -75,16 +93,12 @@ export function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
 
   function activate(el, ev) {
     if (!preview) return;
-    const patch = (fn) => setDoc((doc) => patchElement(doc, el.id, fn));
-    if (el.type === 'toggle')
-      patch((current) => ({ ...current, state: current.state === 'on' ? 'off' : 'on' }));
+    const current = renderStateFor(el);
+    if (el.type === 'toggle') setUiFor(el.id, { state: current === 'on' ? 'off' : 'on' });
     else if (el.type === 'checkbox')
-      patch((current) => ({
-        ...current,
-        state: current.state === 'checked' ? 'unchecked' : 'checked',
-      }));
+      setUiFor(el.id, { state: current === 'checked' ? 'unchecked' : 'checked' });
     else if (el.type === 'select')
-      patch((current) => ({ ...current, state: current.state === 'open' ? 'default' : 'open' }));
+      setUiFor(el.id, { state: current === 'open' ? 'default' : 'open' });
     else if (el.type === 'input') setUiFor(el.id, { focus: true });
     else if (el.type === 'tabs') {
       const rect = ev.currentTarget.getBoundingClientRect();
@@ -104,8 +118,7 @@ export function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
     exitPreview,
     back,
     closeOverlay,
-    pageState,
-    setPageState,
+    showState,
     ui,
     setUi,
     setUiFor,

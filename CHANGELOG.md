@@ -6,6 +6,20 @@
 
 ## [Unreleased]
 
+### Added
+- **设计稿库**：设计稿从「会话附件」变成独立对象（`docs/<docId>.json`），会话只绑定当前稿（`sessions/<sessionId>/active.json`）。左侧新增「设计稿」面板：新建、重命名（双击）、复制、删除、导出 JSON、导入 JSON；删除正在使用的稿子会自动给会话分配一份新的空白稿。
+- **图片组件**：支持 URL 或本地文件（2MB 内转 data URL）、`cover / contain / fill` 三种填充方式；编辑器、HTML、React、PNG 导出都渲染真实图片。
+- **页面状态变体**：加载 / 空 / 错误不再是文案蒙层，而是真实变体页（`variantOf` + `stateKey`）。顶部状态切换直接切换/创建变体，变体可以像普通页面一样增删元素；复制基础页会带上变体，删除基础页会一起删除变体，改画板尺寸会同步整个状态家族；预览里可切换状态；HTML / React 导出带上状态切换条；AI 用 `add_page_state` / `delete_page_state`。
+- **空会话入口**：注册 `conversation.hero.options`，空白会话在输入框旁显示「打开产品设计」，直接进入全屏画布。
+
+### Changed
+- **HTTP API**：新增 `GET/POST /docs`、`POST /docs/rename|duplicate|delete|import`、`GET /docs/export`、`POST /session/doc`；`GET /doc` 返回 `docId`，`POST /doc` 携带 `docId`，写错稿返回 409。
+- **工具**：`product_design_apply` 用 `add_page_state` / `delete_page_state` 取代 `set_page_states`；`product_design_get_document` 返回 `docId`。
+- **模型提示**：更新入口说明（会话顶部标签 + 空会话入口）、设计稿库、图片 `src/fit` 与状态变体。
+- **预览交互不写回**：预览里的开关 / 复选框 / 下拉切换改为瞬态，不再修改设计稿或产生撤销步骤。
+- **存储结构变更（不兼容）**：设计稿从 `sessions/<sessionId>/doc.json` 移到 `docs/<docId>.json` + `sessions/<sessionId>/active.json`；旧版按会话存的稿子不再读取（开发阶段，不做迁移）。
+- **README**：同步设计稿库、图片、状态变体、空会话入口与新的存储 / API 结构。
+
 ## [1.3.0] - 2026-11-05
 
 首个「会话标签页」版本。文档格式升到 v3，旧稿不再读取；同时补齐编辑手感、原型交互、约束 / Auto Layout 与三种导出。

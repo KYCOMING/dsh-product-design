@@ -8,7 +8,7 @@
  */
 
 const API_PREFIX = '/dsh-product-design/api';
-const MAX_BODY = 4 * 1024 * 1024;
+const MAX_BODY = 16 * 1024 * 1024;
 const HEARTBEAT_MS = 15000;
 
 function writeJson(res, status, value) {
@@ -83,9 +83,73 @@ function makeHandler(ctx, stores) {
 
       if (sub === '/doc' && req.method === 'POST') {
         const body = await readJson(req);
-        const store = stores.forSession(body?.sessionId || querySessionId);
-        const result = store.setDoc(body?.doc, body?.baseRevision);
+        const sessionId = body?.sessionId || querySessionId;
+        const result = stores
+          .forSession(sessionId)
+          .setDoc(body?.doc, body?.baseRevision, body?.docId);
         writeJson(res, result.conflict ? 409 : 200, result);
+        return;
+      }
+
+      if (sub === '/session/doc' && req.method === 'POST') {
+        const body = await readJson(req);
+        const sessionId = body?.sessionId || querySessionId;
+        writeJson(res, 200, stores.forSession(sessionId).selectDoc(body?.docId));
+        return;
+      }
+
+      if (sub === '/docs' && req.method === 'GET') {
+        writeJson(res, 200, stores.listDocs(querySessionId));
+        return;
+      }
+
+      if (sub === '/docs' && req.method === 'POST') {
+        const body = await readJson(req);
+        const sessionId = body?.sessionId || querySessionId;
+        writeJson(res, 200, stores.createDocFor({ sessionId, name: body?.name, doc: body?.doc }));
+        return;
+      }
+
+      if (sub === '/docs/duplicate' && req.method === 'POST') {
+        const body = await readJson(req);
+        writeJson(res, 200, stores.duplicateDoc(body?.docId, body?.name));
+        return;
+      }
+
+      if (sub === '/docs/rename' && req.method === 'POST') {
+        const body = await readJson(req);
+        writeJson(res, 200, stores.renameDoc(body?.docId, body?.name));
+        return;
+      }
+
+      if (sub === '/docs/delete' && req.method === 'POST') {
+        const body = await readJson(req);
+        writeJson(res, 200, stores.deleteDoc(body?.docId));
+        return;
+      }
+
+      if (sub === '/docs/import' && req.method === 'POST') {
+        const body = await readJson(req);
+        writeJson(res, 200, stores.importDoc(body?.payload, body?.name));
+        return;
+      }
+
+      if (sub === '/docs/export' && req.method === 'GET') {
+        const docId = url.searchParams.get('docId') || '';
+        const payload = stores.exportDoc(docId);
+        const body = JSON.stringify(payload);
+        const safeName =
+          String(payload.doc?.name || 'design')
+            .replace(/[^a-zA-Z0-9._\-\u4e00-\u9fa5 ]/g, '_')
+            .trim()
+            .slice(0, 60) || 'design';
+        res.writeHead(200, {
+          'content-type': 'application/json; charset=utf-8',
+          'content-disposition': `attachment; filename="${safeName}.json"`,
+          'cache-control': 'no-store',
+          'content-length': Buffer.byteLength(body),
+        });
+        res.end(body);
         return;
       }
 
@@ -104,8 +168,8 @@ function makeHandler(ctx, stores) {
           'cache-control': 'no-cache',
           connection: 'keep-alive',
         });
-        const push = () =>
-          res.write(`data: ${JSON.stringify({ revision: store.snapshot().revision })}\n\n`);
+        const push = (revision, docId) =>
+          res.write(`data: ${JSON.stringify({ revision, docId })}\n\n`);
         const unsubscribe = store.subscribe(push);
         const heartbeat = setInterval(() => {
           try {
@@ -120,7 +184,8 @@ function makeHandler(ctx, stores) {
         };
         req.once('close', close);
         res.once('close', close);
-        push();
+        const snap = store.snapshot();
+        push(snap.revision, snap.docId);
         return;
       }
 

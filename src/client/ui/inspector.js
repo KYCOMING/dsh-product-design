@@ -1,14 +1,31 @@
 import { isContainerType } from '../../shared/elements.js';
 import { H_MODES, V_MODES } from '../../shared/layout.js';
+import { PAGE_STATE_KEYS } from '../../shared/page-states.js';
 import { ACCENT, defaultState, TYPE_INFO } from '../constants.js';
 import { IconBack, IconCopy, IconFront, IconTrash } from '../icons.js';
 import { h } from '../react.js';
 
-const PAGE_STATE_KEYS = {
-  loading: ['text'],
-  empty: ['title', 'desc', 'action'],
-  error: ['title', 'desc', 'action'],
-};
+const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+/** Pick a local image and hand it back as a data URL (stored inside the document). */
+function chooseImageFile({ onPick, onError }) {
+  if (typeof document === 'undefined') return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > IMAGE_MAX_BYTES) {
+      onError();
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener('load', () => onPick(String(reader.result || '')));
+    reader.readAsDataURL(file);
+  });
+  input.click();
+}
 
 export function InspectorView(props) {
   const {
@@ -17,14 +34,15 @@ export function InspectorView(props) {
     sel,
     selCount,
     activePage,
-    pageState,
+    statePageIds,
+    switchPageState,
+    deleteStateVariant,
     resizeMode,
     setResizeMode,
     fitContentToFrame,
     setPreset,
     renameActivePage,
     patchActiveFrame,
-    patchPageStates,
     duplicateEl,
     bringFront,
     sendBack,
@@ -254,6 +272,73 @@ export function InspectorView(props) {
               placeholder: t('sample.text'),
               onChange: (e) => applyProps({ text: e.target.value }, 'text:' + sel.id),
             }),
+          )
+        : null,
+      sel.type === 'image'
+        ? h(
+            'div',
+            { className: 'dpd-section' },
+            h('div', { className: 'dpd-panelTitle' }, h('span', null, t('inspector.image'))),
+            h(
+              'div',
+              { className: 'dpd-row' },
+              h('label', null, t('inspector.imageUrl')),
+              h('input', {
+                className: 'dpd-input',
+                type: 'text',
+                value: sel.props.src || '',
+                placeholder: 'https://…',
+                onChange: (e) => applyProps({ src: e.target.value }, 'src:' + sel.id),
+              }),
+            ),
+            h(
+              'div',
+              { className: 'dpd-row' },
+              h('label', null, t('inspector.imageFit')),
+              h(
+                'select',
+                {
+                  className: 'dpd-select',
+                  style: { flex: 1 },
+                  value: sel.props.fit || 'cover',
+                  onChange: (e) => applyProps({ fit: e.target.value }, 'fit:' + sel.id),
+                },
+                ['cover', 'contain', 'fill'].map((fit) =>
+                  h('option', { key: fit, value: fit }, t('inspector.fit.' + fit)),
+                ),
+              ),
+            ),
+            h(
+              'div',
+              { className: 'dpd-row' },
+              h(
+                'button',
+                {
+                  className: 'dpd-btn',
+                  type: 'button',
+                  onClick: () =>
+                    chooseImageFile({
+                      onPick: (src) => applyProps({ src }, 'src:' + sel.id),
+                      onError: () => {
+                        if (typeof window !== 'undefined')
+                          window.alert(t('inspector.imageTooLarge'));
+                      },
+                    }),
+                },
+                t('inspector.chooseImage'),
+              ),
+              sel.props.src
+                ? h(
+                    'button',
+                    {
+                      className: 'dpd-btn',
+                      type: 'button',
+                      onClick: () => applyProps({ src: '' }, 'src:' + sel.id),
+                    },
+                    t('inspector.removeImage'),
+                  )
+                : null,
+            ),
           )
         : null,
       info.hasColor || info.hasText
@@ -686,9 +771,6 @@ export function InspectorView(props) {
       ),
     );
   } else {
-    const states = (activePage && activePage.states) || {};
-    const stateKeys = PAGE_STATE_KEYS[pageState] || null;
-    const stateValue = stateKeys ? states[pageState] || {} : null;
     inspectorBody = h(
       'div',
       { key: 'page' },
@@ -769,46 +851,77 @@ export function InspectorView(props) {
           ),
         ),
       ),
-      stateKeys
-        ? h(
-            'div',
-            { className: 'dpd-section' },
-            h(
+      h(
+        'div',
+        { className: 'dpd-section' },
+        h(
+          'div',
+          { className: 'dpd-panelTitle' },
+          h('span', null, t('inspector.states')),
+          activePage && activePage.variantOf
+            ? h('span', null, t('state.' + activePage.stateKey))
+            : null,
+        ),
+        activePage && activePage.variantOf
+          ? h(
               'div',
-              { className: 'dpd-panelTitle' },
-              h('span', null, t('inspector.states')),
-              h('span', null, t('state.' + pageState)),
-            ),
-            stateKeys.map((field) =>
+              null,
+              h('div', { className: 'dpd-hint' }, t('inspector.variantEditing')),
               h(
                 'div',
-                { className: 'dpd-row', key: field },
-                h('label', null, t('inspector.state' + field[0].toUpperCase() + field.slice(1))),
-                h('input', {
-                  className: 'dpd-input',
-                  type: 'text',
-                  value: (stateValue && stateValue[field]) || '',
-                  placeholder: t(
-                    pageState === 'loading'
-                      ? 'overlay.loading'
-                      : pageState === 'empty'
-                        ? field === 'title'
-                          ? 'overlay.emptyTitle'
-                          : field === 'desc'
-                            ? 'overlay.emptyDesc'
-                            : 'overlay.emptyBtn'
-                        : field === 'title'
-                          ? 'overlay.errorTitle'
-                          : field === 'desc'
-                            ? 'overlay.errorDesc'
-                            : 'overlay.errorBtn',
-                  ),
-                  onChange: (e) => patchPageStates(pageState, { [field]: e.target.value }),
-                }),
+                { className: 'dpd-actions' },
+                h(
+                  'button',
+                  {
+                    className: 'dpd-btn',
+                    type: 'button',
+                    onClick: () => switchPageState('normal'),
+                  },
+                  t('inspector.backToBase'),
+                ),
+                h(
+                  'button',
+                  {
+                    className: 'dpd-btn',
+                    type: 'button',
+                    onClick: () => deleteStateVariant(activePage.stateKey),
+                  },
+                  h(IconTrash),
+                  t('inspector.deleteVariant'),
+                ),
               ),
-            ),
-          )
-        : null,
+            )
+          : PAGE_STATE_KEYS.map((key) => {
+              const linked = !!(statePageIds && statePageIds[key]);
+              return h(
+                'div',
+                { className: 'dpd-row', key },
+                h('label', null, t('state.' + key)),
+                h(
+                  'button',
+                  {
+                    className: 'dpd-btn',
+                    type: 'button',
+                    onClick: () => switchPageState(key),
+                  },
+                  linked ? t('inspector.editState') : t('inspector.createState'),
+                ),
+                linked
+                  ? h(
+                      'button',
+                      {
+                        className: 'dpd-mini',
+                        type: 'button',
+                        title: t('inspector.deleteVariant'),
+                        'aria-label': t('inspector.deleteVariant'),
+                        onClick: () => deleteStateVariant(key),
+                      },
+                      h(IconTrash),
+                    )
+                  : null,
+              );
+            }),
+      ),
     );
   }
 

@@ -194,18 +194,24 @@ describe('host API + tools', () => {
     expect(command.handler({ agent: { followup() {} }, rawInput: '  ' }).kind).toBe('error');
   });
 
-  it('GET /doc 初始为空 → POST 播种 → GET 读到', async () => {
+  it('GET /doc 为新会话自动建稿 → POST 播种 → GET 读到', async () => {
     const before = await call('GET', '/dsh-product-design/api/doc');
     expect(before.status).toBe(200);
-    expect(before.json.doc).toBeNull();
+    expect(before.json.docId).toBeTruthy();
+    expect(before.json.doc.pages).toEqual([]);
 
     const seed = { name: 'demo', activePageId: null, pages: [] };
-    const post = await call('POST', '/dsh-product-design/api/doc', { baseRevision: 0, doc: seed });
+    const post = await call('POST', '/dsh-product-design/api/doc', {
+      baseRevision: before.json.revision,
+      docId: before.json.docId,
+      doc: seed,
+    });
     expect(post.status).toBe(200);
     expect(post.json.revision).toBe(1);
 
     const after = await call('GET', '/dsh-product-design/api/doc');
     expect(after.json.doc.name).toBe('demo');
+    expect(after.json.docId).toBe(before.json.docId);
   });
 
   it('陈旧 baseRevision 触发 409 冲突', async () => {
@@ -301,14 +307,17 @@ describe('host API + tools', () => {
       doc: { name: 'traversal', pages: [] },
     });
     expect(res.status).toBe(200);
-    const safeFile = join(
+    const bindingFile = join(
       home,
       'storages',
       'dsh-product-design',
       'sessions',
       'default',
-      'doc.json',
+      'active.json',
     );
+    expect(existsSync(bindingFile)).toBe(true);
+    const bound = JSON.parse(readFileSync(bindingFile, 'utf8')).docId;
+    const safeFile = join(home, 'storages', 'dsh-product-design', 'docs', `${bound}.json`);
     expect(existsSync(safeFile)).toBe(true);
     expect(JSON.parse(readFileSync(safeFile, 'utf8')).doc.name).toBe('traversal');
     const escapedFile = join(home, 'storages', 'dsh-product-design', 'doc.json');
@@ -372,5 +381,92 @@ describe('host API + tools', () => {
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+});
+
+describe('设计稿库', () => {
+  const page = (id, name) => ({
+    id,
+    name,
+    frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
+    elements: [],
+  });
+
+  it('新建 / 列表 / 重命名 / 复制 / 导出 / 导入 / 切换 / 删除', async () => {
+    const sid = 'docs-session';
+    const created = await call('POST', '/dsh-product-design/api/docs', {
+      sessionId: sid,
+      doc: { name: 'Draft', activePageId: 'dp1', pages: [page('dp1', 'Draft page')] },
+    });
+    expect(created.status).toBe(200);
+    const id = created.json.meta.id;
+    expect(id).toBeTruthy();
+    expect(created.json.snapshot.docId).toBe(id);
+
+    const listed = await call('GET', `/dsh-product-design/api/docs?sessionId=${sid}`);
+    expect(listed.status).toBe(200);
+    expect(listed.json.activeDocId).toBe(id);
+    expect(listed.json.docs.some((d) => d.id === id)).toBe(true);
+
+    const renamed = await call('POST', '/dsh-product-design/api/docs/rename', {
+      docId: id,
+      name: 'Renamed',
+    });
+    expect(renamed.json.name).toBe('Renamed');
+
+    const dup = await call('POST', '/dsh-product-design/api/docs/duplicate', { docId: id });
+    expect(dup.json.id).not.toBe(id);
+    expect(dup.json.name).toBe('Renamed copy');
+
+    const exported = await call(
+      'GET',
+      `/dsh-product-design/api/docs/export?docId=${encodeURIComponent(id)}`,
+    );
+    expect(exported.status).toBe(200);
+    expect(exported.json.format).toBe('dsh-product-design');
+    expect(exported.json.doc.name).toBe('Renamed');
+
+    const imported = await call('POST', '/dsh-product-design/api/docs/import', {
+      payload: exported.json,
+      name: 'Imported',
+    });
+    expect(imported.json.name).toBe('Imported');
+
+    const switched = await call('POST', '/dsh-product-design/api/session/doc', {
+      sessionId: sid,
+      docId: dup.json.id,
+    });
+    expect(switched.json.docId).toBe(dup.json.id);
+    expect(switched.json.doc.name).toBe('Renamed copy');
+
+    const del = await call('POST', '/dsh-product-design/api/docs/delete', { docId: dup.json.id });
+    expect(del.json.ok).toBe(true);
+    expect(del.json.rebinds.some((r) => r.sessionId === sid)).toBe(true);
+
+    const after = await call('GET', `/dsh-product-design/api/doc?sessionId=${sid}`);
+    expect(after.json.docId).not.toBe(dup.json.id);
+  });
+
+  it('切稿后旧 docId 的写入返回 409，不会写进新稿', async () => {
+    const sid = 'docs-stale';
+    const first = await call('POST', '/dsh-product-design/api/docs', {
+      sessionId: sid,
+      doc: { name: 'First', activePageId: 'p1', pages: [page('p1', 'First')] },
+    });
+    const second = await call('POST', '/dsh-product-design/api/docs', {
+      sessionId: sid,
+      doc: { name: 'Second', activePageId: 'p2', pages: [page('p2', 'Second')] },
+    });
+    const current = await call('GET', `/dsh-product-design/api/doc?sessionId=${sid}`);
+    expect(current.json.docId).toBe(second.json.meta.id);
+
+    const stale = await call('POST', `/dsh-product-design/api/doc?sessionId=${sid}`, {
+      baseRevision: current.json.revision,
+      docId: first.json.meta.id,
+      doc: { name: 'Stale', activePageId: 'p1', pages: [page('p1', 'Stale')] },
+    });
+    expect(stale.status).toBe(409);
+    const still = await call('GET', `/dsh-product-design/api/doc?sessionId=${sid}`);
+    expect(still.json.doc.name).toBe('Second');
   });
 });

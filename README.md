@@ -1,8 +1,8 @@
 # dsh-product-design
 
-会话标签页里的「简化版 Figma」产品设计画布。用于产品设计需求沟通：在画布上直接搭原型，组件可交互、可切换状态，并预览整页的加载 / 空 / 错误状态。
+会话标签页里的「简化版 Figma」产品设计画布。用于产品设计需求沟通：在画布上直接搭原型，组件可交互、可切换状态，加载 / 空 / 错误是可直接编辑的变体页。
 
-> DSH 插件（DeepSeek Harness）。客户端半由 `src/client` 构建为单文件模块，通过 `window.__ModuleLoader__` 挂载侧边栏入口与主页面。
+> DSH 插件（DeepSeek Harness）。客户端半由 `src/client` 构建为单文件模块，通过 `window.__ModuleLoader__` 挂载会话视图、全屏画布与空会话入口。
 
 ## 安装
 
@@ -37,7 +37,7 @@ dsh plugin --profile desktop remove dsh-product-design
 ### 权限与数据
 
 - 在 Host 进程内注册同源 HTTP 路由 `/dsh-product-design/api`，提供文档读写与 SSE 变更推送。
-- 设计稿写入 `<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`；浏览器端另用 `localStorage`（`doc:v3:<sessionId>`）做缓存/离线兜底。
+- 设计稿写入 `<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`，会话只记录当前打开的稿子（`sessions/<sessionId>/active.json`）；浏览器端另用 `localStorage`（`doc:v3:<sessionId>`）做缓存/离线兜底。
 - 注册两个 agent 工具（`product_design_get_document` / `product_design_apply`）、一段系统提示和 `/design` 命令。
 - 不发起外部网络请求，不收集遥测。
 
@@ -79,12 +79,15 @@ dsh plugin --profile desktop remove dsh-product-design
 - **预览模式**：一键进入「只看产品」的干净视图——隐藏工具栏与左右侧栏、只显示当前画板、不显示网格与页面标签；组件真实响应悬停 / 按下 / 点击，开关、复选框、标签页、下拉可交互。`Esc` 或右上角「退出预览」返回编辑器。
 - **原型交互**：给任意元素配置 `点击 → 跳转页面 / 返回 / 打开为弹层`，预览里可以真的走通一条流程（带返回栈，`Esc` 逐层退出）。
 - **导出**：工具栏「导出」支持三种产物——当前页 PNG（1× / 2×）、单文件可交互 HTML 原型、React + Tailwind 组件文件。全部在浏览器内生成，不上传任何数据。
-- **页面状态**：顶部「正常 / 加载中 / 空状态 / 错误」一键切换整页效果；三种状态的标题/说明/按钮文案可在右侧属性面板逐页编辑，AI 也能通过 `set_page_states` 写入。
+- **页面状态变体**：顶部「正常 / 加载中 / 空状态 / 错误」切换的是真实变体页——每个状态有自己的元素树，可以像普通页面一样增删改；预览里也能切换状态，导出 HTML / React 时带上状态切换条。AI 用 `add_page_state` 生成变体。
+- **设计稿库**：左侧「设计稿」列出 Host 上的所有稿子，可新建、重命名、复制、删除、导出 / 导入 JSON；会话只绑定其中一份，换会话不会丢稿。
+- **图片**：「图片」组件支持 URL 或本地文件（2MB 内转 data URL）、三种填充方式（cover / contain / fill），编辑器与三种导出都渲染真实图片。
+- **空会话入口**：还没有消息的会话看不到顶部标签，但输入框旁的「打开产品设计」可以直接进入画布。
 - **网格 + 缩放**：画布小方格网格随缩放变化；`Ctrl/⌘ + 滚轮` 缩放，普通滚轮滚动。
 - **编辑体验**：撤销 / 重做（含 AI 改动）、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
 - **对话内产品预览（Visualize 风格）**：AI 调用 `product_design_apply` 后，聊天回合末尾会出现当前页面的产品缩略卡片，可一键「打开画布」；无需先手动打开画布。
 - **会话标签页**：产品设计是会话顶部的一个视图标签（与 Chat 并列），不再占用侧边栏；画布内可一键「全屏」，全屏模式可「返回会话」。
-- **多会话独立设计稿**：每个会话拥有自己的设计稿；切换会话时画布自动切换，互不覆盖。
+- **多会话与设计稿库**：每个会话绑定设计稿库中的一份稿子；切换会话时画布自动切换，互不覆盖；也可以在同一会话里切换不同稿子。
 - **自动保存**：设计稿持久化到 Host（按会话分目录）和 `localStorage`（`doc:v3:<sessionId>`）。
 
 ## 导出
@@ -139,11 +142,11 @@ dsh-product-design/
 │  │  │  ├─ tree.js           #   元素树不可变操作（增删改、复制、重挂载）
 │  │  │  └─ document.js       #   文档变换（页面/元素/粘贴/对齐/编组/缩放）
 │  │  ├─ editor/              # 行为层：React hooks，一个关注点一个文件
-│  │  │  ├─ useDocument.js    #   文档状态 + 撤销历史 + Host 同步（SSE/POST）
+│  │  │  ├─ useDocument.js    #   文档状态 + 撤销历史 + Host 同步（SSE/POST）+ 切稿
 │  │  │  ├─ useSelection.js   #   选区派生、批量属性、微移
 │  │  │  ├─ useEditorActions.js # 页面/元素/排列命令（调用 domain）
 │  │  │  ├─ useGestures.js    #   拖拽 / 缩放 / 框选 / 平移 / 磁吸 / 堆叠重排
-│  │  │  ├─ usePreview.js     #   预览栈、弹层、页面状态、交互态
+│  │  │  ├─ usePreview.js     #   预览栈、弹层、状态切换、交互态
 │  │  │  ├─ useClipboard.js   #   内部剪贴板
 │  │  │  ├─ useTextEditing.js #   就地编辑
 │  │  │  ├─ useKeyboard.js    #   全局快捷键映射
@@ -165,8 +168,9 @@ dsh-product-design/
 │  │  │  └─ exportmenu.js
 │  │  ├─ react.js  constants.js  i18n.js  color.js  icons.js  styles.js
 │  │  ├─ model.js             # 文档归一化 / localStorage / Host API 调用
+│  │  ├─ docs.js              # 设计稿库客户端（列表 / 新建 / 重命名 / 复制 / 导入导出）
 │  │  ├─ widgets.js           # 组件渲染
-│  │  ├─ overlay.js           # 页面状态浮层
+│  │  ├─ ui/heroEntry.js      # 空会话的「打开产品设计」入口
 │  │  ├─ cards.js             # 对话内产品预览卡片
 │  │  └─ session.js           # 跟随当前会话
 │  ├─ shared/                 # 浏览器 / Host 共用纯逻辑
@@ -176,7 +180,7 @@ dsh-product-design/
 │  └─ host/
 │     ├─ index.js             # 装配：注册 HTTP / tools / command / prompt
 │     ├─ paths.js             # 文件系统布局
-│     ├─ store.js             # 会话文档 + revision + 订阅
+│     ├─ store.js             # 设计稿库 + 会话绑定 + revision + 订阅
 │     ├─ http.js              # 同源 API 路由
 │     ├─ tools.js             # agent 工具
 │     ├─ preview.js           # 对话卡片描述
@@ -206,15 +210,17 @@ dsh-product-design/
 
 设计稿的所有权在 **Host**，浏览器只是视图，因此模型可以通过工具直接读写画布：
 
-- **数据**：`<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`（默认 `~/.dsh/...`），每个会话一份，含 `revision` 与 `doc`；旧版全局 `doc.json` 会迁移到首个打开画布的会话。
+- **数据**：`<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`（默认 `~/.dsh/...`），每份稿子含 `revision` 与 `doc`；`sessions/<sessionId>/active.json` 记录该会话当前打开哪份稿子。
 - **HTTP 路由**（同源，前缀 `/dsh-product-design/api`）：
-  - `GET /doc` → `{ revision, doc }`
-  - `POST /doc` → `{ baseRevision, doc }`（乐观并发，版本不匹配返回 409 + 当前文档）
+  - `GET /doc` → `{ docId, revision, doc }`
+  - `POST /doc` → `{ baseRevision, docId, doc }`（乐观并发，版本或 docId 不匹配返回 409 + 当前文档）
+  - `POST /session/doc` → `{ sessionId, docId }`（切换会话当前稿）
+  - `GET /docs` / `POST /docs` / `POST /docs/rename|duplicate|delete|import` / `GET /docs/export` → 设计稿库
   - `POST /apply` → `{ operations: [...] }`（服务端 reducer）
-  - `GET /events` → SSE，每次变更推送 `{ revision }`
+  - `GET /events` → SSE，每次变更推送 `{ revision, docId }`
 - **Agent 工具**（`ctx.get('tools').register`）：
   - `product_design_get_document`：读取当前文档（页面 / 元素 / 状态 / 属性）。
-  - `product_design_apply`：按顺序应用操作，返回生成的 page/element id 与新 revision。支持 `add_page` / `duplicate_page` / `delete_page` / `rename_page` / `set_active_page` / `set_page_frame` / `set_page_states` / `clear_page` / `add_element` / `update_element` / `delete_element` / `move_element` / `reorder_element` / `group_elements` / `ungroup_elements` / `set_document_name`；页面可用 `pageId`、`"@last"` 或 `pageIndex` 定位。元素支持 `name / hidden / locked / opacity / interactions`。
+  - `product_design_apply`：按顺序应用操作，返回生成的 page/element id 与新 revision。支持 `add_page` / `duplicate_page` / `delete_page` / `rename_page` / `set_active_page` / `set_page_frame` / `add_page_state` / `delete_page_state` / `clear_page` / `add_element` / `update_element` / `delete_element` / `move_element` / `reorder_element` / `group_elements` / `ungroup_elements` / `set_document_name`；页面可用 `pageId`、`"@last"` 或 `pageIndex` 定位。元素支持 `name / hidden / locked / opacity / interactions`。
 - **模型提示段**：通过 `ctx.systemPrompt.section` 注册说明，告诉模型画布与工具、坐标系与组件/状态清单，以及“先 get 再单次 apply 批量搭建”。
 - **同步**：客户端 GET + SSE 拉取 Host 变更；本地编辑 400ms debounce 回写；冲突以 409 让客户端采纳服务端版本。Host 不可用时自动退回 localStorage 单机模式。
 - **安全**：路由复用 Host 的 `connection.requestRejection` 同源护栏（若有）；默认仅本机回环绑定。
@@ -235,7 +241,7 @@ pnpm run check      # build + syntax + lint + test 一次跑完
 
 ## 数据存储
 
-- **Host 权威**：`<DSH_HOME>/storages/dsh-product-design/sessions/<sessionId>/doc.json`（`{ revision, doc }`），按会话隔离、供 AI 工具读写；无会话上下文时退回旧版全局 `doc.json`。
+- **Host 权威**：`<DSH_HOME>/storages/dsh-product-design/docs/<docId>.json`（`{ revision, doc }`），设计稿库供 AI 工具读写；`sessions/<sessionId>/active.json` 只记录会话当前稿。
 - `dsh-product-design:doc:v3:<sessionId>`：浏览器端 **按会话缓存/离线兜底**（Host 不可达时使用；首次连接时若 Host 为空则作为种子上报）。
 - `dsh-product-design:ui:v1`：界面偏好（左右侧栏宽度、当前分区、磁吸开关）。
 - 文档格式为 v3；开发阶段不保留旧格式迁移，旧稿不会被读取。

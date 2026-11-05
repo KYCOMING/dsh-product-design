@@ -394,6 +394,7 @@ function setAppCtx(ctx) {
 var DICT = {
   zh: {
     "entry.label": "\u4EA7\u54C1\u8BBE\u8BA1",
+    "hero.open": "\u6253\u5F00\u4EA7\u54C1\u8BBE\u8BA1",
     "app.title": "\u4EA7\u54C1\u8BBE\u8BA1\u753B\u5E03",
     "name.placeholder": "\u672A\u547D\u540D\u8BBE\u8BA1",
     "toolbar.preview": "\u9884\u89C8",
@@ -421,6 +422,27 @@ var DICT = {
     "state.loading": "\u52A0\u8F7D\u4E2D",
     "state.empty": "\u7A7A\u72B6\u6001",
     "state.error": "\u9519\u8BEF",
+    "docs.title": "\u8BBE\u8BA1\u7A3F",
+    "docs.add": "\u65B0\u5EFA",
+    "docs.import": "\u5BFC\u5165",
+    "docs.untitled": "\u672A\u547D\u540D\u8BBE\u8BA1\u7A3F",
+    "docs.pages": "\u9875",
+    "docs.rename": "\u91CD\u547D\u540D\uFF08\u53CC\u51FB\u540D\u79F0\uFF09",
+    "docs.duplicate": "\u590D\u5236\u8BBE\u8BA1\u7A3F",
+    "docs.export": "\u5BFC\u51FA JSON",
+    "docs.delete": "\u5220\u9664\u8BBE\u8BA1\u7A3F",
+    "docs.deleteConfirm": "\u5220\u9664\u8FD9\u4EFD\u8BBE\u8BA1\u7A3F\uFF1F\u6B63\u5728\u4F7F\u7528\u5B83\u7684\u4F1A\u8BDD\u4F1A\u5207\u6362\u5230\u4E00\u4EFD\u65B0\u7684\u7A7A\u767D\u7A3F\u3002",
+    "docs.empty": "\u8FD8\u6CA1\u6709\u8BBE\u8BA1\u7A3F\u3002\u65B0\u5EFA\u4E00\u4EFD\uFF0C\u6216\u4ECE JSON \u5BFC\u5165\u3002",
+    "docs.offline": "Host \u672A\u8FDE\u63A5\uFF0C\u8BBE\u8BA1\u7A3F\u5E93\u6682\u4E0D\u53EF\u7528\u3002",
+    "docs.loadFailed": "\u8BFB\u53D6\u8BBE\u8BA1\u7A3F\u5217\u8868\u5931\u8D25\u3002",
+    "docs.createFailed": "\u65B0\u5EFA\u8BBE\u8BA1\u7A3F\u5931\u8D25\u3002",
+    "docs.duplicateFailed": "\u590D\u5236\u8BBE\u8BA1\u7A3F\u5931\u8D25\u3002",
+    "docs.renameFailed": "\u91CD\u547D\u540D\u5931\u8D25\u3002",
+    "docs.deleteFailed": "\u5220\u9664\u5931\u8D25\u3002",
+    "docs.importFailed": "\u5BFC\u5165\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u6587\u4EF6\u683C\u5F0F\u3002",
+    "docs.invalidFile": "\u4E0D\u662F\u6709\u6548\u7684 JSON \u6587\u4EF6\u3002",
+    "docs.imported": "\u5DF2\u5BFC\u5165\u8BBE\u8BA1\u7A3F",
+    "docs.exportFailed": "\u5BFC\u51FA\u5931\u8D25\u3002",
     "pages.title": "\u9875\u9762",
     "pages.add": "\u65B0\u589E\u9875",
     "pages.default": "\u9875\u9762",
@@ -440,6 +462,15 @@ var DICT = {
     "inspector.empty": "\u9009\u4E2D\u4E00\u4E2A\u7EC4\u4EF6\u53EF\u7F16\u8F91\u5C5E\u6027\u3001\u5207\u6362\u72B6\u6001\uFF1B\u4E0D\u9009\u4E2D\u65F6\u53EF\u8BBE\u7F6E\u5F53\u524D\u9875\u9762\u3002",
     "inspector.text": "\u6587\u672C",
     "inspector.color": "\u989C\u8272",
+    "inspector.image": "\u56FE\u7247",
+    "inspector.imageUrl": "\u56FE\u7247\u5730\u5740",
+    "inspector.imageFit": "\u586B\u5145\u65B9\u5F0F",
+    "inspector.chooseImage": "\u9009\u62E9\u56FE\u7247",
+    "inspector.removeImage": "\u79FB\u9664\u56FE\u7247",
+    "inspector.imageTooLarge": "\u56FE\u7247\u8FC7\u5927\uFF0C\u8BF7\u9009\u62E9 2MB \u4EE5\u5185\u7684\u56FE\u7247\u6216\u6539\u7528\u56FE\u7247\u5730\u5740\u3002",
+    "inspector.fit.cover": "\u88C1\u526A\u586B\u6EE1",
+    "inspector.fit.contain": "\u5B8C\u6574\u663E\u793A",
+    "inspector.fit.fill": "\u62C9\u4F38\u586B\u6EE1",
     "inspector.position": "\u4F4D\u7F6E",
     "inspector.size": "\u5C3A\u5BF8",
     "inspector.radius": "\u5706\u89D2",
@@ -507,13 +538,6 @@ var DICT = {
     "stateName.off": "\u5173",
     "stateName.checked": "\u9009\u4E2D",
     "stateName.unchecked": "\u672A\u9009",
-    "overlay.loading": "\u6B63\u5728\u52A0\u8F7D\u2026",
-    "overlay.emptyTitle": "\u8FD9\u91CC\u8FD8\u4EC0\u4E48\u90FD\u6CA1\u6709",
-    "overlay.emptyDesc": "\u6DFB\u52A0\u7B2C\u4E00\u4E2A\u7EC4\u4EF6\uFF0C\u5F00\u59CB\u642D\u5EFA\u4F60\u7684\u9875\u9762",
-    "overlay.emptyBtn": "\u65B0\u5EFA\u7EC4\u4EF6",
-    "overlay.errorTitle": "\u51FA\u4E86\u70B9\u95EE\u9898",
-    "overlay.errorDesc": "\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5",
-    "overlay.errorBtn": "\u91CD\u8BD5",
     "ctx.copy": "\u590D\u5236",
     "ctx.cut": "\u526A\u5207",
     "ctx.paste": "\u7C98\u8D34",
@@ -549,11 +573,13 @@ var DICT = {
     "inspector.action.navigate": "\u8DF3\u8F6C\u5230\u9875\u9762",
     "inspector.action.back": "\u8FD4\u56DE\u4E0A\u4E00\u9875",
     "inspector.action.openOverlay": "\u6253\u5F00\u4E3A\u5F39\u5C42",
-    "inspector.states": "\u9875\u9762\u72B6\u6001\u6587\u6848",
-    "inspector.stateText": "\u63D0\u793A\u6587\u6848",
-    "inspector.stateTitle": "\u6807\u9898",
-    "inspector.stateDesc": "\u8BF4\u660E",
-    "inspector.stateAction": "\u6309\u94AE\u6587\u6848",
+    "inspector.states": "\u9875\u9762\u72B6\u6001",
+    "inspector.variantEditing": "\u6B63\u5728\u7F16\u8F91\u72B6\u6001\u53D8\u4F53\uFF0C\u6539\u52A8\u53EA\u5F71\u54CD\u8FD9\u4E2A\u72B6\u6001\u3002",
+    "inspector.backToBase": "\u56DE\u5230\u6B63\u5E38\u9875\u9762",
+    "inspector.deleteVariant": "\u5220\u9664\u53D8\u4F53",
+    "inspector.editState": "\u7F16\u8F91",
+    "inspector.createState": "\u521B\u5EFA",
+    "preview.noState": "\u8FD9\u4E2A\u72B6\u6001\u8FD8\u6CA1\u6709\u53D8\u4F53",
     "inspector.fitContent": "\u7F29\u653E\u5185\u5BB9\u4EE5\u9002\u914D\u753B\u677F",
     "inspector.resizeMode": "\u5C3A\u5BF8\u53D8\u5316\u65F6",
     "resizeMode.constraints": "\u6309\u7EA6\u675F",
@@ -594,6 +620,7 @@ var DICT = {
   },
   en: {
     "entry.label": "Product Design",
+    "hero.open": "Open product design",
     "app.title": "Product Design Canvas",
     "name.placeholder": "Untitled design",
     "toolbar.preview": "Preview",
@@ -621,6 +648,27 @@ var DICT = {
     "state.loading": "Loading",
     "state.empty": "Empty",
     "state.error": "Error",
+    "docs.title": "Designs",
+    "docs.add": "New",
+    "docs.import": "Import",
+    "docs.untitled": "Untitled design",
+    "docs.pages": "pages",
+    "docs.rename": "Rename (double-click)",
+    "docs.duplicate": "Duplicate design",
+    "docs.export": "Export JSON",
+    "docs.delete": "Delete design",
+    "docs.deleteConfirm": "Delete this design? Sessions using it switch to a new blank design.",
+    "docs.empty": "No designs yet. Create one or import a JSON file.",
+    "docs.offline": "Host is not connected; the design library is unavailable.",
+    "docs.loadFailed": "Failed to load designs.",
+    "docs.createFailed": "Failed to create a design.",
+    "docs.duplicateFailed": "Failed to duplicate the design.",
+    "docs.renameFailed": "Failed to rename the design.",
+    "docs.deleteFailed": "Failed to delete the design.",
+    "docs.importFailed": "Import failed. Check the file format.",
+    "docs.invalidFile": "Not a valid JSON file.",
+    "docs.imported": "Design imported",
+    "docs.exportFailed": "Export failed.",
     "pages.title": "Pages",
     "pages.add": "Add page",
     "pages.default": "Page",
@@ -640,6 +688,15 @@ var DICT = {
     "inspector.empty": "Select a component to edit properties and switch states; with nothing selected you can configure the current page.",
     "inspector.text": "Text",
     "inspector.color": "Color",
+    "inspector.image": "Image",
+    "inspector.imageUrl": "Image URL",
+    "inspector.imageFit": "Fit",
+    "inspector.chooseImage": "Choose image",
+    "inspector.removeImage": "Remove image",
+    "inspector.imageTooLarge": "Image is larger than 2MB. Use an image URL instead.",
+    "inspector.fit.cover": "Cover",
+    "inspector.fit.contain": "Contain",
+    "inspector.fit.fill": "Fill",
     "inspector.position": "Position",
     "inspector.size": "Size",
     "inspector.radius": "Radius",
@@ -707,13 +764,6 @@ var DICT = {
     "stateName.off": "Off",
     "stateName.checked": "Checked",
     "stateName.unchecked": "Unchecked",
-    "overlay.loading": "Loading\u2026",
-    "overlay.emptyTitle": "Nothing here yet",
-    "overlay.emptyDesc": "Add your first component to start building",
-    "overlay.emptyBtn": "Add component",
-    "overlay.errorTitle": "Something went wrong",
-    "overlay.errorDesc": "Check your connection and try again",
-    "overlay.errorBtn": "Retry",
     "ctx.copy": "Copy",
     "ctx.cut": "Cut",
     "ctx.paste": "Paste",
@@ -749,11 +799,13 @@ var DICT = {
     "inspector.action.navigate": "Navigate to page",
     "inspector.action.back": "Go back",
     "inspector.action.openOverlay": "Open as overlay",
-    "inspector.states": "Page state copy",
-    "inspector.stateText": "Message",
-    "inspector.stateTitle": "Title",
-    "inspector.stateDesc": "Description",
-    "inspector.stateAction": "Button label",
+    "inspector.states": "Page states",
+    "inspector.variantEditing": "Editing a state variant; changes only affect this state.",
+    "inspector.backToBase": "Back to default",
+    "inspector.deleteVariant": "Delete variant",
+    "inspector.editState": "Edit",
+    "inspector.createState": "Create",
+    "preview.noState": "No variant for this state yet",
     "inspector.fitContent": "Fit content to frame",
     "inspector.resizeMode": "On resize",
     "resizeMode.constraints": "Constraints",
@@ -1250,6 +1302,21 @@ function renderWidget(el, state, t, opts) {
     );
   }
   if (el.type === "image") {
+    if (p.src) {
+      return h("img", {
+        src: p.src,
+        alt: p.alt || "",
+        draggable: false,
+        style: {
+          width: "100%",
+          height: "100%",
+          display: "block",
+          objectFit: p.fit || "cover",
+          borderRadius: p.radius != null ? p.radius : 10,
+          pointerEvents: "none"
+        }
+      });
+    }
     return h(
       "div",
       {
@@ -1450,9 +1517,9 @@ var turnCardsDefinition = {
     return { kind: "turn", turn, key: PRODUCT_DESIGN_TURN_KEY, value: { cards } };
   }
 };
-function cardsBefore(turn, seq) {
+function cardsBefore(turn, seq2) {
   const cards = turn && turn.data && turn.data.get(PRODUCT_DESIGN_TURN_KEY)?.cards || [];
-  return cards.filter((card) => card.seq < seq);
+  return cards.filter((card) => card.seq < seq2);
 }
 function selectTurnCards(owner) {
   if (!owner) return null;
@@ -1820,1133 +1887,225 @@ function resizePage(page, newW, newH, mode) {
   return reflowPage({ ...page, frame: { ...page.frame, w, h: h2 }, elements });
 }
 
-// src/client/model.js
-var __seq = 1;
-function uid2() {
-  return "e" + Date.now().toString(36) + (__seq++).toString(36);
+// src/shared/page-states.js
+var PAGE_STATE_KEYS = ["loading", "empty", "error"];
+var seq = 0;
+function defaultId(prefix) {
+  seq += 1;
+  const rnd = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8) : Math.random().toString(36).slice(2, 10);
+  return prefix + Date.now().toString(36) + seq.toString(36) + rnd;
 }
-function makeEl(type, x, y, w, hh, props, state) {
-  const el = {
-    id: uid2(),
-    type,
-    name: "",
-    x,
-    y,
-    w,
-    h: hh,
-    hidden: false,
-    locked: false,
-    opacity: 1,
-    state: state || defaultState(type),
-    props: props || {},
-    interactions: [],
-    constraints: defaultConstraints(type)
-  };
-  if (isContainerType(type)) {
-    el.layout = null;
-    el.children = [];
-  }
-  return el;
+function isVariant(page) {
+  return !!(page && page.variantOf && PAGE_STATE_KEYS.includes(page.stateKey));
 }
-function emptyStates() {
-  return {
-    loading: { text: "" },
-    empty: { title: "", desc: "", action: "" },
-    error: { title: "", desc: "", action: "" }
-  };
-}
-function starterElements(t) {
-  return [
-    makeEl("navbar", 0, 0, 390, 56),
-    makeEl("text", 24, 84, 320, 30, { fontSize: 22, text: t ? t("sample.welcome") : "\u6B22\u8FCE\u56DE\u6765" }),
-    makeEl("text", 24, 120, 320, 22, {
-      fontSize: 13,
-      fontWeight: 400,
-      color: "#6b7280",
-      text: t ? t("sample.welcomeSub") : "\u4ECA\u5929\u60F3\u8BBE\u8BA1\u70B9\u4EC0\u4E48\uFF1F"
-    }),
-    makeEl("card", 24, 158, 342, 116),
-    makeEl("input", 24, 296, 342, 44),
-    makeEl("button", 24, 356, 150, 44),
-    makeEl("toggle", 300, 364, 50, 28),
-    makeEl("badge", 24, 420, 70, 24),
-    makeEl("tabs", 0, 470, 390, 48),
-    makeEl("image", 24, 540, 342, 160)
-  ];
-}
-function defaultDoc(t) {
-  const page = {
-    id: uid2(),
-    name: t ? t("pages.default") + " 1" : "Page 1",
-    frame: { w: 390, h: 844, preset: "mobile", background: "#ffffff" },
-    states: emptyStates(),
-    elements: starterElements(t)
-  };
-  return { name: "", pages: [page], activePageId: page.id };
-}
-function normalizeInteractions(raw) {
-  if (!Array.isArray(raw)) return [];
-  const out = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    if (!["navigate", "back", "openOverlay"].includes(item.action)) continue;
-    const next = { trigger: "click", action: item.action };
-    if (item.action !== "back") next.targetPageId = String(item.targetPageId || "");
-    out.push(next);
+function normalizeStateLinks(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const key of PAGE_STATE_KEYS) {
+    if (typeof raw[key] === "string" && raw[key]) out[key] = raw[key];
   }
   return out;
 }
-function normalizeStates(raw) {
-  const src = raw && typeof raw === "object" ? raw : {};
-  const pick = (key, fields) => {
-    const value = src[key] && typeof src[key] === "object" ? src[key] : {};
-    const out = {};
-    for (const field of fields) out[field] = typeof value[field] === "string" ? value[field] : "";
-    return out;
-  };
-  return {
-    loading: pick("loading", ["text"]),
-    empty: pick("empty", ["title", "desc", "action"]),
-    error: pick("error", ["title", "desc", "action"])
-  };
+function basePages(doc) {
+  return (doc.pages || []).filter((page) => !isVariant(page));
 }
-function normalizeElement(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const type = TYPE_INFO[raw.type] ? raw.type : "text";
-  const el = {
-    id: raw.id || uid2(),
-    type,
-    name: typeof raw.name === "string" ? raw.name : "",
-    x: Number.isFinite(Number(raw.x)) ? Number(raw.x) : 0,
-    y: Number.isFinite(Number(raw.y)) ? Number(raw.y) : 0,
-    w: Math.max(12, Number.isFinite(Number(raw.w)) ? Number(raw.w) : TYPE_INFO[type].size[0]),
-    h: Math.max(8, Number.isFinite(Number(raw.h)) ? Number(raw.h) : TYPE_INFO[type].size[1]),
-    hidden: raw.hidden === true,
-    locked: raw.locked === true,
-    opacity: Number.isFinite(Number(raw.opacity)) ? Math.max(0, Math.min(1, Number(raw.opacity))) : 1,
-    state: raw.state || defaultState(type),
-    props: raw.props && typeof raw.props === "object" ? { ...raw.props } : {},
-    interactions: normalizeInteractions(raw.interactions),
-    constraints: normalizeConstraints(raw.constraints, type)
-  };
-  if (isContainerType(type)) {
-    el.layout = normalizeLayout(raw.layout);
-    el.children = Array.isArray(raw.children) ? raw.children.map(normalizeElement).filter(Boolean) : [];
-  }
-  return el;
+function basePageOf(doc, pageId) {
+  const page = (doc.pages || []).find((candidate) => candidate.id === pageId);
+  if (!page) return null;
+  if (!isVariant(page)) return page;
+  return (doc.pages || []).find((candidate) => candidate.id === page.variantOf) || null;
 }
-function normalizeElements(list) {
-  return Array.isArray(list) ? list.map(normalizeElement).filter(Boolean) : [];
-}
-function normalizeDoc(doc) {
-  if (!doc || !Array.isArray(doc.pages)) return null;
-  const pages = doc.pages.filter((p) => p && Array.isArray(p.elements)).map((p) => {
-    const fr = p.frame || {};
-    return {
-      id: p.id || uid2(),
-      name: p.name || "Page",
-      frame: {
-        w: fr.w || 390,
-        h: fr.h || 844,
-        preset: fr.preset || "mobile",
-        background: fr.background || "#ffffff"
-      },
-      states: normalizeStates(p.states),
-      elements: normalizeElements(p.elements)
-    };
-  });
-  if (!pages.length) return null;
-  const activePageId = pages.some((p) => p.id === doc.activePageId) ? doc.activePageId : pages[0].id;
-  return { name: doc.name || "", pages: pages.map(reflowPage), activePageId };
-}
-function docStorageKey(sessionId) {
-  return sessionId ? `${STORAGE_KEY}:${sessionId}` : STORAGE_KEY;
-}
-function loadDoc(sessionId) {
-  try {
-    const raw = window.localStorage.getItem(docStorageKey(sessionId));
-    if (!raw) return null;
-    return normalizeDoc(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
-function saveDoc(doc, sessionId) {
-  try {
-    window.localStorage.setItem(docStorageKey(sessionId), JSON.stringify(doc));
-  } catch {
-  }
-}
-function loadUi() {
-  try {
-    const raw = window.localStorage.getItem(UI_KEY);
-    return raw ? JSON.parse(raw) || {} : {};
-  } catch {
-    return {};
-  }
-}
-function saveUi(ui) {
-  try {
-    window.localStorage.setItem(UI_KEY, JSON.stringify(ui));
-  } catch {
-  }
-}
-function apiFetch(path, init, sessionId) {
-  if (typeof fetch !== "function") return Promise.resolve(null);
-  let target = API_PREFIX + path;
-  if (sessionId) {
-    target += (target.includes("?") ? "&" : "?") + "sessionId=" + encodeURIComponent(sessionId);
-  }
-  let url;
-  try {
-    url = new URL(
-      target,
-      window.location && window.location.href ? window.location.href : "http://localhost/"
-    ).toString();
-  } catch {
-    return Promise.resolve(null);
-  }
-  const opts = Object.assign({}, init);
-  if (!opts.signal && typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
-    try {
-      opts.signal = AbortSignal.timeout(4e3);
-    } catch {
-    }
-  }
-  return fetch(url, opts).then(
-    (res) => res.text().then((text) => {
-      let body = null;
-      if (text) {
-        try {
-          body = JSON.parse(text);
-        } catch {
-          body = null;
-        }
-      }
-      return { status: res.status, body };
-    }),
-    () => null
+function stateVariantsOf(doc, baseId) {
+  return (doc.pages || []).filter(
+    (page) => page.variantOf === baseId && PAGE_STATE_KEYS.includes(page.stateKey)
   );
 }
-
-// src/client/domain/tree.js
-function mapTree(elements, fn) {
-  let changed = false;
-  const out = elements.map((el) => {
-    let next = fn(el);
-    if (isContainerType(next.type) && Array.isArray(next.children)) {
-      const kids = mapTree(next.children, fn);
-      if (kids !== next.children) next = { ...next, children: kids };
-    }
-    if (next !== el) changed = true;
-    return next;
-  });
-  return changed ? out : elements;
+function statePageId(doc, baseId, key) {
+  const base = (doc.pages || []).find((page2) => page2.id === baseId);
+  const id = base && base.states ? base.states[key] : "";
+  if (!id) return "";
+  const page = (doc.pages || []).find((candidate) => candidate.id === id);
+  return page && page.variantOf === baseId && page.stateKey === key ? id : "";
 }
-function removeFromTree(elements, idSet) {
-  let changed = false;
-  const out = [];
-  for (const el of elements) {
-    if (idSet.has(el.id)) {
-      changed = true;
+function repairPageStates(doc) {
+  const pages = doc.pages || [];
+  const byId = new Map(pages.map((page) => [page.id, page]));
+  for (const page of pages) {
+    if (!page.variantOf) continue;
+    const base = byId.get(page.variantOf);
+    if (!base || !PAGE_STATE_KEYS.includes(page.stateKey)) {
+      delete page.variantOf;
+      delete page.stateKey;
+      page.states = {};
+    }
+  }
+  for (const page of pages) {
+    if (page.variantOf) {
+      page.states = {};
       continue;
     }
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = removeFromTree(el.children, idSet);
-      if (kids !== el.children) {
-        changed = true;
-        out.push({ ...el, children: kids });
-        continue;
+    const links = normalizeStateLinks(page.states);
+    const valid = {};
+    for (const key of PAGE_STATE_KEYS) {
+      const target = links[key] ? byId.get(links[key]) : null;
+      if (target && target.variantOf === page.id && target.stateKey === key) {
+        valid[key] = target.id;
       }
     }
-    out.push(el);
+    page.states = valid;
   }
-  return changed ? out : elements;
-}
-function extractFromTree2(elements, id) {
-  let extracted = null;
-  let changed = false;
-  const walk = (list) => {
-    const out = [];
-    for (const el of list) {
-      if (el.id === id) {
-        extracted = el;
-        changed = true;
-        continue;
-      }
-      if (isContainerType(el.type) && Array.isArray(el.children)) {
-        const kids = walk(el.children);
-        if (kids !== el.children) {
-          out.push({ ...el, children: kids });
-          continue;
-        }
-      }
-      out.push(el);
+  for (const page of pages) {
+    if (!page.variantOf) continue;
+    const base = byId.get(page.variantOf);
+    if (!base) continue;
+    if (base.states[page.stateKey] && base.states[page.stateKey] !== page.id) {
+      delete page.variantOf;
+      delete page.stateKey;
+      page.states = {};
+      continue;
     }
-    return out;
+    base.states[page.stateKey] = page.id;
+  }
+  return doc;
+}
+function addStateVariant(doc, pageId, key, options = {}) {
+  if (!PAGE_STATE_KEYS.includes(key)) return { doc, pageId: "", created: false };
+  const base = basePageOf(doc, pageId);
+  if (!base) return { doc, pageId: "", created: false };
+  const existing = statePageId(doc, base.id, key);
+  if (existing) return { doc, pageId: existing, created: false };
+  const id = options.id || defaultId;
+  const variant = {
+    id: id("p"),
+    name: options.name || `${base.name} \xB7 ${key}`,
+    frame: { ...base.frame },
+    states: {},
+    variantOf: base.id,
+    stateKey: key,
+    elements: cloneElementDeep2(
+      { id: "root", type: "group", x: 0, y: 0, w: 0, h: 0, children: base.elements || [] },
+      () => id("e")
+    ).children
   };
-  const next = walk(elements);
-  return { elements: changed ? next : elements, extracted };
+  const pages = doc.pages.filter((page) => !(page.variantOf === base.id && page.stateKey === key));
+  let at = pages.findIndex((page) => page.id === base.id) + 1;
+  while (at < pages.length && pages[at].variantOf === base.id) at += 1;
+  pages.splice(at, 0, variant);
+  const next = pages.map(
+    (page) => page.id === base.id ? { ...page, states: { ...page.states || {}, [key]: variant.id } } : page
+  );
+  return {
+    doc: { ...doc, pages: next, activePageId: variant.id },
+    pageId: variant.id,
+    created: true
+  };
 }
-function appendToContainer(elements, containerId, el) {
-  let changed = false;
-  const out = elements.map((cur) => {
-    if (cur.id === containerId) {
-      changed = true;
-      return { ...cur, children: [...cur.children || [], el] };
-    }
-    if (isContainerType(cur.type) && Array.isArray(cur.children)) {
-      const kids = appendToContainer(cur.children, containerId, el);
-      if (kids !== cur.children) {
-        changed = true;
-        return { ...cur, children: kids };
-      }
-    }
-    return cur;
-  });
-  return changed ? out : elements;
-}
-function replaceInTree(elements, id, updater) {
-  let changed = false;
-  const out = elements.map((el) => {
-    if (el.id === id) {
-      changed = true;
-      return updater(el);
-    }
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = replaceInTree(el.children, id, updater);
-      if (kids !== el.children) {
-        changed = true;
-        return { ...el, children: kids };
-      }
-    }
-    return el;
-  });
-  return changed ? out : elements;
-}
-function duplicateInTree(elements, idSet, rootIds) {
-  const out = [];
-  for (const el of elements) {
-    if (idSet.has(el.id)) {
-      const copy = cloneElementDeep(el, () => uid());
-      copy.x += 16;
-      copy.y += 16;
-      rootIds.push(copy.id);
-      out.push(el, copy);
-      continue;
-    }
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = duplicateInTree(el.children, idSet, rootIds);
-      out.push(kids !== el.children ? { ...el, children: kids } : el);
-      continue;
-    }
-    out.push(el);
+function removeStateVariant(doc, pageId, key) {
+  const base = basePageOf(doc, pageId);
+  if (!base) return { doc, removedId: "" };
+  let id = statePageId(doc, base.id, key);
+  if (!id) {
+    const orphan = doc.pages.find((page) => page.variantOf === base.id && page.stateKey === key);
+    id = orphan ? orphan.id : "";
   }
-  return out;
+  if (!id) return { doc, removedId: "" };
+  const pages = doc.pages.filter((page) => page.id !== id).map((page) => {
+    if (page.id !== base.id) return page;
+    const states = { ...page.states || {} };
+    delete states[key];
+    return { ...page, states };
+  });
+  const activePageId = doc.activePageId === id ? base.id : doc.activePageId;
+  return { doc: { ...doc, pages, activePageId }, removedId: id };
 }
-
-// src/client/domain/document.js
-function activePageOf(doc) {
-  return doc.pages.find((page) => page.id === doc.activePageId) || doc.pages[0] || null;
-}
-function mapPage(doc, pageId, fn) {
-  return { ...doc, pages: doc.pages.map((page) => page.id === pageId ? fn(page) : page) };
-}
-function mapElements(doc, pageId, fn) {
-  return mapPage(doc, pageId, (page) => ({ ...page, elements: fn(page.elements) }));
-}
-function addPage(doc, page) {
-  return { ...doc, pages: [...doc.pages, page], activePageId: page.id };
-}
-function insertPageAfter(doc, afterId, page) {
-  const index = doc.pages.findIndex((candidate) => candidate.id === afterId);
-  if (index === -1) return doc;
-  const pages = doc.pages.slice();
-  pages.splice(index + 1, 0, page);
-  return { ...doc, pages, activePageId: page.id };
-}
-function removePage(doc, pageId) {
-  if (doc.pages.length <= 1) return doc;
-  const index = doc.pages.findIndex((page) => page.id === pageId);
-  if (index === -1) return doc;
-  const pages = doc.pages.filter((page) => page.id !== pageId);
-  const activePageId = doc.activePageId === pageId ? pages[Math.max(0, Math.min(pages.length - 1, index - 1))].id : doc.activePageId;
+function removePageDeep(doc, pageId) {
+  const page = (doc.pages || []).find((candidate) => candidate.id === pageId);
+  if (!page) return doc;
+  const base = page.variantOf ? basePageOf(doc, pageId) : page;
+  const family = base ? [base.id, ...stateVariantsOf(doc, base.id).map((item) => item.id)] : [];
+  const removing = new Set(page.variantOf ? [pageId] : family.length ? family : [pageId]);
+  const remaining = doc.pages.filter((candidate) => !removing.has(candidate.id));
+  if (!remaining.some((candidate) => !isVariant(candidate))) return doc;
+  let activePageId = doc.activePageId;
+  if (removing.has(activePageId)) {
+    activePageId = base && !removing.has(base.id) ? base.id : remaining[0]?.id || null;
+  }
+  const pages = remaining.map((candidate) => {
+    if (!base || candidate.id !== base.id) return candidate;
+    const states = { ...candidate.states || {} };
+    for (const key of PAGE_STATE_KEYS) {
+      if (states[key] && removing.has(states[key])) delete states[key];
+    }
+    return { ...candidate, states };
+  });
   return { ...doc, pages, activePageId };
 }
-function renamePage(doc, pageId, name) {
-  return mapPage(doc, pageId, (page) => ({ ...page, name }));
+function duplicatePageDeep(doc, pageId, options = {}) {
+  const source = (doc.pages || []).find((candidate) => candidate.id === pageId);
+  if (!source) return doc;
+  const base = source.variantOf ? basePageOf(doc, pageId) : source;
+  if (!base) return doc;
+  const variants = stateVariantsOf(doc, base.id);
+  const id = options.id || defaultId;
+  const suffix = options.suffix || "copy";
+  const pageIdMap = /* @__PURE__ */ new Map();
+  pageIdMap.set(base.id, id("p"));
+  for (const variant of variants) pageIdMap.set(variant.id, id("p"));
+  const clonePage2 = (page, extra) => {
+    const copy = {
+      ...page,
+      id: pageIdMap.get(page.id),
+      name: page.id === base.id ? `${page.name} ${suffix}` : page.name,
+      frame: { ...page.frame },
+      states: {},
+      elements: cloneElementDeep2(
+        { id: "root", type: "group", x: 0, y: 0, w: 0, h: 0, children: page.elements || [] },
+        () => id("e")
+      ).children,
+      ...extra
+    };
+    if (!extra) {
+      delete copy.variantOf;
+      delete copy.stateKey;
+    }
+    return copy;
+  };
+  const baseCopy = clonePage2(base);
+  baseCopy.states = {};
+  const copies = [baseCopy];
+  for (const variant of variants) {
+    const copy = clonePage2(variant, { variantOf: baseCopy.id, stateKey: variant.stateKey });
+    baseCopy.states[variant.stateKey] = copy.id;
+    copies.push(copy);
+  }
+  const remap = (elements) => {
+    for (const el of elements) {
+      if (Array.isArray(el.interactions)) {
+        el.interactions = el.interactions.map(
+          (link) => link.targetPageId && pageIdMap.has(link.targetPageId) ? { ...link, targetPageId: pageIdMap.get(link.targetPageId) } : link
+        );
+      }
+      if (Array.isArray(el.children)) remap(el.children);
+    }
+  };
+  for (const copy of copies) remap(copy.elements);
+  const pages = doc.pages.slice();
+  const lastIndex = Math.max(
+    ...[base, ...variants].map((page) => pages.findIndex((item) => item.id === page.id))
+  );
+  pages.splice(lastIndex + 1, 0, ...copies);
+  return { ...doc, pages, activePageId: baseCopy.id };
 }
-function patchFrame(doc, pageId, patch) {
-  return mapPage(doc, pageId, (page) => ({ ...page, frame: { ...page.frame, ...patch } }));
-}
-function resizePageTo(doc, pageId, width, height, mode, preset) {
-  return mapPage(doc, pageId, (page) => {
+function resizePageFamily(doc, pageId, width, height, mode, preset) {
+  const base = basePageOf(doc, pageId);
+  if (!base) return doc;
+  const family = /* @__PURE__ */ new Set([base.id, ...stateVariantsOf(doc, base.id).map((page) => page.id)]);
+  const pages = doc.pages.map((page) => {
+    if (!family.has(page.id)) return page;
     const resized = resizePage(page, width, height, mode);
     return preset ? { ...resized, frame: { ...resized.frame, preset } } : resized;
   });
-}
-function patchPageStates(doc, pageId, key, patch) {
-  return mapPage(doc, pageId, (page) => ({
-    ...page,
-    states: {
-      ...page.states || {},
-      [key]: { ...(page.states || {})[key] || {}, ...patch }
-    }
-  }));
-}
-function fitContent(doc, pageId) {
-  const page = doc.pages.find((candidate) => candidate.id === pageId);
-  if (!page || !page.elements.length) return doc;
-  const bounds = boundsOfEntries(collectElementEntries(page.elements));
-  if (!bounds || bounds.w <= 0 || bounds.h <= 0) return doc;
-  const sx = page.frame.w / bounds.w;
-  const sy = page.frame.h / bounds.h;
-  return mapPage(doc, pageId, (target) => ({
-    ...target,
-    elements: scaleElementsInTree(target.elements, sx, sy, Math.min(sx, sy), bounds.x, bounds.y)
-  }));
-}
-function addElement(doc, pageId, parentId, el) {
-  return mapElements(
-    doc,
-    pageId,
-    (elements) => parentId ? appendToContainer(elements, parentId, el) : [...elements, el]
-  );
-}
-function removeElements(doc, pageId, ids) {
-  return mapElements(doc, pageId, (elements) => removeFromTree(elements, new Set(ids)));
-}
-function duplicateElements(doc, pageId, ids) {
-  const roots = [];
-  const next = mapElements(
-    doc,
-    pageId,
-    (elements) => duplicateInTree(elements, new Set(ids), roots)
-  );
-  return { doc: next, ids: roots };
-}
-function reorderElements(doc, pageId, ids, mode) {
-  return mapElements(doc, pageId, (elements) => {
-    let next = elements;
-    for (const id of ids) next = reorderInTree(next, id, mode);
-    return next;
-  });
-}
-function moveElementTo(doc, pageId, id, targetId, position) {
-  return mapElements(
-    doc,
-    pageId,
-    (elements) => moveElementInTree(elements, id, targetId, position)
-  );
-}
-function patchElements(doc, pageId, ids, fn) {
-  const idSet = new Set(ids);
-  return mapElements(
-    doc,
-    pageId,
-    (elements) => mapTree(elements, (el) => idSet.has(el.id) ? fn(el) : el)
-  );
-}
-function moveElementsBy(doc, pageId, ids, dx, dy) {
-  return patchElements(doc, pageId, ids, (el) => ({ ...el, x: el.x + dx, y: el.y + dy }));
-}
-function patchElement(doc, elementId, fn) {
-  return {
-    ...doc,
-    pages: doc.pages.map((page) => ({
-      ...page,
-      elements: mapTree(page.elements, (el) => el.id === elementId ? fn(el) : el)
-    }))
-  };
-}
-function setElementText(doc, elementId, text) {
-  return {
-    ...doc,
-    pages: doc.pages.map((page) => ({
-      ...page,
-      elements: mapTree(
-        page.elements,
-        (el) => el.id === elementId ? { ...el, props: { ...el.props, text } } : el
-      )
-    }))
-  };
-}
-function pasteElements(doc, pageId, items, targetId) {
-  const page = doc.pages.find((candidate) => candidate.id === pageId);
-  if (!page || !items.length) return { doc, ids: [] };
-  const target = targetId ? findElementEntry(page.elements, targetId) : null;
-  const ids = [];
-  const copies = items.map((item) => {
-    const copy = cloneElementDeep2(item.el, () => uid2());
-    copy.x = Math.round(item.absX + 16 - (target ? target.absX : 0));
-    copy.y = Math.round(item.absY + 16 - (target ? target.absY : 0));
-    ids.push(copy.id);
-    return copy;
-  });
-  const next = mapElements(doc, pageId, (elements) => {
-    if (!target) return [...elements, ...copies];
-    let out = elements;
-    for (const copy of copies) out = appendToContainer(out, targetId, copy);
-    return out;
-  });
-  return { doc: next, ids };
-}
-function groupEntries(doc, pageId, entries, name) {
-  if (entries.length < 2) return { doc, groupId: null };
-  const list = entries[0].list;
-  if (!entries.every((entry) => entry.list === list)) return { doc, groupId: null };
-  const bounds = boundsOfEntries(entries);
-  if (!bounds) return { doc, groupId: null };
-  const parentAbsX = entries[0].absX - entries[0].el.x;
-  const parentAbsY = entries[0].absY - entries[0].el.y;
-  const group = {
-    id: uid2(),
-    type: "group",
-    name: "",
-    x: bounds.x - parentAbsX,
-    y: bounds.y - parentAbsY,
-    w: bounds.w,
-    h: bounds.h,
-    hidden: false,
-    locked: false,
-    opacity: 1,
-    state: "default",
-    props: { name },
-    interactions: [],
-    constraints: { h: "leftRight", v: "top" },
-    layout: null,
-    children: entries.map((entry) => {
-      const copy = cloneElementDeep2(entry.el);
-      copy.x = entry.absX - bounds.x;
-      copy.y = entry.absY - bounds.y;
-      return copy;
-    })
-  };
-  const ids = new Set(entries.map((entry) => entry.el.id));
-  const insertAt = Math.min(...entries.map((entry) => entry.index));
-  const remaining = list.filter((el) => !ids.has(el.id));
-  remaining.splice(insertAt, 0, group);
-  const next = mapElements(doc, pageId, (elements) => {
-    if (!entries[0].parent) return remaining;
-    return mapTree(
-      elements,
-      (el) => el.id === entries[0].parent.id ? { ...el, children: remaining } : el
-    );
-  });
-  return { doc: next, groupId: group.id };
-}
-function ungroupEntry(doc, pageId, id) {
-  const page = doc.pages.find((candidate) => candidate.id === pageId);
-  const entry = page ? findElementEntry(page.elements, id) : null;
-  if (!entry || entry.el.type !== "group") return { doc, ids: [] };
-  const group = entry.el;
-  const kids = (group.children || []).map((child) => {
-    const copy = cloneElementDeep2(child);
-    copy.x += group.x;
-    copy.y += group.y;
-    return copy;
-  });
-  const next = entry.list.slice();
-  next.splice(entry.index, 1, ...kids);
-  const out = mapElements(doc, pageId, (elements) => {
-    if (!entry.parent) return next;
-    return mapTree(elements, (el) => el.id === entry.parent.id ? { ...el, children: next } : el);
-  });
-  return { doc: out, ids: kids.map((kid) => kid.id) };
-}
-function alignEntries(doc, pageId, entries, target, mode) {
-  const ids = new Set(entries.map((entry) => entry.el.id));
-  return mapElements(
-    doc,
-    pageId,
-    (elements) => mapTree(elements, (el) => {
-      if (!ids.has(el.id)) return el;
-      const entry = findElementEntry(elements, el.id);
-      if (!entry) return el;
-      const parentAbsX = entry.absX - el.x;
-      const parentAbsY = entry.absY - el.y;
-      let absX = entry.absX;
-      let absY = entry.absY;
-      if (mode === "left") absX = target.x;
-      else if (mode === "centerX") absX = target.x + (target.w - el.w) / 2;
-      else if (mode === "right") absX = target.x + target.w - el.w;
-      else if (mode === "top") absY = target.y;
-      else if (mode === "centerY") absY = target.y + (target.h - el.h) / 2;
-      else if (mode === "bottom") absY = target.y + target.h - el.h;
-      return { ...el, x: Math.round(absX - parentAbsX), y: Math.round(absY - parentAbsY) };
-    })
-  );
-}
-function distributeEntries(doc, pageId, entries, axis) {
-  if (entries.length < 3) return doc;
-  const sorted = entries.slice().sort((a, b) => axis === "x" ? a.absX - b.absX : a.absY - b.absY);
-  const first = sorted[0];
-  const last = sorted[sorted.length - 1];
-  const total = axis === "x" ? last.absX + last.w - first.absX : last.absY + last.h - first.absY;
-  const sum = sorted.reduce((acc, entry) => acc + (axis === "x" ? entry.w : entry.h), 0);
-  const gap = (total - sum) / (sorted.length - 1);
-  let cursor = axis === "x" ? first.absX : first.absY;
-  const positions = /* @__PURE__ */ new Map();
-  for (const entry of sorted) {
-    positions.set(entry.el.id, cursor);
-    cursor += (axis === "x" ? entry.w : entry.h) + gap;
-  }
-  return mapElements(
-    doc,
-    pageId,
-    (elements) => mapTree(elements, (el) => {
-      if (!positions.has(el.id)) return el;
-      const entry = findElementEntry(elements, el.id);
-      if (!entry) return el;
-      const parentAbs = axis === "x" ? entry.absX - el.x : entry.absY - el.y;
-      const pos = Math.round(positions.get(el.id) - parentAbs);
-      return axis === "x" ? { ...el, x: pos } : { ...el, y: pos };
-    })
-  );
-}
-
-// src/client/editor/contextMenuItems.js
-function buildMenuItems({ t, selIds, selEntries, hasClipboard, ctxEl, actions }) {
-  const hasSelection = selIds.length > 0;
-  return [
-    { label: t("ctx.copy"), key: "\u2318C", onClick: actions.copySelection, disabled: !hasSelection },
-    { label: t("ctx.cut"), key: "\u2318X", onClick: actions.cutSelection, disabled: !hasSelection },
-    {
-      label: t("ctx.paste"),
-      key: "\u2318V",
-      onClick: actions.pasteClipboard,
-      disabled: !hasClipboard
-    },
-    { sep: true },
-    {
-      label: t("ctx.duplicate"),
-      key: "\u2318D",
-      onClick: actions.duplicateSelection,
-      disabled: !hasSelection
-    },
-    { sep: true },
-    {
-      label: t("ctx.front"),
-      onClick: () => actions.reorderSelection("front"),
-      disabled: !hasSelection
-    },
-    {
-      label: t("ctx.forward"),
-      key: "\u2318]",
-      onClick: () => actions.reorderSelection("forward"),
-      disabled: !hasSelection
-    },
-    {
-      label: t("ctx.backward"),
-      key: "\u2318[",
-      onClick: () => actions.reorderSelection("backward"),
-      disabled: !hasSelection
-    },
-    {
-      label: t("ctx.back"),
-      onClick: () => actions.reorderSelection("back"),
-      disabled: !hasSelection
-    },
-    { sep: true },
-    {
-      label: t("ctx.group"),
-      key: "\u2318G",
-      onClick: actions.groupSelection,
-      disabled: selEntries.length < 2
-    },
-    ...ctxEl && ctxEl.type === "group" ? [{ label: t("ctx.ungroup"), key: "\u21E7\u2318G", onClick: actions.ungroupSelection }] : [],
-    ...ctxEl ? [
-      {
-        label: ctxEl.hidden ? t("ctx.show") : t("ctx.hide"),
-        onClick: () => actions.applyAttrs({ hidden: !ctxEl.hidden })
-      },
-      {
-        label: ctxEl.locked ? t("ctx.unlock") : t("ctx.lock"),
-        onClick: () => actions.applyAttrs({ locked: !ctxEl.locked })
-      }
-    ] : [],
-    { sep: true },
-    {
-      label: t("ctx.delete"),
-      key: "\u232B",
-      onClick: actions.deleteSelection,
-      danger: true,
-      disabled: !hasSelection
-    }
-  ];
-}
-
-// src/client/editor/useClipboard.js
-function useClipboard({ docRef, setDoc, setSelIds, getSelected, deleteSelection }) {
-  const clipboardRef = useRef([]);
-  function copySelection() {
-    const entries = getSelected();
-    if (!entries.length) return;
-    clipboardRef.current = entries.map((entry) => ({
-      el: cloneElementDeep2(entry.el),
-      absX: entry.absX,
-      absY: entry.absY
-    }));
-  }
-  function cutSelection() {
-    copySelection();
-    deleteSelection();
-  }
-  function pasteClipboard() {
-    const items = clipboardRef.current;
-    if (!items.length) return;
-    const doc = docRef.current;
-    const page = doc.pages.find((candidate) => candidate.id === doc.activePageId);
-    if (!page) return;
-    const selected = getSelected();
-    const target = selected.length === 1 && selected[0].el.type === "container" ? selected[0] : null;
-    let ids = [];
-    setDoc((current) => {
-      const out = pasteElements(current, page.id, items, target ? target.el.id : null);
-      ids = out.ids;
-      return out.doc;
-    });
-    if (ids.length) setSelIds(ids);
-  }
-  return { clipboardRef, copySelection, cutSelection, pasteClipboard };
-}
-
-// src/client/editor/useDocument.js
-var HIST_LIMIT = 120;
-function sameDoc(a, b) {
-  if (a === b) return true;
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch {
-    return false;
-  }
-}
-function useDocument({ sessionId, t, resetTransient, onAdopt }) {
-  const sessionIdRef = useRef(sessionId);
-  sessionIdRef.current = sessionId;
-  const [doc, setDocState] = useState2(() => loadDoc(sessionId) || defaultDoc(t));
-  const docRef = useRef(doc);
-  const histRef = useRef({ past: [], future: [] });
-  const lastKeyRef = useRef({ key: null, time: 0 });
-  const lastEditRef = useRef(0);
-  const [, bumpHist] = useState2(0);
-  const hostRef = useRef({ on: false, revision: 0, suppressSave: false });
-  function pushPastSnapshot(snapshot) {
-    const h2 = histRef.current;
-    h2.past.push(snapshot);
-    if (h2.past.length > HIST_LIMIT) h2.past.shift();
-    h2.future = [];
-    lastKeyRef.current = { key: null, time: 0 };
-    bumpHist((v) => v + 1);
-  }
-  const setDoc = useCallback2((updater, mode) => {
-    const prev = docRef.current;
-    const raw = typeof updater === "function" ? updater(prev) : updater;
-    const next = reflowDoc(raw);
-    if (next === prev) return;
-    if (mode !== false) {
-      const h2 = histRef.current;
-      let record = true;
-      if (typeof mode === "string") {
-        const now = Date.now();
-        if (lastKeyRef.current.key === mode && now - lastKeyRef.current.time < 900) record = false;
-        lastKeyRef.current = { key: mode, time: now };
-      } else {
-        lastKeyRef.current = { key: null, time: 0 };
-      }
-      if (record) {
-        pushPastSnapshot(prev);
-        lastEditRef.current = Date.now();
-      }
-      h2.future = [];
-    }
-    docRef.current = next;
-    setDocState(next);
-  }, []);
-  const mapEl = useCallback2(
-    (elId, fn, mode) => {
-      setDoc(
-        (d) => ({
-          ...d,
-          pages: d.pages.map((p) => ({
-            ...p,
-            elements: replaceInTree(p.elements, elId, fn)
-          }))
-        }),
-        mode
-      );
-    },
-    [setDoc]
-  );
-  const setEl = useCallback2(
-    (elId, patch, mode) => mapEl(elId, (e) => ({ ...e, ...patch }), mode),
-    [mapEl]
-  );
-  const setElProps = useCallback2(
-    (elId, patch, mode) => mapEl(elId, (e) => ({ ...e, props: { ...e.props, ...patch } }), mode),
-    [mapEl]
-  );
-  function undo() {
-    const h2 = histRef.current;
-    if (!h2.past.length) return;
-    const prev = h2.past.pop();
-    h2.future.push(docRef.current);
-    docRef.current = prev;
-    setDocState(prev);
-    lastKeyRef.current = { key: null, time: 0 };
-    bumpHist((v) => v + 1);
-  }
-  function redo() {
-    const h2 = histRef.current;
-    if (!h2.future.length) return;
-    const next = h2.future.pop();
-    h2.past.push(docRef.current);
-    if (h2.past.length > HIST_LIMIT) h2.past.shift();
-    docRef.current = next;
-    setDocState(next);
-    lastKeyRef.current = { key: null, time: 0 };
-    bumpHist((v) => v + 1);
-  }
-  function adoptRemoteDoc(nd) {
-    const prev = docRef.current;
-    if (prev && sameDoc(prev, nd)) return;
-    if (prev && Date.now() - lastEditRef.current > 800) pushPastSnapshot(prev);
-    hostRef.current.suppressSave = true;
-    docRef.current = nd;
-    setDocState(nd);
-    onAdopt(nd);
-  }
-  useEffect2(() => {
-    const sid = sessionIdRef.current;
-    saveDoc(doc, sid);
-    if (hostRef.current.suppressSave) {
-      hostRef.current.suppressSave = false;
-      return void 0;
-    }
-    if (!hostRef.current.on) return void 0;
-    const timer = setTimeout(() => {
-      apiFetch(
-        "/doc",
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            baseRevision: hostRef.current.revision,
-            doc,
-            sessionId: sid
-          })
-        },
-        sid
-      ).then((res) => {
-        if (!res) return;
-        if (res.status === 200 && res.body) {
-          hostRef.current.revision = res.body.revision;
-        } else if (res.status === 409 && res.body && res.body.doc) {
-          const nd = normalizeDoc(res.body.doc);
-          if (nd) {
-            hostRef.current.revision = res.body.revision;
-            adoptRemoteDoc(nd);
-          }
-        }
-      });
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [doc]);
-  useEffect2(() => {
-    let cancelled = false;
-    let source = null;
-    const sid = sessionId;
-    const localDoc = loadDoc(sid) || defaultDoc(t);
-    hostRef.current = { on: false, revision: 0, suppressSave: true };
-    docRef.current = localDoc;
-    setDocState(localDoc);
-    resetTransient();
-    histRef.current = { past: [], future: [] };
-    (async () => {
-      const canStream = typeof window.EventSource === "function";
-      const attempts = canStream ? 6 : 1;
-      let got = null;
-      for (let i = 0; i < attempts && !cancelled; i += 1) {
-        got = await apiFetch("/doc", void 0, sid);
-        if (got && got.status === 200 && got.body) break;
-        if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500));
-      }
-      if (cancelled || !got || got.status !== 200 || !got.body) return;
-      hostRef.current.on = true;
-      hostRef.current.revision = got.body.revision || 0;
-      if (got.body.doc) {
-        const nd = normalizeDoc(got.body.doc);
-        if (nd) {
-          hostRef.current.suppressSave = true;
-          docRef.current = nd;
-          setDocState(nd);
-        }
-      } else {
-        const seeded = await apiFetch(
-          "/doc",
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              baseRevision: hostRef.current.revision,
-              doc: docRef.current,
-              sessionId: sid
-            })
-          },
-          sid
-        );
-        if (seeded && seeded.status === 200 && seeded.body)
-          hostRef.current.revision = seeded.body.revision;
-      }
-      if (cancelled || typeof window.EventSource !== "function") return;
-      try {
-        const eventsUrl = new URL(API_PREFIX + "/events", window.location.href);
-        if (sid) eventsUrl.searchParams.set("sessionId", sid);
-        source = new window.EventSource(eventsUrl.toString());
-        source.onmessage = (evt) => {
-          let data = null;
-          try {
-            data = JSON.parse(evt.data);
-          } catch {
-            data = null;
-          }
-          if (!data || typeof data.revision !== "number" || data.revision === hostRef.current.revision)
-            return;
-          apiFetch("/doc", void 0, sid).then((snap) => {
-            if (!snap || snap.status !== 200 || !snap.body || !snap.body.doc) return;
-            const nd = normalizeDoc(snap.body.doc);
-            if (!nd) return;
-            hostRef.current.revision = snap.body.revision;
-            adoptRemoteDoc(nd);
-          });
-        };
-      } catch {
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (source) {
-        try {
-          source.close();
-        } catch {
-        }
-      }
-    };
-  }, [sessionId]);
-  return {
-    doc,
-    docRef,
-    setDoc,
-    mapEl,
-    setEl,
-    setElProps,
-    undo,
-    redo,
-    canUndo: histRef.current.past.length > 0,
-    canRedo: histRef.current.future.length > 0,
-    pushPastSnapshot,
-    adoptRemoteDoc
-  };
-}
-
-// src/client/editor/useEditorActions.js
-function useEditorActions({
-  doc,
-  setDoc,
-  t,
-  activePage,
-  selIds,
-  selEntries,
-  topSelectedEntries,
-  setSelIds,
-  resizeMode
-}) {
-  function addPageAction() {
-    const base = activePage;
-    const page = {
-      id: uid2(),
-      name: t("pages.default") + " " + (doc.pages.length + 1),
-      frame: {
-        w: base ? base.frame.w : 390,
-        h: base ? base.frame.h : 844,
-        preset: base ? base.frame.preset : "mobile",
-        background: "#ffffff"
-      },
-      states: emptyStates(),
-      elements: []
-    };
-    setDoc((current) => addPage(current, page));
-    setSelIds([]);
-  }
-  function duplicatePage(id) {
-    const source = doc.pages.find((candidate) => candidate.id === id);
-    if (!source) return;
-    const copy = {
-      id: uid2(),
-      name: source.name + " " + t("pages.copySuffix"),
-      frame: { ...source.frame },
-      states: JSON.parse(JSON.stringify(source.states || emptyStates())),
-      elements: cloneElementDeep2(
-        { id: "root", type: "group", x: 0, y: 0, w: 0, h: 0, children: source.elements },
-        () => uid2()
-      ).children
-    };
-    setDoc((current) => insertPageAfter(current, id, copy));
-    setSelIds([]);
-  }
-  function deletePage(id) {
-    if (doc.pages.length <= 1) return;
-    if (!window.confirm(t("pages.deleteConfirm"))) return;
-    setDoc((current) => removePage(current, id));
-    setSelIds([]);
-  }
-  function addElementAction(type) {
-    if (!activePage) return;
-    const info = TYPE_INFO[type];
-    if (!info) return;
-    const selected = selEntries.length === 1 ? selEntries[0] : null;
-    const parent = selected && isContainerType(selected.el.type) ? selected.el : null;
-    const boundW = parent ? parent.w : activePage.frame.w;
-    const boundH = parent ? parent.h : activePage.frame.h;
-    const fullWidth = type === "navbar" || type === "tabs";
-    const width = fullWidth ? boundW : info.size[0];
-    const height = info.size[1];
-    const count = (parent ? parent.children || [] : activePage.elements).length;
-    const x = fullWidth ? 0 : parent ? 16 : 24;
-    const y = fullWidth ? Math.min(24 + count % 6 * 16, Math.max(0, boundH - height)) : 24 + count % 8 * 18;
-    const props = type === "container" ? {
-      name: t("comp.container") + " " + (count + 1),
-      background: "#ffffff",
-      radius: 12,
-      clipContent: true
-    } : {};
-    const el = makeEl(
-      type,
-      Math.max(0, Math.min(x, boundW - width)),
-      Math.max(0, Math.min(y, boundH - height)),
-      width,
-      height,
-      props
-    );
-    setDoc((current) => addElement(current, activePage.id, parent ? parent.id : null, el));
-    setSelIds([el.id]);
-  }
-  function duplicateSelection() {
-    const ids = topSelectedEntries().map((entry) => entry.el.id);
-    if (!ids.length || !activePage) return;
-    let created = [];
-    setDoc((current) => {
-      const out = duplicateElements(current, activePage.id, ids);
-      created = out.ids;
-      return out.doc;
-    });
-    if (created.length) setSelIds(created);
-  }
-  function deleteSelection() {
-    if (!selIds.length || !activePage) return;
-    setDoc((current) => removeElements(current, activePage.id, selIds));
-    setSelIds([]);
-  }
-  function reorderSelection(mode) {
-    const ids = topSelectedEntries().map((entry) => entry.el.id);
-    if (!ids.length || !activePage) return;
-    setDoc((current) => reorderElements(current, activePage.id, ids, mode));
-  }
-  function bringFront() {
-    if (!selIds.length) return;
-    reorderSelection("front");
-  }
-  function sendBack() {
-    if (!selIds.length) return;
-    reorderSelection("back");
-  }
-  function moveLayer(id, targetId, position) {
-    if (!activePage) return;
-    setDoc((current) => moveElementTo(current, activePage.id, id, targetId, position));
-  }
-  function setPreset(key) {
-    const sizes = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
-    const size = sizes[key];
-    if (!size || !activePage) return;
-    setDoc((current) => resizePageTo(current, activePage.id, size[0], size[1], resizeMode, key));
-  }
-  function fitContentToFrame() {
-    if (!activePage) return;
-    setDoc((current) => fitContent(current, activePage.id));
-  }
-  function patchActiveFrame(patch) {
-    if (!activePage) return;
-    setDoc(
-      (current) => patchFrame(current, activePage.id, patch),
-      "frame:" + Object.keys(patch).join(",")
-    );
-  }
-  function renameActivePage(name) {
-    if (!activePage) return;
-    setDoc((current) => renamePage(current, activePage.id, name), "pagename:" + activePage.id);
-  }
-  function patchStates(key, patch) {
-    if (!activePage) return;
-    setDoc((current) => patchPageStates(current, activePage.id, key, patch), "pstate:" + key);
-  }
-  function groupSelection() {
-    const entries = topSelectedEntries();
-    if (entries.length < 2 || !activePage) return;
-    let groupId = null;
-    setDoc((current) => {
-      const out = groupEntries(current, activePage.id, entries, t("comp.group"));
-      groupId = out.groupId;
-      return out.doc;
-    });
-    if (groupId) setSelIds([groupId]);
-  }
-  function ungroupSelection() {
-    const entry = selEntries[0];
-    if (!entry || entry.el.type !== "group" || !activePage) return;
-    let ids = [];
-    setDoc((current) => {
-      const out = ungroupEntry(current, activePage.id, entry.el.id);
-      ids = out.ids;
-      return out.doc;
-    });
-    if (ids.length) setSelIds(ids);
-  }
-  function alignSelection(mode) {
-    const entries = topSelectedEntries();
-    if (!entries.length || !activePage) return;
-    const target = entries.length === 1 ? { x: 0, y: 0, w: activePage.frame.w, h: activePage.frame.h } : boundsOfEntries(entries);
-    if (!target) return;
-    setDoc(
-      (current) => alignEntries(current, activePage.id, entries, target, mode),
-      "align:" + mode
-    );
-  }
-  function distributeSelection(axis) {
-    const entries = topSelectedEntries();
-    if (entries.length < 3 || !activePage) return;
-    setDoc((current) => distributeEntries(current, activePage.id, entries, axis));
-  }
-  return {
-    addPage: addPageAction,
-    duplicatePage,
-    deletePage,
-    addElement: addElementAction,
-    duplicateSelection,
-    deleteSelection,
-    reorderSelection,
-    bringFront,
-    sendBack,
-    moveLayer,
-    setPreset,
-    fitContentToFrame,
-    patchActiveFrame,
-    renameActivePage,
-    patchStates,
-    groupSelection,
-    ungroupSelection,
-    alignSelection,
-    distributeSelection
-  };
+  return { ...doc, pages };
 }
 
 // src/client/export/download.js
@@ -3168,6 +2327,15 @@ function renderElement(el, ctx) {
     return box(el, {}, inner, attrs);
   }
   if (el.type === "image") {
+    if (p.src) {
+      const fit = ["cover", "contain", "fill"].includes(p.fit) ? p.fit : "cover";
+      return box(
+        el,
+        { borderRadius: px(p.radius != null ? p.radius : 10), overflow: "hidden" },
+        `<img src="${escapeHtml(p.src)}" alt="${escapeHtml(p.alt || "")}" style="display:block;width:100%;height:100%;object-fit:${fit}" />`,
+        attrs
+      );
+    }
     return box(
       el,
       {
@@ -3209,7 +2377,8 @@ function renderPageBody(page, ctx) {
 }
 function renderPage(page, ctx) {
   const frame = page.frame || { w: 390, h: 844, background: "#ffffff" };
-  return `<div class="dpd-page" data-page="${escapeHtml(page.id)}" style="position:relative;width:${px(frame.w)};height:${px(frame.h)};background:${frame.background || "#ffffff"};overflow:hidden">${renderPageBody(page, ctx)}</div>`;
+  const variant = page.variantOf ? ` data-variant-of="${escapeHtml(page.variantOf)}" data-state-key="${escapeHtml(page.stateKey || "")}"` : "";
+  return `<div class="dpd-page" data-page="${escapeHtml(page.id)}"${variant} style="position:relative;width:${px(frame.w)};height:${px(frame.h)};background:${frame.background || "#ffffff"};overflow:hidden">${renderPageBody(page, ctx)}</div>`;
 }
 
 // src/client/export/html.js
@@ -3225,6 +2394,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC
 #bar button{border:1px solid #d6d9e2;background:#fff;color:#374151;border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
 #bar button.active{background:#6366f1;border-color:transparent;color:#fff}
 #bar .spacer{width:8px}
+#statebar{display:none;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap;padding:4px 16px 0}
+#statebar button{border:1px solid #d6d9e2;background:#fff;color:#6b7280;border-radius:999px;padding:3px 10px;font:inherit;font-size:11px;cursor:pointer}
+#statebar button.active{background:#111827;border-color:transparent;color:#fff}
+#statebar button:disabled{opacity:.35;cursor:default}
 #overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:50}
 #overlay.open{display:flex}
 #overlayBackdrop{position:absolute;inset:0;background:rgba(17,24,39,.38)}
@@ -3249,16 +2422,41 @@ var RUNTIME = `
   var stack = [];
   var overlay = document.getElementById('overlay');
   var overlayHost = document.getElementById('overlayHost');
+  var statebar = document.getElementById('statebar');
+
+  function baseIdOf(page){
+    return page.getAttribute('data-variant-of') || page.getAttribute('data-page');
+  }
+  function statePage(base, key){
+    if(key === 'normal') return byId[base] || null;
+    for(var i=0;i<pages.length;i++){
+      if(pages[i].getAttribute('data-variant-of') === base && pages[i].getAttribute('data-state-key') === key) return pages[i];
+    }
+    return null;
+  }
+  function refreshStateBar(page){
+    if(!statebar) return;
+    var base = baseIdOf(page);
+    var key = page.getAttribute('data-state-key') || 'normal';
+    var buttons = statebar.querySelectorAll('button[data-state]');
+    for(var i=0;i<buttons.length;i++){
+      var state = buttons[i].getAttribute('data-state');
+      buttons[i].classList.toggle('active', state === key);
+      buttons[i].disabled = statePage(base, state) === null;
+    }
+  }
 
   function show(id, push){
     var page = byId[id];
     if(!page) return;
     pages.forEach(function(candidate){ candidate.classList.toggle('active', candidate === page); });
     if(push) stack.push(id);
+    var base = baseIdOf(page);
     var buttons = document.querySelectorAll('#bar button[data-go]');
     for(var i=0;i<buttons.length;i++){
-      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-go') === id);
+      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-go') === base);
     }
+    refreshStateBar(page);
   }
   function back(){
     if(stack.length > 1){ stack.pop(); show(stack[stack.length-1], false); }
@@ -3285,6 +2483,15 @@ var RUNTIME = `
 
   document.addEventListener('click', function(event){
     var target = event.target;
+    var stateBtn = target.closest('#statebar [data-state]');
+    if(stateBtn && !stateBtn.disabled){
+      var activePage = document.querySelector('#pages .dpd-page.active');
+      if(activePage){
+        var next = statePage(baseIdOf(activePage), stateBtn.getAttribute('data-state'));
+        if(next) show(next.getAttribute('data-page'), false);
+      }
+      return;
+    }
     var nav = target.closest('[data-nav]');
     if(nav){ show(nav.getAttribute('data-nav'), true); return; }
     var backEl = target.closest('[data-back]');
@@ -3350,14 +2557,19 @@ var RUNTIME = `
     if(reset && stack.length){ show(stack[0], false); stack = [stack[0]]; }
   });
 
-  if(pages.length){ stack = [pages[0].getAttribute('data-page')]; show(stack[0], false); }
+  var first = pages.filter(function(page){ return !page.getAttribute('data-variant-of'); })[0] || pages[0];
+  if(first){ stack = [first.getAttribute('data-page')]; show(stack[0], false); }
+  if(statebar && pages.some(function(page){ return !!page.getAttribute('data-variant-of'); })) statebar.style.display = 'flex';
 })();
 `;
 function buildHtml(doc, ctx) {
   const title = escapeHtml(doc.name || ctx.t("app.title"));
   const pages = (doc.pages || []).map((page) => renderPage(page, ctx)).join("");
-  const buttons = (doc.pages || []).map(
+  const buttons = (doc.pages || []).filter((page) => !page.variantOf).map(
     (page) => `<button type="button" data-go="${escapeHtml(page.id)}">${escapeHtml(page.name)}</button>`
+  ).join("");
+  const stateBar = ["normal", "loading", "empty", "error"].map(
+    (key) => `<button type="button" data-state="${key}">${escapeHtml(ctx.t("state." + key))}</button>`
   ).join("");
   return `<!doctype html>
 <html lang="zh-CN">
@@ -3370,6 +2582,7 @@ function buildHtml(doc, ctx) {
 <body>
 <main id="stage"><div id="pages">${pages}</div></main>
 <div id="overlay"><div id="overlayBackdrop"></div><div id="overlayHost"></div></div>
+<div id="statebar">${stateBar}</div>
 <nav id="bar">${buttons}<span class="spacer"></span><button type="button" data-reset="1">\u21BA</button></nav>
 <script>${RUNTIME}<\/script>
 </body>
@@ -3390,6 +2603,51 @@ function buildSvg(page, ctx, scale = 2) {
   const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="${style}">${body}</div>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w * factor}" height="${h2 * factor}" viewBox="0 0 ${w} ${h2}"><foreignObject x="0" y="0" width="${w}" height="${h2}">${html}</foreignObject></svg>`;
 }
+function clonePage(page) {
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(page);
+    } catch {
+    }
+  }
+  return JSON.parse(JSON.stringify(page));
+}
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("image read failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+async function inlineImages(page) {
+  const copy = clonePage(page);
+  const tasks = [];
+  const walk = (elements) => {
+    for (const el of elements || []) {
+      const src = el && el.props && el.props.src;
+      if (el.type === "image" && typeof src === "string" && /^https?:/i.test(src)) {
+        tasks.push(
+          (async () => {
+            try {
+              const res = await fetch(src, {
+                signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(4e3) : void 0
+              });
+              if (!res.ok) throw new Error("image fetch failed");
+              el.props.src = await blobToDataUrl(await res.blob());
+            } catch {
+              el.props.src = "";
+            }
+          })()
+        );
+      }
+      if (Array.isArray(el.children)) walk(el.children);
+    }
+  };
+  walk(copy.elements);
+  await Promise.all(tasks);
+  return copy;
+}
 async function renderPagePng(page, ctx, scale = 2) {
   if (typeof document === "undefined") throw new Error("png export requires a browser");
   if (document.fonts && document.fonts.ready) {
@@ -3401,11 +2659,12 @@ async function renderPagePng(page, ctx, scale = 2) {
     } catch {
     }
   }
-  const frame = page.frame || { w: 390, h: 844, background: "#ffffff" };
+  const exportPage = await inlineImages(page);
+  const frame = exportPage.frame || { w: 390, h: 844, background: "#ffffff" };
   const w = Math.max(1, Math.round(frame.w));
   const h2 = Math.max(1, Math.round(frame.h));
   const factor = Math.max(1, Math.min(4, Number(scale) || 1));
-  const svg = buildSvg(page, ctx, factor);
+  const svg = buildSvg(exportPage, ctx, factor);
   const dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   const image = await loadImage(dataUrl);
   const canvas = document.createElement("canvas");
@@ -3690,6 +2949,15 @@ ${pad}</label>`;
     )}}${inter}>{${textOf(el, ctx.t("sample.text"))}}</p>`;
   }
   if (el.type === "image") {
+    if (p.src) {
+      const fit = ["cover", "contain", "fill"].includes(p.fit) ? p.fit : "cover";
+      const fitCls = fit === "contain" ? "object-contain" : fit === "fill" ? "object-fill" : "object-cover";
+      return `${pad}<img src={${JSON.stringify(p.src)}} alt={${JSON.stringify(
+        p.alt || ""
+      )}} className={${JSON.stringify(
+        cls(size, `rounded-[${p.radius != null ? p.radius : 10}px]`, fitCls)
+      )}}${inter} />`;
+    }
     return `${pad}<div className={${JSON.stringify(
       cls(
         size,
@@ -3758,9 +3026,22 @@ ${body}
 }`;
   }).join("\n\n");
   const registry = pages.map((page, index) => `  '${page.id}': ${names[index]},`).join("\n");
-  const first = pages[0] ? pages[0].id : "";
+  const bases = pages.filter((page) => !page.variantOf);
+  const first = (bases[0] || pages[0] || {}).id || "";
+  const baseOf = {};
+  const stateOf = {};
+  const statePages = {};
+  for (const page of pages) {
+    if (!page.variantOf) continue;
+    baseOf[page.id] = page.variantOf;
+    stateOf[page.id] = page.stateKey;
+    statePages[page.variantOf] = statePages[page.variantOf] || {};
+    statePages[page.variantOf][page.stateKey] = page.id;
+  }
+  const stateKeys = ["normal", "loading", "empty", "error"];
+  const stateLabels2 = stateKeys.map((key) => ctx.t("state." + key));
   const source = `// Generated by dsh-product-design.
-// ${doc.name || "Prototype"} \u2014 ${pages.length} page(s). Tailwind CSS required.
+// ${doc.name || "Prototype"} \u2014 ${bases.length} page(s) + ${pages.length - bases.length} state variant(s). Tailwind CSS required.
 import { useState } from 'react';
 
 ${components}
@@ -3768,6 +3049,10 @@ ${components}
 const PAGES = {
 ${registry}
 };
+
+const BASE_OF = ${JSON.stringify(baseOf)};
+const STATE_OF = ${JSON.stringify(stateOf)};
+const STATE_PAGES = ${JSON.stringify(statePages)};
 
 export default function App() {
   const [page, setPage] = useState('${first}');
@@ -3778,6 +3063,13 @@ export default function App() {
     setStack((current) => [...current, id]);
     setPage(id);
   };
+  const switchState = (id) => {
+    setStack((current) => [...current.slice(0, -1), id]);
+    setPage(id);
+  };
+  const base = BASE_OF[page] || page;
+  const currentState = STATE_OF[page] || 'normal';
+  const stateTarget = (key) => (key === 'normal' ? base : (STATE_PAGES[base] || {})[key] || null);
   const back = () => {
     setStack((current) => {
       if (current.length <= 1) return current;
@@ -3792,8 +3084,30 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-8">
-      <div className="rounded-2xl shadow-2xl overflow-hidden">
-        <Current onNavigate={navigate} onBack={back} onOverlay={setOverlay} />
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex gap-1">
+          {${JSON.stringify(stateKeys)}.map((key) => {
+            const target = stateTarget(key);
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={!target}
+                onClick={() => target && switchState(target)}
+                className={[
+                  'rounded-full border px-3 py-1 text-[11px]',
+                  currentState === key ? 'bg-[#111827] text-white border-transparent' : 'bg-white text-[#6b7280] border-[#d6d9e2]',
+                  target ? 'cursor-pointer' : 'opacity-40 cursor-default',
+                ].join(' ')}
+              >
+                {${JSON.stringify(stateLabels2)}[${JSON.stringify(stateKeys)}.indexOf(key)]}
+              </button>
+            );
+          })}
+        </div>
+        <div className="rounded-2xl shadow-2xl overflow-hidden">
+          <Current onNavigate={navigate} onBack={back} onOverlay={setOverlay} />
+        </div>
       </div>
       {Overlay ? (
         <div
@@ -3810,6 +3124,1331 @@ export default function App() {
 }
 `;
   return source.replace(/className=\{("(?:[^"\\]|\\.)*")\}/g, "className=$1").replace(/placeholder=\{("(?:[^"\\]|\\.)*")\}/g, "placeholder=$1");
+}
+
+// src/client/model.js
+var __seq = 1;
+function uid2() {
+  return "e" + Date.now().toString(36) + (__seq++).toString(36);
+}
+function makeEl(type, x, y, w, hh, props, state) {
+  const el = {
+    id: uid2(),
+    type,
+    name: "",
+    x,
+    y,
+    w,
+    h: hh,
+    hidden: false,
+    locked: false,
+    opacity: 1,
+    state: state || defaultState(type),
+    props: props || {},
+    interactions: [],
+    constraints: defaultConstraints(type)
+  };
+  if (isContainerType(type)) {
+    el.layout = null;
+    el.children = [];
+  }
+  return el;
+}
+function starterElements(t) {
+  return [
+    makeEl("navbar", 0, 0, 390, 56),
+    makeEl("text", 24, 84, 320, 30, { fontSize: 22, text: t ? t("sample.welcome") : "\u6B22\u8FCE\u56DE\u6765" }),
+    makeEl("text", 24, 120, 320, 22, {
+      fontSize: 13,
+      fontWeight: 400,
+      color: "#6b7280",
+      text: t ? t("sample.welcomeSub") : "\u4ECA\u5929\u60F3\u8BBE\u8BA1\u70B9\u4EC0\u4E48\uFF1F"
+    }),
+    makeEl("card", 24, 158, 342, 116),
+    makeEl("input", 24, 296, 342, 44),
+    makeEl("button", 24, 356, 150, 44),
+    makeEl("toggle", 300, 364, 50, 28),
+    makeEl("badge", 24, 420, 70, 24),
+    makeEl("tabs", 0, 470, 390, 48),
+    makeEl("image", 24, 540, 342, 160)
+  ];
+}
+function defaultDoc(t) {
+  const page = {
+    id: uid2(),
+    name: t ? t("pages.default") + " 1" : "Page 1",
+    frame: { w: 390, h: 844, preset: "mobile", background: "#ffffff" },
+    states: {},
+    elements: starterElements(t)
+  };
+  return { name: "", pages: [page], activePageId: page.id };
+}
+function normalizeInteractions(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    if (!["navigate", "back", "openOverlay"].includes(item.action)) continue;
+    const next = { trigger: "click", action: item.action };
+    if (item.action !== "back") next.targetPageId = String(item.targetPageId || "");
+    out.push(next);
+  }
+  return out;
+}
+function normalizeElement(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const type = TYPE_INFO[raw.type] ? raw.type : "text";
+  const el = {
+    id: raw.id || uid2(),
+    type,
+    name: typeof raw.name === "string" ? raw.name : "",
+    x: Number.isFinite(Number(raw.x)) ? Number(raw.x) : 0,
+    y: Number.isFinite(Number(raw.y)) ? Number(raw.y) : 0,
+    w: Math.max(12, Number.isFinite(Number(raw.w)) ? Number(raw.w) : TYPE_INFO[type].size[0]),
+    h: Math.max(8, Number.isFinite(Number(raw.h)) ? Number(raw.h) : TYPE_INFO[type].size[1]),
+    hidden: raw.hidden === true,
+    locked: raw.locked === true,
+    opacity: Number.isFinite(Number(raw.opacity)) ? Math.max(0, Math.min(1, Number(raw.opacity))) : 1,
+    state: raw.state || defaultState(type),
+    props: raw.props && typeof raw.props === "object" ? { ...raw.props } : {},
+    interactions: normalizeInteractions(raw.interactions),
+    constraints: normalizeConstraints(raw.constraints, type)
+  };
+  if (isContainerType(type)) {
+    el.layout = normalizeLayout(raw.layout);
+    el.children = Array.isArray(raw.children) ? raw.children.map(normalizeElement).filter(Boolean) : [];
+  }
+  return el;
+}
+function normalizeElements(list) {
+  return Array.isArray(list) ? list.map(normalizeElement).filter(Boolean) : [];
+}
+function normalizeDoc(doc) {
+  if (!doc || !Array.isArray(doc.pages)) return null;
+  const pages = doc.pages.filter((p) => p && Array.isArray(p.elements)).map((p) => {
+    const fr = p.frame || {};
+    const page = {
+      id: p.id || uid2(),
+      name: p.name || "Page",
+      frame: {
+        w: fr.w || 390,
+        h: fr.h || 844,
+        preset: fr.preset || "mobile",
+        background: fr.background || "#ffffff"
+      },
+      states: normalizeStateLinks(p.states),
+      elements: normalizeElements(p.elements)
+    };
+    if (p.variantOf && PAGE_STATE_KEYS.includes(p.stateKey)) {
+      page.variantOf = p.variantOf;
+      page.stateKey = p.stateKey;
+    }
+    return page;
+  });
+  if (!pages.length) return null;
+  const out = {
+    name: doc.name || "",
+    pages: pages.map(reflowPage),
+    activePageId: pages.some((p) => p.id === doc.activePageId) ? doc.activePageId : pages[0].id
+  };
+  repairPageStates(out);
+  if (!out.pages.some((p) => p.id === out.activePageId)) out.activePageId = out.pages[0].id;
+  return out;
+}
+function docStorageKey(sessionId) {
+  return sessionId ? `${STORAGE_KEY}:${sessionId}` : STORAGE_KEY;
+}
+function loadDoc(sessionId) {
+  try {
+    const raw = window.localStorage.getItem(docStorageKey(sessionId));
+    if (!raw) return null;
+    return normalizeDoc(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+function saveDoc(doc, sessionId) {
+  try {
+    window.localStorage.setItem(docStorageKey(sessionId), JSON.stringify(doc));
+  } catch {
+  }
+}
+function loadUi() {
+  try {
+    const raw = window.localStorage.getItem(UI_KEY);
+    return raw ? JSON.parse(raw) || {} : {};
+  } catch {
+    return {};
+  }
+}
+function saveUi(ui) {
+  try {
+    window.localStorage.setItem(UI_KEY, JSON.stringify(ui));
+  } catch {
+  }
+}
+function apiFetch(path, init, sessionId) {
+  if (typeof fetch !== "function") return Promise.resolve(null);
+  let target = API_PREFIX + path;
+  if (sessionId) {
+    target += (target.includes("?") ? "&" : "?") + "sessionId=" + encodeURIComponent(sessionId);
+  }
+  let url;
+  try {
+    url = new URL(
+      target,
+      window.location && window.location.href ? window.location.href : "http://localhost/"
+    ).toString();
+  } catch {
+    return Promise.resolve(null);
+  }
+  const opts = Object.assign({}, init);
+  if (!opts.signal && typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    try {
+      opts.signal = AbortSignal.timeout(4e3);
+    } catch {
+    }
+  }
+  return fetch(url, opts).then(
+    (res) => res.text().then((text) => {
+      let body = null;
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch {
+          body = null;
+        }
+      }
+      return { status: res.status, body };
+    }),
+    () => null
+  );
+}
+
+// src/client/docs.js
+function blankDoc(t) {
+  const page = {
+    id: uid2(),
+    name: (t ? t("pages.default") : "Page") + " 1",
+    frame: { w: 390, h: 844, preset: "mobile", background: "#ffffff" },
+    states: {},
+    elements: []
+  };
+  return { name: "", pages: [page], activePageId: page.id };
+}
+function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
+  const [docs, setDocs] = useState2([]);
+  const [ready, setReady] = useState2(false);
+  const [error, setError] = useState2("");
+  const switchRef = useRef(onSwitch);
+  switchRef.current = onSwitch;
+  const statusRef = useRef(onStatus);
+  statusRef.current = onStatus;
+  const tRef = useRef(t);
+  tRef.current = t;
+  const refresh = useCallback2(async () => {
+    const res = await apiFetch("/docs", void 0, sessionId);
+    if (!res) {
+      setReady(false);
+      return null;
+    }
+    if (res.status !== 200 || !res.body) {
+      setError(tRef.current("docs.loadFailed"));
+      return null;
+    }
+    setError("");
+    setReady(true);
+    setDocs(Array.isArray(res.body.docs) ? res.body.docs : []);
+    return res.body;
+  }, [sessionId]);
+  useEffect2(() => {
+    refresh();
+  }, [refresh]);
+  const create = useCallback2(async () => {
+    const res = await apiFetch(
+      "/docs",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId, doc: blankDoc(tRef.current) })
+      },
+      sessionId
+    );
+    if (!res || res.status !== 200 || !res.body || !res.body.meta) {
+      setError(tRef.current("docs.createFailed"));
+      return null;
+    }
+    await refresh();
+    await switchRef.current(res.body.meta.id);
+    return res.body.meta;
+  }, [refresh, sessionId]);
+  const duplicate = useCallback2(
+    async (docId) => {
+      const res = await apiFetch(
+        "/docs/duplicate",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ docId })
+        },
+        sessionId
+      );
+      if (!res || res.status !== 200) {
+        setError(tRef.current("docs.duplicateFailed"));
+        return null;
+      }
+      await refresh();
+      return res.body;
+    },
+    [refresh, sessionId]
+  );
+  const rename = useCallback2(
+    async (docId, name) => {
+      const res = await apiFetch(
+        "/docs/rename",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ docId, name })
+        },
+        sessionId
+      );
+      if (!res || res.status !== 200) {
+        setError(tRef.current("docs.renameFailed"));
+        return null;
+      }
+      await refresh();
+      return res.body;
+    },
+    [refresh, sessionId]
+  );
+  const remove = useCallback2(
+    async (docId) => {
+      const res = await apiFetch(
+        "/docs/delete",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ docId })
+        },
+        sessionId
+      );
+      if (!res || res.status !== 200) {
+        setError(tRef.current("docs.deleteFailed"));
+        return false;
+      }
+      const rebind = (res.body.rebinds || []).find((item) => item.sessionId === sessionId);
+      if (docId === activeDocId) {
+        if (rebind) await switchRef.current(rebind.docId);
+        else await refresh();
+      } else {
+        await refresh();
+      }
+      return true;
+    },
+    [activeDocId, refresh, sessionId]
+  );
+  const importFile = useCallback2(
+    async (file) => {
+      if (!file) return null;
+      let payload = null;
+      try {
+        payload = JSON.parse(await file.text());
+      } catch {
+        setError(tRef.current("docs.invalidFile"));
+        return null;
+      }
+      const res = await apiFetch(
+        "/docs/import",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionId, payload })
+        },
+        sessionId
+      );
+      if (!res || res.status !== 200 || !res.body || !res.body.meta) {
+        setError(tRef.current("docs.importFailed"));
+        return null;
+      }
+      await switchRef.current(res.body.meta.id);
+      await refresh();
+      if (statusRef.current) statusRef.current(true, "docs.imported");
+      return res.body.meta;
+    },
+    [refresh, sessionId]
+  );
+  const exportDoc = useCallback2(
+    async (docId) => {
+      const res = await apiFetch(
+        "/docs/export?docId=" + encodeURIComponent(docId),
+        void 0,
+        sessionId
+      );
+      if (!res || res.status !== 200 || !res.body) {
+        setError(tRef.current("docs.exportFailed"));
+        return false;
+      }
+      const name = res.body.doc && res.body.doc.name ? res.body.doc.name : "design";
+      downloadText(
+        JSON.stringify(res.body, null, 2),
+        `${safeFileName(name, "design")}.json`,
+        "application/json;charset=utf-8"
+      );
+      if (statusRef.current) statusRef.current(true, "export.done");
+      return true;
+    },
+    [sessionId]
+  );
+  return {
+    docs,
+    ready,
+    error,
+    refresh,
+    create,
+    duplicate,
+    rename,
+    remove,
+    importFile,
+    exportDoc
+  };
+}
+
+// src/client/domain/tree.js
+function mapTree(elements, fn) {
+  let changed = false;
+  const out = elements.map((el) => {
+    let next = fn(el);
+    if (isContainerType(next.type) && Array.isArray(next.children)) {
+      const kids = mapTree(next.children, fn);
+      if (kids !== next.children) next = { ...next, children: kids };
+    }
+    if (next !== el) changed = true;
+    return next;
+  });
+  return changed ? out : elements;
+}
+function removeFromTree(elements, idSet) {
+  let changed = false;
+  const out = [];
+  for (const el of elements) {
+    if (idSet.has(el.id)) {
+      changed = true;
+      continue;
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = removeFromTree(el.children, idSet);
+      if (kids !== el.children) {
+        changed = true;
+        out.push({ ...el, children: kids });
+        continue;
+      }
+    }
+    out.push(el);
+  }
+  return changed ? out : elements;
+}
+function extractFromTree2(elements, id) {
+  let extracted = null;
+  let changed = false;
+  const walk = (list) => {
+    const out = [];
+    for (const el of list) {
+      if (el.id === id) {
+        extracted = el;
+        changed = true;
+        continue;
+      }
+      if (isContainerType(el.type) && Array.isArray(el.children)) {
+        const kids = walk(el.children);
+        if (kids !== el.children) {
+          out.push({ ...el, children: kids });
+          continue;
+        }
+      }
+      out.push(el);
+    }
+    return out;
+  };
+  const next = walk(elements);
+  return { elements: changed ? next : elements, extracted };
+}
+function appendToContainer(elements, containerId, el) {
+  let changed = false;
+  const out = elements.map((cur) => {
+    if (cur.id === containerId) {
+      changed = true;
+      return { ...cur, children: [...cur.children || [], el] };
+    }
+    if (isContainerType(cur.type) && Array.isArray(cur.children)) {
+      const kids = appendToContainer(cur.children, containerId, el);
+      if (kids !== cur.children) {
+        changed = true;
+        return { ...cur, children: kids };
+      }
+    }
+    return cur;
+  });
+  return changed ? out : elements;
+}
+function replaceInTree(elements, id, updater) {
+  let changed = false;
+  const out = elements.map((el) => {
+    if (el.id === id) {
+      changed = true;
+      return updater(el);
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = replaceInTree(el.children, id, updater);
+      if (kids !== el.children) {
+        changed = true;
+        return { ...el, children: kids };
+      }
+    }
+    return el;
+  });
+  return changed ? out : elements;
+}
+function duplicateInTree(elements, idSet, rootIds) {
+  const out = [];
+  for (const el of elements) {
+    if (idSet.has(el.id)) {
+      const copy = cloneElementDeep(el, () => uid());
+      copy.x += 16;
+      copy.y += 16;
+      rootIds.push(copy.id);
+      out.push(el, copy);
+      continue;
+    }
+    if (isContainerType(el.type) && Array.isArray(el.children)) {
+      const kids = duplicateInTree(el.children, idSet, rootIds);
+      out.push(kids !== el.children ? { ...el, children: kids } : el);
+      continue;
+    }
+    out.push(el);
+  }
+  return out;
+}
+
+// src/client/domain/document.js
+function activePageOf(doc) {
+  return doc.pages.find((page) => page.id === doc.activePageId) || doc.pages[0] || null;
+}
+function mapPage(doc, pageId, fn) {
+  return { ...doc, pages: doc.pages.map((page) => page.id === pageId ? fn(page) : page) };
+}
+function mapElements(doc, pageId, fn) {
+  return mapPage(doc, pageId, (page) => ({ ...page, elements: fn(page.elements) }));
+}
+function addPage(doc, page) {
+  return { ...doc, pages: [...doc.pages, page], activePageId: page.id };
+}
+function renamePage(doc, pageId, name) {
+  return mapPage(doc, pageId, (page) => ({ ...page, name }));
+}
+function patchFrame(doc, pageId, patch) {
+  return mapPage(doc, pageId, (page) => ({ ...page, frame: { ...page.frame, ...patch } }));
+}
+function fitContent(doc, pageId) {
+  const page = doc.pages.find((candidate) => candidate.id === pageId);
+  if (!page || !page.elements.length) return doc;
+  const bounds = boundsOfEntries(collectElementEntries(page.elements));
+  if (!bounds || bounds.w <= 0 || bounds.h <= 0) return doc;
+  const sx = page.frame.w / bounds.w;
+  const sy = page.frame.h / bounds.h;
+  return mapPage(doc, pageId, (target) => ({
+    ...target,
+    elements: scaleElementsInTree(target.elements, sx, sy, Math.min(sx, sy), bounds.x, bounds.y)
+  }));
+}
+function addElement(doc, pageId, parentId, el) {
+  return mapElements(
+    doc,
+    pageId,
+    (elements) => parentId ? appendToContainer(elements, parentId, el) : [...elements, el]
+  );
+}
+function removeElements(doc, pageId, ids) {
+  return mapElements(doc, pageId, (elements) => removeFromTree(elements, new Set(ids)));
+}
+function duplicateElements(doc, pageId, ids) {
+  const roots = [];
+  const next = mapElements(
+    doc,
+    pageId,
+    (elements) => duplicateInTree(elements, new Set(ids), roots)
+  );
+  return { doc: next, ids: roots };
+}
+function reorderElements(doc, pageId, ids, mode) {
+  return mapElements(doc, pageId, (elements) => {
+    let next = elements;
+    for (const id of ids) next = reorderInTree(next, id, mode);
+    return next;
+  });
+}
+function moveElementTo(doc, pageId, id, targetId, position) {
+  return mapElements(
+    doc,
+    pageId,
+    (elements) => moveElementInTree(elements, id, targetId, position)
+  );
+}
+function patchElements(doc, pageId, ids, fn) {
+  const idSet = new Set(ids);
+  return mapElements(
+    doc,
+    pageId,
+    (elements) => mapTree(elements, (el) => idSet.has(el.id) ? fn(el) : el)
+  );
+}
+function moveElementsBy(doc, pageId, ids, dx, dy) {
+  return patchElements(doc, pageId, ids, (el) => ({ ...el, x: el.x + dx, y: el.y + dy }));
+}
+function setElementText(doc, elementId, text) {
+  return {
+    ...doc,
+    pages: doc.pages.map((page) => ({
+      ...page,
+      elements: mapTree(
+        page.elements,
+        (el) => el.id === elementId ? { ...el, props: { ...el.props, text } } : el
+      )
+    }))
+  };
+}
+function pasteElements(doc, pageId, items, targetId) {
+  const page = doc.pages.find((candidate) => candidate.id === pageId);
+  if (!page || !items.length) return { doc, ids: [] };
+  const target = targetId ? findElementEntry(page.elements, targetId) : null;
+  const ids = [];
+  const copies = items.map((item) => {
+    const copy = cloneElementDeep2(item.el, () => uid2());
+    copy.x = Math.round(item.absX + 16 - (target ? target.absX : 0));
+    copy.y = Math.round(item.absY + 16 - (target ? target.absY : 0));
+    ids.push(copy.id);
+    return copy;
+  });
+  const next = mapElements(doc, pageId, (elements) => {
+    if (!target) return [...elements, ...copies];
+    let out = elements;
+    for (const copy of copies) out = appendToContainer(out, targetId, copy);
+    return out;
+  });
+  return { doc: next, ids };
+}
+function groupEntries(doc, pageId, entries, name) {
+  if (entries.length < 2) return { doc, groupId: null };
+  const list = entries[0].list;
+  if (!entries.every((entry) => entry.list === list)) return { doc, groupId: null };
+  const bounds = boundsOfEntries(entries);
+  if (!bounds) return { doc, groupId: null };
+  const parentAbsX = entries[0].absX - entries[0].el.x;
+  const parentAbsY = entries[0].absY - entries[0].el.y;
+  const group = {
+    id: uid2(),
+    type: "group",
+    name: "",
+    x: bounds.x - parentAbsX,
+    y: bounds.y - parentAbsY,
+    w: bounds.w,
+    h: bounds.h,
+    hidden: false,
+    locked: false,
+    opacity: 1,
+    state: "default",
+    props: { name },
+    interactions: [],
+    constraints: { h: "leftRight", v: "top" },
+    layout: null,
+    children: entries.map((entry) => {
+      const copy = cloneElementDeep2(entry.el);
+      copy.x = entry.absX - bounds.x;
+      copy.y = entry.absY - bounds.y;
+      return copy;
+    })
+  };
+  const ids = new Set(entries.map((entry) => entry.el.id));
+  const insertAt = Math.min(...entries.map((entry) => entry.index));
+  const remaining = list.filter((el) => !ids.has(el.id));
+  remaining.splice(insertAt, 0, group);
+  const next = mapElements(doc, pageId, (elements) => {
+    if (!entries[0].parent) return remaining;
+    return mapTree(
+      elements,
+      (el) => el.id === entries[0].parent.id ? { ...el, children: remaining } : el
+    );
+  });
+  return { doc: next, groupId: group.id };
+}
+function ungroupEntry(doc, pageId, id) {
+  const page = doc.pages.find((candidate) => candidate.id === pageId);
+  const entry = page ? findElementEntry(page.elements, id) : null;
+  if (!entry || entry.el.type !== "group") return { doc, ids: [] };
+  const group = entry.el;
+  const kids = (group.children || []).map((child) => {
+    const copy = cloneElementDeep2(child);
+    copy.x += group.x;
+    copy.y += group.y;
+    return copy;
+  });
+  const next = entry.list.slice();
+  next.splice(entry.index, 1, ...kids);
+  const out = mapElements(doc, pageId, (elements) => {
+    if (!entry.parent) return next;
+    return mapTree(elements, (el) => el.id === entry.parent.id ? { ...el, children: next } : el);
+  });
+  return { doc: out, ids: kids.map((kid) => kid.id) };
+}
+function alignEntries(doc, pageId, entries, target, mode) {
+  const ids = new Set(entries.map((entry) => entry.el.id));
+  return mapElements(
+    doc,
+    pageId,
+    (elements) => mapTree(elements, (el) => {
+      if (!ids.has(el.id)) return el;
+      const entry = findElementEntry(elements, el.id);
+      if (!entry) return el;
+      const parentAbsX = entry.absX - el.x;
+      const parentAbsY = entry.absY - el.y;
+      let absX = entry.absX;
+      let absY = entry.absY;
+      if (mode === "left") absX = target.x;
+      else if (mode === "centerX") absX = target.x + (target.w - el.w) / 2;
+      else if (mode === "right") absX = target.x + target.w - el.w;
+      else if (mode === "top") absY = target.y;
+      else if (mode === "centerY") absY = target.y + (target.h - el.h) / 2;
+      else if (mode === "bottom") absY = target.y + target.h - el.h;
+      return { ...el, x: Math.round(absX - parentAbsX), y: Math.round(absY - parentAbsY) };
+    })
+  );
+}
+function distributeEntries(doc, pageId, entries, axis) {
+  if (entries.length < 3) return doc;
+  const sorted = entries.slice().sort((a, b) => axis === "x" ? a.absX - b.absX : a.absY - b.absY);
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const total = axis === "x" ? last.absX + last.w - first.absX : last.absY + last.h - first.absY;
+  const sum = sorted.reduce((acc, entry) => acc + (axis === "x" ? entry.w : entry.h), 0);
+  const gap = (total - sum) / (sorted.length - 1);
+  let cursor = axis === "x" ? first.absX : first.absY;
+  const positions = /* @__PURE__ */ new Map();
+  for (const entry of sorted) {
+    positions.set(entry.el.id, cursor);
+    cursor += (axis === "x" ? entry.w : entry.h) + gap;
+  }
+  return mapElements(
+    doc,
+    pageId,
+    (elements) => mapTree(elements, (el) => {
+      if (!positions.has(el.id)) return el;
+      const entry = findElementEntry(elements, el.id);
+      if (!entry) return el;
+      const parentAbs = axis === "x" ? entry.absX - el.x : entry.absY - el.y;
+      const pos = Math.round(positions.get(el.id) - parentAbs);
+      return axis === "x" ? { ...el, x: pos } : { ...el, y: pos };
+    })
+  );
+}
+
+// src/client/editor/contextMenuItems.js
+function buildMenuItems({ t, selIds, selEntries, hasClipboard, ctxEl, actions }) {
+  const hasSelection = selIds.length > 0;
+  return [
+    { label: t("ctx.copy"), key: "\u2318C", onClick: actions.copySelection, disabled: !hasSelection },
+    { label: t("ctx.cut"), key: "\u2318X", onClick: actions.cutSelection, disabled: !hasSelection },
+    {
+      label: t("ctx.paste"),
+      key: "\u2318V",
+      onClick: actions.pasteClipboard,
+      disabled: !hasClipboard
+    },
+    { sep: true },
+    {
+      label: t("ctx.duplicate"),
+      key: "\u2318D",
+      onClick: actions.duplicateSelection,
+      disabled: !hasSelection
+    },
+    { sep: true },
+    {
+      label: t("ctx.front"),
+      onClick: () => actions.reorderSelection("front"),
+      disabled: !hasSelection
+    },
+    {
+      label: t("ctx.forward"),
+      key: "\u2318]",
+      onClick: () => actions.reorderSelection("forward"),
+      disabled: !hasSelection
+    },
+    {
+      label: t("ctx.backward"),
+      key: "\u2318[",
+      onClick: () => actions.reorderSelection("backward"),
+      disabled: !hasSelection
+    },
+    {
+      label: t("ctx.back"),
+      onClick: () => actions.reorderSelection("back"),
+      disabled: !hasSelection
+    },
+    { sep: true },
+    {
+      label: t("ctx.group"),
+      key: "\u2318G",
+      onClick: actions.groupSelection,
+      disabled: selEntries.length < 2
+    },
+    ...ctxEl && ctxEl.type === "group" ? [{ label: t("ctx.ungroup"), key: "\u21E7\u2318G", onClick: actions.ungroupSelection }] : [],
+    ...ctxEl ? [
+      {
+        label: ctxEl.hidden ? t("ctx.show") : t("ctx.hide"),
+        onClick: () => actions.applyAttrs({ hidden: !ctxEl.hidden })
+      },
+      {
+        label: ctxEl.locked ? t("ctx.unlock") : t("ctx.lock"),
+        onClick: () => actions.applyAttrs({ locked: !ctxEl.locked })
+      }
+    ] : [],
+    { sep: true },
+    {
+      label: t("ctx.delete"),
+      key: "\u232B",
+      onClick: actions.deleteSelection,
+      danger: true,
+      disabled: !hasSelection
+    }
+  ];
+}
+
+// src/client/editor/useClipboard.js
+function useClipboard({ docRef, setDoc, setSelIds, getSelected, deleteSelection }) {
+  const clipboardRef = useRef([]);
+  function copySelection() {
+    const entries = getSelected();
+    if (!entries.length) return;
+    clipboardRef.current = entries.map((entry) => ({
+      el: cloneElementDeep2(entry.el),
+      absX: entry.absX,
+      absY: entry.absY
+    }));
+  }
+  function cutSelection() {
+    copySelection();
+    deleteSelection();
+  }
+  function pasteClipboard() {
+    const items = clipboardRef.current;
+    if (!items.length) return;
+    const doc = docRef.current;
+    const page = doc.pages.find((candidate) => candidate.id === doc.activePageId);
+    if (!page) return;
+    const selected = getSelected();
+    const target = selected.length === 1 && selected[0].el.type === "container" ? selected[0] : null;
+    let ids = [];
+    setDoc((current) => {
+      const out = pasteElements(current, page.id, items, target ? target.el.id : null);
+      ids = out.ids;
+      return out.doc;
+    });
+    if (ids.length) setSelIds(ids);
+  }
+  return { clipboardRef, copySelection, cutSelection, pasteClipboard };
+}
+
+// src/client/editor/useDocument.js
+var HIST_LIMIT = 120;
+function sameDoc(a, b) {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+function useDocument({ sessionId, t, resetTransient, onAdopt }) {
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+  const [doc, setDocState] = useState2(() => loadDoc(sessionId) || defaultDoc(t));
+  const [docId, setDocId] = useState2("");
+  const docRef = useRef(doc);
+  const histRef = useRef({ past: [], future: [] });
+  const lastKeyRef = useRef({ key: null, time: 0 });
+  const lastEditRef = useRef(0);
+  const [, bumpHist] = useState2(0);
+  const hostRef = useRef({ on: false, revision: 0, docId: "", suppressSave: false });
+  function pushPastSnapshot(snapshot) {
+    const h2 = histRef.current;
+    h2.past.push(snapshot);
+    if (h2.past.length > HIST_LIMIT) h2.past.shift();
+    h2.future = [];
+    lastKeyRef.current = { key: null, time: 0 };
+    bumpHist((v) => v + 1);
+  }
+  const setDoc = useCallback2((updater, mode) => {
+    const prev = docRef.current;
+    const raw = typeof updater === "function" ? updater(prev) : updater;
+    const next = reflowDoc(raw);
+    if (next === prev) return;
+    if (mode !== false) {
+      const h2 = histRef.current;
+      let record = true;
+      if (typeof mode === "string") {
+        const now = Date.now();
+        if (lastKeyRef.current.key === mode && now - lastKeyRef.current.time < 900) record = false;
+        lastKeyRef.current = { key: mode, time: now };
+      } else {
+        lastKeyRef.current = { key: null, time: 0 };
+      }
+      if (record) {
+        pushPastSnapshot(prev);
+        lastEditRef.current = Date.now();
+      }
+      h2.future = [];
+    }
+    docRef.current = next;
+    setDocState(next);
+  }, []);
+  const mapEl = useCallback2(
+    (elId, fn, mode) => {
+      setDoc(
+        (d) => ({
+          ...d,
+          pages: d.pages.map((p) => ({
+            ...p,
+            elements: replaceInTree(p.elements, elId, fn)
+          }))
+        }),
+        mode
+      );
+    },
+    [setDoc]
+  );
+  const setEl = useCallback2(
+    (elId, patch, mode) => mapEl(elId, (e) => ({ ...e, ...patch }), mode),
+    [mapEl]
+  );
+  const setElProps = useCallback2(
+    (elId, patch, mode) => mapEl(elId, (e) => ({ ...e, props: { ...e.props, ...patch } }), mode),
+    [mapEl]
+  );
+  function undo() {
+    const h2 = histRef.current;
+    if (!h2.past.length) return;
+    const prev = h2.past.pop();
+    h2.future.push(docRef.current);
+    docRef.current = prev;
+    setDocState(prev);
+    lastKeyRef.current = { key: null, time: 0 };
+    bumpHist((v) => v + 1);
+  }
+  function redo() {
+    const h2 = histRef.current;
+    if (!h2.future.length) return;
+    const next = h2.future.pop();
+    h2.past.push(docRef.current);
+    if (h2.past.length > HIST_LIMIT) h2.past.shift();
+    docRef.current = next;
+    setDocState(next);
+    lastKeyRef.current = { key: null, time: 0 };
+    bumpHist((v) => v + 1);
+  }
+  function applySnapshot(snap, { resetHistory } = {}) {
+    if (!snap || !snap.doc) return false;
+    const nd = normalizeDoc(snap.doc);
+    if (!nd) return false;
+    hostRef.current.on = true;
+    hostRef.current.revision = Number(snap.revision) || 0;
+    hostRef.current.docId = snap.docId || hostRef.current.docId;
+    hostRef.current.suppressSave = true;
+    if (resetHistory) {
+      histRef.current = { past: [], future: [] };
+      bumpHist((v) => v + 1);
+    }
+    setDocId(hostRef.current.docId);
+    docRef.current = nd;
+    setDocState(nd);
+    onAdopt(nd);
+    return true;
+  }
+  function adoptRemoteDoc(nd, nextDocId) {
+    const prev = docRef.current;
+    if (prev && sameDoc(prev, nd)) return;
+    if (prev && Date.now() - lastEditRef.current > 800) pushPastSnapshot(prev);
+    hostRef.current.suppressSave = true;
+    if (nextDocId) hostRef.current.docId = nextDocId;
+    setDocId(hostRef.current.docId);
+    docRef.current = nd;
+    setDocState(nd);
+    onAdopt(nd);
+  }
+  async function refreshFromHost(sid) {
+    const got = await apiFetch("/doc", void 0, sid);
+    if (!got || got.status !== 200 || !got.body) return null;
+    const body = got.body;
+    hostRef.current.on = true;
+    hostRef.current.revision = Number(body.revision) || 0;
+    hostRef.current.docId = body.docId || "";
+    setDocId(hostRef.current.docId);
+    if (body.doc && Array.isArray(body.doc.pages) && body.doc.pages.length > 0) {
+      const nd = normalizeDoc(body.doc);
+      if (nd) {
+        hostRef.current.suppressSave = true;
+        docRef.current = nd;
+        setDocState(nd);
+        onAdopt(nd);
+      }
+      return body;
+    }
+    const seeded = defaultDoc(t);
+    hostRef.current.suppressSave = true;
+    docRef.current = seeded;
+    setDocState(seeded);
+    const res = await apiFetch(
+      "/doc",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          baseRevision: hostRef.current.revision,
+          docId: hostRef.current.docId,
+          doc: seeded,
+          sessionId: sid
+        })
+      },
+      sid
+    );
+    if (res && res.status === 200 && res.body) {
+      hostRef.current.revision = res.body.revision;
+    }
+    return body;
+  }
+  async function switchDoc(nextDocId) {
+    const sid = sessionIdRef.current;
+    if (!nextDocId || nextDocId === hostRef.current.docId) return false;
+    const res = await apiFetch(
+      "/session/doc",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId: sid, docId: nextDocId })
+      },
+      sid
+    );
+    if (!res || res.status !== 200 || !res.body) return false;
+    const ok = applySnapshot(res.body, { resetHistory: true });
+    if (ok) resetTransient();
+    return ok;
+  }
+  useEffect2(() => {
+    const sid = sessionIdRef.current;
+    saveDoc(doc, sid);
+    if (hostRef.current.suppressSave) {
+      hostRef.current.suppressSave = false;
+      return void 0;
+    }
+    if (!hostRef.current.on) return void 0;
+    const timer = setTimeout(() => {
+      apiFetch(
+        "/doc",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            baseRevision: hostRef.current.revision,
+            docId: hostRef.current.docId,
+            doc,
+            sessionId: sid
+          })
+        },
+        sid
+      ).then((res) => {
+        if (!res) return;
+        if (res.status === 200 && res.body) {
+          hostRef.current.revision = res.body.revision;
+        } else if (res.status === 409 && res.body && res.body.doc) {
+          const nd = normalizeDoc(res.body.doc);
+          if (nd) {
+            hostRef.current.revision = res.body.revision;
+            adoptRemoteDoc(nd, res.body.docId);
+          }
+        }
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [doc]);
+  useEffect2(() => {
+    let cancelled = false;
+    let source = null;
+    const sid = sessionId;
+    const localDoc = loadDoc(sid) || defaultDoc(t);
+    hostRef.current = { on: false, revision: 0, docId: "", suppressSave: true };
+    setDocId("");
+    docRef.current = localDoc;
+    setDocState(localDoc);
+    resetTransient();
+    histRef.current = { past: [], future: [] };
+    (async () => {
+      const canStream = typeof window.EventSource === "function";
+      const attempts = canStream ? 6 : 1;
+      let got = null;
+      for (let i = 0; i < attempts && !cancelled; i += 1) {
+        got = await apiFetch("/doc", void 0, sid);
+        if (got && got.status === 200 && got.body) break;
+        if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (cancelled || !got || got.status !== 200 || !got.body) return;
+      await refreshFromHost(sid);
+      if (cancelled || typeof window.EventSource !== "function") return;
+      try {
+        const eventsUrl = new URL(API_PREFIX + "/events", window.location.href);
+        if (sid) eventsUrl.searchParams.set("sessionId", sid);
+        source = new window.EventSource(eventsUrl.toString());
+        source.onmessage = (evt) => {
+          let data = null;
+          try {
+            data = JSON.parse(evt.data);
+          } catch {
+            data = null;
+          }
+          if (!data || typeof data.revision !== "number") return;
+          const docChanged = data.docId && data.docId !== hostRef.current.docId;
+          if (!docChanged && data.revision === hostRef.current.revision) return;
+          apiFetch("/doc", void 0, sid).then((snap) => {
+            if (!snap || snap.status !== 200 || !snap.body || !snap.body.doc) return;
+            const nextId = snap.body.docId || "";
+            if (nextId && nextId !== hostRef.current.docId) {
+              hostRef.current.revision = snap.body.revision;
+              applySnapshot(snap.body, { resetHistory: true });
+              resetTransient();
+              return;
+            }
+            const nd = normalizeDoc(snap.body.doc);
+            if (!nd) return;
+            hostRef.current.revision = snap.body.revision;
+            adoptRemoteDoc(nd, nextId);
+          });
+        };
+      } catch {
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (source) {
+        try {
+          source.close();
+        } catch {
+        }
+      }
+    };
+  }, [sessionId]);
+  return {
+    doc,
+    docId,
+    docRef,
+    setDoc,
+    mapEl,
+    setEl,
+    setElProps,
+    undo,
+    redo,
+    canUndo: histRef.current.past.length > 0,
+    canRedo: histRef.current.future.length > 0,
+    pushPastSnapshot,
+    adoptRemoteDoc,
+    switchDoc,
+    refreshFromHost
+  };
+}
+
+// src/client/editor/useEditorActions.js
+function useEditorActions({
+  doc,
+  setDoc,
+  t,
+  activePage,
+  selIds,
+  selEntries,
+  topSelectedEntries,
+  setSelIds,
+  resizeMode
+}) {
+  function addPageAction() {
+    const base = activePage;
+    const page = {
+      id: uid2(),
+      name: t("pages.default") + " " + (basePages(doc).length + 1),
+      frame: {
+        w: base ? base.frame.w : 390,
+        h: base ? base.frame.h : 844,
+        preset: base ? base.frame.preset : "mobile",
+        background: "#ffffff"
+      },
+      states: {},
+      elements: []
+    };
+    setDoc((current) => addPage(current, page));
+    setSelIds([]);
+  }
+  function duplicatePage(id) {
+    const source = doc.pages.find((candidate) => candidate.id === id);
+    if (!source) return;
+    setDoc((current) => duplicatePageDeep(current, id, { suffix: t("pages.copySuffix"), id: uid2 }));
+    setSelIds([]);
+  }
+  function deletePage(id) {
+    const source = doc.pages.find((candidate) => candidate.id === id);
+    if (!source) return;
+    if (!source.variantOf && basePages(doc).length <= 1) return;
+    if (!window.confirm(t("pages.deleteConfirm"))) return;
+    setDoc((current) => removePageDeep(current, id));
+    setSelIds([]);
+  }
+  function addElementAction(type) {
+    if (!activePage) return;
+    const info = TYPE_INFO[type];
+    if (!info) return;
+    const selected = selEntries.length === 1 ? selEntries[0] : null;
+    const parent = selected && isContainerType(selected.el.type) ? selected.el : null;
+    const boundW = parent ? parent.w : activePage.frame.w;
+    const boundH = parent ? parent.h : activePage.frame.h;
+    const fullWidth = type === "navbar" || type === "tabs";
+    const width = fullWidth ? boundW : info.size[0];
+    const height = info.size[1];
+    const count = (parent ? parent.children || [] : activePage.elements).length;
+    const x = fullWidth ? 0 : parent ? 16 : 24;
+    const y = fullWidth ? Math.min(24 + count % 6 * 16, Math.max(0, boundH - height)) : 24 + count % 8 * 18;
+    const props = type === "container" ? {
+      name: t("comp.container") + " " + (count + 1),
+      background: "#ffffff",
+      radius: 12,
+      clipContent: true
+    } : {};
+    const el = makeEl(
+      type,
+      Math.max(0, Math.min(x, boundW - width)),
+      Math.max(0, Math.min(y, boundH - height)),
+      width,
+      height,
+      props
+    );
+    setDoc((current) => addElement(current, activePage.id, parent ? parent.id : null, el));
+    setSelIds([el.id]);
+  }
+  function duplicateSelection() {
+    const ids = topSelectedEntries().map((entry) => entry.el.id);
+    if (!ids.length || !activePage) return;
+    let created = [];
+    setDoc((current) => {
+      const out = duplicateElements(current, activePage.id, ids);
+      created = out.ids;
+      return out.doc;
+    });
+    if (created.length) setSelIds(created);
+  }
+  function deleteSelection() {
+    if (!selIds.length || !activePage) return;
+    setDoc((current) => removeElements(current, activePage.id, selIds));
+    setSelIds([]);
+  }
+  function reorderSelection(mode) {
+    const ids = topSelectedEntries().map((entry) => entry.el.id);
+    if (!ids.length || !activePage) return;
+    setDoc((current) => reorderElements(current, activePage.id, ids, mode));
+  }
+  function bringFront() {
+    if (!selIds.length) return;
+    reorderSelection("front");
+  }
+  function sendBack() {
+    if (!selIds.length) return;
+    reorderSelection("back");
+  }
+  function moveLayer(id, targetId, position) {
+    if (!activePage) return;
+    setDoc((current) => moveElementTo(current, activePage.id, id, targetId, position));
+  }
+  function setPreset(key) {
+    const sizes = { mobile: [390, 844], tablet: [768, 1024], desktop: [1280, 800] };
+    const size = sizes[key];
+    if (!size || !activePage) return;
+    setDoc(
+      (current) => resizePageFamily(current, activePage.id, size[0], size[1], resizeMode, key)
+    );
+  }
+  function fitContentToFrame() {
+    if (!activePage) return;
+    setDoc((current) => fitContent(current, activePage.id));
+  }
+  function patchActiveFrame(patch) {
+    if (!activePage) return;
+    setDoc(
+      (current) => patchFrame(current, activePage.id, patch),
+      "frame:" + Object.keys(patch).join(",")
+    );
+  }
+  function renameActivePage(name) {
+    if (!activePage) return;
+    setDoc((current) => renamePage(current, activePage.id, name), "pagename:" + activePage.id);
+  }
+  function groupSelection() {
+    const entries = topSelectedEntries();
+    if (entries.length < 2 || !activePage) return;
+    let groupId = null;
+    setDoc((current) => {
+      const out = groupEntries(current, activePage.id, entries, t("comp.group"));
+      groupId = out.groupId;
+      return out.doc;
+    });
+    if (groupId) setSelIds([groupId]);
+  }
+  function ungroupSelection() {
+    const entry = selEntries[0];
+    if (!entry || entry.el.type !== "group" || !activePage) return;
+    let ids = [];
+    setDoc((current) => {
+      const out = ungroupEntry(current, activePage.id, entry.el.id);
+      ids = out.ids;
+      return out.doc;
+    });
+    if (ids.length) setSelIds(ids);
+  }
+  function alignSelection(mode) {
+    const entries = topSelectedEntries();
+    if (!entries.length || !activePage) return;
+    const target = entries.length === 1 ? { x: 0, y: 0, w: activePage.frame.w, h: activePage.frame.h } : boundsOfEntries(entries);
+    if (!target) return;
+    setDoc(
+      (current) => alignEntries(current, activePage.id, entries, target, mode),
+      "align:" + mode
+    );
+  }
+  function distributeSelection(axis) {
+    const entries = topSelectedEntries();
+    if (entries.length < 3 || !activePage) return;
+    setDoc((current) => distributeEntries(current, activePage.id, entries, axis));
+  }
+  return {
+    addPage: addPageAction,
+    duplicatePage,
+    deletePage,
+    addElement: addElementAction,
+    duplicateSelection,
+    deleteSelection,
+    reorderSelection,
+    bringFront,
+    sendBack,
+    moveLayer,
+    setPreset,
+    fitContentToFrame,
+    patchActiveFrame,
+    renameActivePage,
+    groupSelection,
+    ungroupSelection,
+    alignSelection,
+    distributeSelection
+  };
 }
 
 // src/client/editor/useExport.js
@@ -4523,9 +5162,8 @@ function useKeyboardShortcuts(actions) {
 }
 
 // src/client/editor/usePreview.js
-function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
+function usePreview({ docRef, setSelIds, setEditing, t }) {
   const [preview, setPreview] = useState2(false);
-  const [pageState, setPageState] = useState2("normal");
   const [ui, setUi] = useState2({});
   const [previewStack, setPreviewStack] = useState2([]);
   const [previewOverlay, setPreviewOverlay] = useState2(null);
@@ -4536,6 +5174,7 @@ function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
     setPreview(false);
     setPreviewStack([]);
     setPreviewOverlay(null);
+    setUi({});
   }
   function togglePreview() {
     if (preview) {
@@ -4544,6 +5183,7 @@ function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
     }
     setPreviewStack([docRef.current.activePageId]);
     setPreviewOverlay(null);
+    setUi({});
     setSelIds([]);
     setEditing(null);
     setPreview(true);
@@ -4553,6 +5193,18 @@ function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
   }
   function closeOverlay() {
     setPreviewOverlay(null);
+  }
+  function showState(key) {
+    setPreviewStack((stack) => {
+      if (!stack.length) return stack;
+      const current = docRef.current.pages.find((page) => page.id === stack[stack.length - 1]);
+      if (!current) return stack;
+      const base = current.variantOf ? docRef.current.pages.find((page) => page.id === current.variantOf) : current;
+      if (!base) return stack;
+      const target = key === "normal" ? base.id : statePageId(docRef.current, base.id, key);
+      if (!target) return stack;
+      return [...stack.slice(0, -1), target];
+    });
   }
   function interact(el) {
     const link = (el.interactions || [])[0];
@@ -4574,6 +5226,7 @@ function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
     const base = el.state || defaultState(el.type);
     if (!preview) return base;
     const transient = ui[el.id] || {};
+    if (transient.state) return transient.state;
     if (el.type === "button") {
       if (base === "disabled") return "disabled";
       if (transient.press) return "active";
@@ -4586,16 +5239,12 @@ function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
   }
   function activate(el, ev) {
     if (!preview) return;
-    const patch = (fn) => setDoc((doc) => patchElement(doc, el.id, fn));
-    if (el.type === "toggle")
-      patch((current) => ({ ...current, state: current.state === "on" ? "off" : "on" }));
+    const current = renderStateFor(el);
+    if (el.type === "toggle") setUiFor(el.id, { state: current === "on" ? "off" : "on" });
     else if (el.type === "checkbox")
-      patch((current) => ({
-        ...current,
-        state: current.state === "checked" ? "unchecked" : "checked"
-      }));
+      setUiFor(el.id, { state: current === "checked" ? "unchecked" : "checked" });
     else if (el.type === "select")
-      patch((current) => ({ ...current, state: current.state === "open" ? "default" : "open" }));
+      setUiFor(el.id, { state: current === "open" ? "default" : "open" });
     else if (el.type === "input") setUiFor(el.id, { focus: true });
     else if (el.type === "tabs") {
       const rect = ev.currentTarget.getBoundingClientRect();
@@ -4614,8 +5263,7 @@ function usePreview({ docRef, setDoc, setSelIds, setEditing, t }) {
     exitPreview,
     back,
     closeOverlay,
-    pageState,
-    setPageState,
+    showState,
     ui,
     setUi,
     setUiFor,
@@ -4735,7 +5383,7 @@ function useUiPrefs() {
   const [rightCollapsed, setRightCollapsed] = useState2(() => loadUi().rightCollapsed === true);
   const [section, setSection] = useState2(() => {
     const value = loadUi().section;
-    return value === null || value === "pages" || value === "components" || value === "layers" ? value : "pages";
+    return value === null || value === "docs" || value === "pages" || value === "components" || value === "layers" ? value : "pages";
   });
   const snapRef = useRef(snapEnabled);
   snapRef.current = snapEnabled;
@@ -4875,6 +5523,20 @@ var CSS2 = [
   ".dpd-panelTitle{padding:10px 12px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dsw-alias-label-secondary,#6b7280);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:6px}",
   ".dpd-hint{padding:0 12px 8px;font-size:11px;color:var(--dsw-alias-label-secondary,#6b7280)}",
   ".dpd-pages{display:flex;flex-direction:column;gap:1px;padding:0 8px 8px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}",
+  ".dpd-docBar{display:flex;gap:6px;padding:0 8px 8px}",
+  ".dpd-docBar .dpd-btn{flex:1;justify-content:center}",
+  ".dpd-docs{display:flex;flex-direction:column;gap:2px;padding:0 8px 8px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}",
+  ".dpd-docRow{display:flex;align-items:center;gap:7px;padding:6px;border-radius:7px;cursor:pointer;color:var(--dsw-alias-label-primary,#111)}",
+  ".dpd-docRow:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
+  ".dpd-docRow.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-docRow .dot{display:flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0}",
+  ".dpd-docRow.active .dot{color:var(--dsw-alias-brand-primary,#6366f1)}",
+  ".dpd-docMain{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}",
+  ".dpd-docMain .nm{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+  ".dpd-docMain .meta{font-size:10px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+  ".dpd-docActions{display:flex;gap:1px;flex-shrink:0;opacity:0;transition:opacity .12s ease}",
+  ".dpd-docRow:hover .dpd-docActions,.dpd-docRow.active .dpd-docActions{opacity:1}",
+  ".dpd-docActions .dpd-mini{width:18px;height:18px;border-color:transparent;background:transparent}",
   ".dpd-pageRow{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-primary,#111)}",
   ".dpd-pageRow:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
   ".dpd-pageRow.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary,#6366f1)}",
@@ -4947,11 +5609,6 @@ var CSS2 = [
   ".dpd-layer .dot{width:14px;height:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;opacity:.85}",
   ".dpd-layer .caret{width:10px;flex-shrink:0;font-size:10px;color:var(--dsw-alias-label-secondary,#6b7280);opacity:.8}",
   ".dpd-layer .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
-  ".dpd-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,.9);z-index:60;text-align:center;padding:24px}",
-  ".dpd-overlayTitle{font-size:15px;font-weight:600;color:#161a22}",
-  ".dpd-overlayDesc{font-size:12.5px;color:#6b7280;max-width:240px;line-height:1.5}",
-  ".dpd-spinner{width:28px;height:28px;border:3px solid rgba(99,102,241,.22);border-top-color:#6366f1;border-radius:50%;animation:dpd-spin .8s linear infinite}",
-  "@keyframes dpd-spin{to{transform:rotate(360deg)}}",
   ".dpd-el.dpd-hover{outline:1.5px solid rgba(99,102,241,.5);outline-offset:-1.5px}",
   ".dpd-el.dpd-locked{cursor:default!important}",
   ".dpd-textEditor{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:2px 4px;border:1.5px solid var(--dsw-alias-brand-primary,#6366f1);border-radius:4px;background:rgba(255,255,255,.96);color:#111827;resize:none;outline:none;overflow:hidden;z-index:80;font-family:inherit}",
@@ -4984,6 +5641,11 @@ var CSS2 = [
   ".dpd-overlayBackdrop{position:absolute;inset:0;background:rgba(17,24,39,.34);z-index:100;display:flex;align-items:center;justify-content:center}",
   ".dpd-overlayFrame{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(17,24,39,.4)}",
   ".dpd-previewNav{position:absolute;top:16px;left:16px;z-index:120;display:flex;gap:6px}",
+  ".dpd-stateBar{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:130;display:flex;gap:3px;background:rgba(255,255,255,.95);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:999px;padding:4px;box-shadow:0 4px 16px rgba(17,24,39,.1)}",
+  ".dpd-stateBar button{border:none;background:transparent;color:var(--dsw-alias-label-secondary,#6b7280);font:inherit;font-size:11px;padding:5px 10px;border-radius:999px;cursor:pointer;white-space:nowrap}",
+  ".dpd-stateBar button:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2,#f0f1f4)}",
+  ".dpd-stateBar button.active{background:#111827;color:#fff}",
+  ".dpd-stateBar button:disabled{opacity:.35;cursor:default}",
   ".dpd-previewNav button{border:none;border-radius:999px;padding:7px 13px;background:rgba(17,24,39,.58);color:#fff;font:inherit;font-size:12px;cursor:pointer;opacity:.65}",
   ".dpd-previewNav button:hover{opacity:1;background:rgba(17,24,39,.82)}",
   ".dpd-exportMenu{position:relative;display:inline-flex}",
@@ -4995,169 +5657,6 @@ var CSS2 = [
 ].join("\n");
 function StyleBlock() {
   return h("style", { dangerouslySetInnerHTML: { __html: CSS2 } });
-}
-
-// src/client/icons.js
-function Svg(props) {
-  const { size, children, ...rest } = props;
-  return h(
-    "svg",
-    Object.assign(
-      {
-        width: size || 14,
-        height: size || 14,
-        viewBox: "0 0 16 16",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: 1.5,
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        "aria-hidden": true
-      },
-      rest
-    ),
-    children
-  );
-}
-var IconPlus = () => h(Svg, null, h("path", { d: "M8 3v10M3 8h10" }));
-var IconMinus = () => h(Svg, null, h("path", { d: "M3 8h10" }));
-var IconEye = () => h(
-  Svg,
-  null,
-  h("path", { d: "M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" }),
-  h("circle", { cx: 8, cy: 8, r: 1.8 })
-);
-var IconPencil = () => h(Svg, null, h("path", { d: "M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z" }));
-var IconTrash = () => h(Svg, null, h("path", { d: "M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4" }));
-var IconCopy = () => h(
-  Svg,
-  null,
-  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.4 }),
-  h("path", { d: "M3 11V4a1 1 0 0 1 1-1h7" })
-);
-var IconFront = () => h(
-  Svg,
-  null,
-  h("rect", { x: 3, y: 3, width: 8, height: 8, rx: 1.2 }),
-  h("path", { d: "M8 8h5v5" })
-);
-var IconBack = () => h(
-  Svg,
-  null,
-  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.2 }),
-  h("path", { d: "M3 8V3h5" })
-);
-var IconUndo = () => h(Svg, null, h("path", { d: "M3.2 8.4a5 5 0 1 1 1.5 3.3M3 4.6V8h3.4" }));
-var IconRedo = () => h(Svg, null, h("path", { d: "M12.8 8.4a5 5 0 1 0-1.5 3.3M13 4.6V8H9.6" }));
-var IconPages = () => h(
-  Svg,
-  null,
-  h("rect", { x: 3, y: 1.8, width: 10, height: 12.4, rx: 1.6 }),
-  h("path", { d: "M3 5.2h10M5.4 8.2h5.2M5.4 10.8h3.4" })
-);
-var IconComponents = () => h(
-  Svg,
-  null,
-  h("rect", { x: 2, y: 2, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 9, y: 2, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 2, y: 9, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 9, y: 9, width: 5, height: 5, rx: 1 })
-);
-var IconLayers = () => h(
-  Svg,
-  null,
-  h("path", { d: "M8 2l6 3-6 3-6-3 6-3z" }),
-  h("path", { d: "M2 8l6 3 6-3M2 11l6 3 6-3" })
-);
-var IconMagnet = () => h(
-  Svg,
-  null,
-  h("path", { d: "M3 2v6a5 5 0 0 0 10 0V2" }),
-  h("path", { d: "M3 2H1.5M13 2h1.5M3 6h3M10 6h3" })
-);
-function libGlyph(type) {
-  const map = {
-    container: h("path", { d: "M2 3.5h12v9H2zM4.5 6h7v4h-7z" }),
-    group: h("path", { d: "M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z" }),
-    button: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 2 }),
-    input: h("rect", { x: 2, y: 4.5, width: 12, height: 7, rx: 1.6 }),
-    card: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
-    navbar: h("path", { d: "M2 4h12M2 4v8h12V4M6 7h4" }),
-    tabs: h("path", { d: "M2 5h12M5 5v6M10 5v6" }),
-    toggle: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 3 }),
-    checkbox: h("rect", { x: 3, y: 3, width: 10, height: 10, rx: 2 }),
-    avatar: h("circle", { cx: 8, cy: 8, r: 5 }),
-    text: h("path", { d: "M3 4h10M8 4v8M5.5 12h5" }),
-    image: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
-    badge: h("rect", { x: 2, y: 6, width: 12, height: 4, rx: 2 }),
-    select: h("path", { d: "M2 4.5h12v7H2zM10 8l1.5 1.5L13 8" })
-  };
-  return map[type] || map.text;
-}
-
-// src/client/overlay.js
-function textOr(value, fallback) {
-  return value && value.trim() ? value : fallback;
-}
-function OverlayAction(props) {
-  return h(
-    "div",
-    {
-      style: {
-        marginTop: 4,
-        padding: "7px 14px",
-        borderRadius: 8,
-        background: "#6366f1",
-        color: "#fff",
-        fontSize: 12.5,
-        fontWeight: 600
-      }
-    },
-    props.label
-  );
-}
-function PageOverlay(props) {
-  const { pageState, content, t } = props;
-  const c = content || {};
-  if (pageState === "loading") {
-    return h(
-      "div",
-      { className: "dpd-overlay" },
-      h("div", { className: "dpd-spinner" }),
-      h("div", { className: "dpd-overlayDesc" }, textOr(c.text, t("overlay.loading")))
-    );
-  }
-  if (pageState === "empty") {
-    return h(
-      "div",
-      { className: "dpd-overlay" },
-      h(
-        Svg,
-        { size: 44, strokeWidth: 1.3, style: { color: "#b8bdc9" } },
-        h("rect", { x: 2, y: 2, width: 12, height: 12, rx: 2.5 }),
-        h("path", { d: "M5 8h6M8 5v6" })
-      ),
-      h("div", { className: "dpd-overlayTitle" }, textOr(c.title, t("overlay.emptyTitle"))),
-      h("div", { className: "dpd-overlayDesc" }, textOr(c.desc, t("overlay.emptyDesc"))),
-      h(OverlayAction, { label: textOr(c.action, t("overlay.emptyBtn")) })
-    );
-  }
-  if (pageState === "error") {
-    return h(
-      "div",
-      { className: "dpd-overlay" },
-      h(
-        Svg,
-        { size: 44, strokeWidth: 1.3, style: { color: "#e5484d" } },
-        h("circle", { cx: 8, cy: 8, r: 6 }),
-        h("path", { d: "M8 5v4M8 11h.01" })
-      ),
-      h("div", { className: "dpd-overlayTitle" }, textOr(c.title, t("overlay.errorTitle"))),
-      h("div", { className: "dpd-overlayDesc" }, textOr(c.desc, t("overlay.errorDesc"))),
-      h(OverlayAction, { label: textOr(c.action, t("overlay.errorBtn")) })
-    );
-  }
-  return null;
 }
 
 // src/client/ui/canvas.js
@@ -5193,7 +5692,6 @@ function CanvasView(props) {
     multiBounds,
     sel,
     preview,
-    pageState,
     ui,
     canvasRef,
     spaceRef,
@@ -5426,11 +5924,6 @@ function CanvasView(props) {
         height: marquee.h
       }
     }) : null;
-    const overlay = pageActive && pageState !== "normal" ? h(PageOverlay, {
-      pageState,
-      content: p.states && p.states[pageState] || null,
-      t
-    }) : null;
     return h(
       "div",
       {
@@ -5462,8 +5955,7 @@ function CanvasView(props) {
       selectionNodes,
       multiSelection,
       guideNodes,
-      marqueeNode,
-      overlay
+      marqueeNode
     );
   });
   const gridCell = 20 * zoom;
@@ -5628,12 +6120,134 @@ function ContextMenu(props) {
   );
 }
 
+// src/client/icons.js
+function Svg(props) {
+  const { size, children, ...rest } = props;
+  return h(
+    "svg",
+    Object.assign(
+      {
+        width: size || 14,
+        height: size || 14,
+        viewBox: "0 0 16 16",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: 1.5,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        "aria-hidden": true
+      },
+      rest
+    ),
+    children
+  );
+}
+var IconPlus = () => h(Svg, null, h("path", { d: "M8 3v10M3 8h10" }));
+var IconMinus = () => h(Svg, null, h("path", { d: "M3 8h10" }));
+var IconEye = () => h(
+  Svg,
+  null,
+  h("path", { d: "M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" }),
+  h("circle", { cx: 8, cy: 8, r: 1.8 })
+);
+var IconPencil = () => h(Svg, null, h("path", { d: "M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z" }));
+var IconDesign = () => h(
+  Svg,
+  null,
+  h("rect", { x: 1.5, y: 2, width: 13, height: 11.5, rx: 2 }),
+  h("path", { d: "M1.5 5.4h13" }),
+  h("rect", { x: 3.6, y: 8, width: 4, height: 3.2, rx: 0.6 }),
+  h("circle", { cx: 10.6, cy: 9.6, r: 1.4 })
+);
+var IconTrash = () => h(Svg, null, h("path", { d: "M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4" }));
+var IconDownload = () => h(Svg, null, h("path", { d: "M8 2v8M4.5 7L8 10.5 11.5 7M2.5 13.5h11" }));
+var IconUpload = () => h(Svg, null, h("path", { d: "M8 10.5V2M4.5 5.5L8 2l3.5 3.5M2.5 13.5h11" }));
+var IconCopy = () => h(
+  Svg,
+  null,
+  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.4 }),
+  h("path", { d: "M3 11V4a1 1 0 0 1 1-1h7" })
+);
+var IconFront = () => h(
+  Svg,
+  null,
+  h("rect", { x: 3, y: 3, width: 8, height: 8, rx: 1.2 }),
+  h("path", { d: "M8 8h5v5" })
+);
+var IconBack = () => h(
+  Svg,
+  null,
+  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.2 }),
+  h("path", { d: "M3 8V3h5" })
+);
+var IconUndo = () => h(Svg, null, h("path", { d: "M3.2 8.4a5 5 0 1 1 1.5 3.3M3 4.6V8h3.4" }));
+var IconRedo = () => h(Svg, null, h("path", { d: "M12.8 8.4a5 5 0 1 0-1.5 3.3M13 4.6V8H9.6" }));
+var IconPages = () => h(
+  Svg,
+  null,
+  h("rect", { x: 3, y: 1.8, width: 10, height: 12.4, rx: 1.6 }),
+  h("path", { d: "M3 5.2h10M5.4 8.2h5.2M5.4 10.8h3.4" })
+);
+var IconComponents = () => h(
+  Svg,
+  null,
+  h("rect", { x: 2, y: 2, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 9, y: 2, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 2, y: 9, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 9, y: 9, width: 5, height: 5, rx: 1 })
+);
+var IconLayers = () => h(
+  Svg,
+  null,
+  h("path", { d: "M8 2l6 3-6 3-6-3 6-3z" }),
+  h("path", { d: "M2 8l6 3 6-3M2 11l6 3 6-3" })
+);
+var IconMagnet = () => h(
+  Svg,
+  null,
+  h("path", { d: "M3 2v6a5 5 0 0 0 10 0V2" }),
+  h("path", { d: "M3 2H1.5M13 2h1.5M3 6h3M10 6h3" })
+);
+function libGlyph(type) {
+  const map = {
+    container: h("path", { d: "M2 3.5h12v9H2zM4.5 6h7v4h-7z" }),
+    group: h("path", { d: "M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z" }),
+    button: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 2 }),
+    input: h("rect", { x: 2, y: 4.5, width: 12, height: 7, rx: 1.6 }),
+    card: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
+    navbar: h("path", { d: "M2 4h12M2 4v8h12V4M6 7h4" }),
+    tabs: h("path", { d: "M2 5h12M5 5v6M10 5v6" }),
+    toggle: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 3 }),
+    checkbox: h("rect", { x: 3, y: 3, width: 10, height: 10, rx: 2 }),
+    avatar: h("circle", { cx: 8, cy: 8, r: 5 }),
+    text: h("path", { d: "M3 4h10M8 4v8M5.5 12h5" }),
+    image: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
+    badge: h("rect", { x: 2, y: 6, width: 12, height: 4, rx: 2 }),
+    select: h("path", { d: "M2 4.5h12v7H2zM10 8l1.5 1.5L13 8" })
+  };
+  return map[type] || map.text;
+}
+
 // src/client/ui/inspector.js
-var PAGE_STATE_KEYS = {
-  loading: ["text"],
-  empty: ["title", "desc", "action"],
-  error: ["title", "desc", "action"]
-};
+var IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+function chooseImageFile({ onPick, onError }) {
+  if (typeof document === "undefined") return;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.addEventListener("change", () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > IMAGE_MAX_BYTES) {
+      onError();
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener("load", () => onPick(String(reader.result || "")));
+    reader.readAsDataURL(file);
+  });
+  input.click();
+}
 function InspectorView(props) {
   const {
     t,
@@ -5641,14 +6255,15 @@ function InspectorView(props) {
     sel,
     selCount,
     activePage,
-    pageState,
+    statePageIds,
+    switchPageState,
+    deleteStateVariant,
     resizeMode,
     setResizeMode,
     fitContentToFrame,
     setPreset,
     renameActivePage,
     patchActiveFrame,
-    patchPageStates: patchPageStates2,
     duplicateEl,
     bringFront,
     sendBack,
@@ -5871,6 +6486,68 @@ function InspectorView(props) {
           placeholder: t("sample.text"),
           onChange: (e) => applyProps({ text: e.target.value }, "text:" + sel.id)
         })
+      ) : null,
+      sel.type === "image" ? h(
+        "div",
+        { className: "dpd-section" },
+        h("div", { className: "dpd-panelTitle" }, h("span", null, t("inspector.image"))),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.imageUrl")),
+          h("input", {
+            className: "dpd-input",
+            type: "text",
+            value: sel.props.src || "",
+            placeholder: "https://\u2026",
+            onChange: (e) => applyProps({ src: e.target.value }, "src:" + sel.id)
+          })
+        ),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h("label", null, t("inspector.imageFit")),
+          h(
+            "select",
+            {
+              className: "dpd-select",
+              style: { flex: 1 },
+              value: sel.props.fit || "cover",
+              onChange: (e) => applyProps({ fit: e.target.value }, "fit:" + sel.id)
+            },
+            ["cover", "contain", "fill"].map(
+              (fit) => h("option", { key: fit, value: fit }, t("inspector.fit." + fit))
+            )
+          )
+        ),
+        h(
+          "div",
+          { className: "dpd-row" },
+          h(
+            "button",
+            {
+              className: "dpd-btn",
+              type: "button",
+              onClick: () => chooseImageFile({
+                onPick: (src) => applyProps({ src }, "src:" + sel.id),
+                onError: () => {
+                  if (typeof window !== "undefined")
+                    window.alert(t("inspector.imageTooLarge"));
+                }
+              })
+            },
+            t("inspector.chooseImage")
+          ),
+          sel.props.src ? h(
+            "button",
+            {
+              className: "dpd-btn",
+              type: "button",
+              onClick: () => applyProps({ src: "" }, "src:" + sel.id)
+            },
+            t("inspector.removeImage")
+          ) : null
+        )
       ) : null,
       info.hasColor || info.hasText ? colorRow(
         sel.props.color,
@@ -6275,9 +6952,6 @@ function InspectorView(props) {
       )
     );
   } else {
-    const states = activePage && activePage.states || {};
-    const stateKeys = PAGE_STATE_KEYS[pageState] || null;
-    const stateValue = stateKeys ? states[pageState] || {} : null;
     inspectorBody = h(
       "div",
       { key: "page" },
@@ -6358,32 +7032,71 @@ function InspectorView(props) {
           )
         )
       ),
-      stateKeys ? h(
+      h(
         "div",
         { className: "dpd-section" },
         h(
           "div",
           { className: "dpd-panelTitle" },
           h("span", null, t("inspector.states")),
-          h("span", null, t("state." + pageState))
+          activePage && activePage.variantOf ? h("span", null, t("state." + activePage.stateKey)) : null
         ),
-        stateKeys.map(
-          (field) => h(
+        activePage && activePage.variantOf ? h(
+          "div",
+          null,
+          h("div", { className: "dpd-hint" }, t("inspector.variantEditing")),
+          h(
             "div",
-            { className: "dpd-row", key: field },
-            h("label", null, t("inspector.state" + field[0].toUpperCase() + field.slice(1))),
-            h("input", {
-              className: "dpd-input",
-              type: "text",
-              value: stateValue && stateValue[field] || "",
-              placeholder: t(
-                pageState === "loading" ? "overlay.loading" : pageState === "empty" ? field === "title" ? "overlay.emptyTitle" : field === "desc" ? "overlay.emptyDesc" : "overlay.emptyBtn" : field === "title" ? "overlay.errorTitle" : field === "desc" ? "overlay.errorDesc" : "overlay.errorBtn"
-              ),
-              onChange: (e) => patchPageStates2(pageState, { [field]: e.target.value })
-            })
+            { className: "dpd-actions" },
+            h(
+              "button",
+              {
+                className: "dpd-btn",
+                type: "button",
+                onClick: () => switchPageState("normal")
+              },
+              t("inspector.backToBase")
+            ),
+            h(
+              "button",
+              {
+                className: "dpd-btn",
+                type: "button",
+                onClick: () => deleteStateVariant(activePage.stateKey)
+              },
+              h(IconTrash),
+              t("inspector.deleteVariant")
+            )
           )
-        )
-      ) : null
+        ) : PAGE_STATE_KEYS.map((key) => {
+          const linked = !!(statePageIds && statePageIds[key]);
+          return h(
+            "div",
+            { className: "dpd-row", key },
+            h("label", null, t("state." + key)),
+            h(
+              "button",
+              {
+                className: "dpd-btn",
+                type: "button",
+                onClick: () => switchPageState(key)
+              },
+              linked ? t("inspector.editState") : t("inspector.createState")
+            ),
+            linked ? h(
+              "button",
+              {
+                className: "dpd-mini",
+                type: "button",
+                title: t("inspector.deleteVariant"),
+                "aria-label": t("inspector.deleteVariant"),
+                onClick: () => deleteStateVariant(key)
+              },
+              h(IconTrash)
+            ) : null
+          );
+        })
+      )
     );
   }
   const right = h(
@@ -6434,6 +7147,25 @@ function LockGlyph(props) {
 function layerLabel(el, t) {
   return el.name || el.props.text || el.props.name || t("comp." + el.type);
 }
+function pickJsonFile(onPick) {
+  if (typeof document === "undefined") return;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.addEventListener("change", () => {
+    const file = input.files && input.files[0];
+    if (file) onPick(file);
+  });
+  input.click();
+}
+function docTime(ts) {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleDateString(void 0, { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
 function LeftView(props) {
   const {
     t,
@@ -6454,18 +7186,36 @@ function LeftView(props) {
     setEl,
     onLayerMove,
     layerQuery,
-    setLayerQuery
+    setLayerQuery,
+    docs,
+    docsReady,
+    docsError,
+    activeDocId,
+    onOpenDoc,
+    onCreateDoc,
+    onDuplicateDoc,
+    onRenameDoc,
+    onDeleteDoc,
+    onImportDoc,
+    onExportDoc,
+    onRefreshDocs
   } = props;
   const [dragId, setDragId] = useState2(null);
   const [dropTarget, setDropTarget] = useState2(null);
   const [renaming, setRenaming] = useState2(null);
   const [renameValue, setRenameValue] = useState2("");
-  const pageRows = doc.pages.map(
-    (p) => h(
+  const [renamingDoc, setRenamingDoc] = useState2(null);
+  const [docNameValue, setDocNameValue] = useState2("");
+  useEffect2(() => {
+    if (section === "docs" && onRefreshDocs) onRefreshDocs();
+  }, [section, onRefreshDocs]);
+  const pageRows = doc.pages.filter((p) => !p.variantOf).map((p) => {
+    const stateActive = activePage && activePage.variantOf === p.id;
+    return h(
       "div",
       {
         key: p.id,
-        className: "dpd-pageRow" + (p.id === activePage.id ? " active" : ""),
+        className: "dpd-pageRow" + (p.id === activePage.id || stateActive ? " active" : ""),
         onClick: () => setActivePage(p.id)
       },
       h("span", { className: "nm" }, p.name),
@@ -6495,9 +7245,10 @@ function LeftView(props) {
           }
         },
         h(IconTrash)
-      )
-    )
-  );
+      ),
+      stateActive && activePage && activePage.stateKey ? h("span", { className: "sz" }, t("state." + activePage.stateKey)) : null
+    );
+  });
   const activeElements = activePage && activePage.elements || [];
   const query = (layerQuery || "").trim().toLowerCase();
   const layerRows = [];
@@ -6523,6 +7274,125 @@ function LeftView(props) {
       onClick: () => setSection((cur) => cur === id ? null : id)
     },
     h(icon)
+  );
+  const commitDocRename = (item) => {
+    const value = docNameValue.trim();
+    setRenamingDoc(null);
+    if (value && value !== (item.name || "")) onRenameDoc(item.id, value);
+  };
+  const docAction = (icon, title, onClick) => h(
+    "button",
+    {
+      className: "dpd-mini",
+      type: "button",
+      title,
+      "aria-label": title,
+      onClick: (e) => {
+        e.stopPropagation();
+        onClick();
+      }
+    },
+    h(icon, { size: 12 })
+  );
+  const docsBody = h(
+    "div",
+    { className: "dpd-sectionBody" },
+    h(
+      "div",
+      { className: "dpd-panelTitle" },
+      h("span", null, t("docs.title")),
+      h(
+        "span",
+        { style: { textTransform: "none", letterSpacing: 0 } },
+        String((docs || []).length)
+      )
+    ),
+    h(
+      "div",
+      { className: "dpd-docBar" },
+      h(
+        "button",
+        { className: "dpd-btn", type: "button", onClick: onCreateDoc },
+        h(IconPlus),
+        t("docs.add")
+      ),
+      h(
+        "button",
+        {
+          className: "dpd-btn",
+          type: "button",
+          onClick: () => pickJsonFile(onImportDoc)
+        },
+        h(IconUpload),
+        t("docs.import")
+      )
+    ),
+    docsError ? h("div", { className: "dpd-hint" }, docsError) : null,
+    !docsReady && !docsError ? h("div", { className: "dpd-hint" }, t("docs.offline")) : null,
+    h(
+      "div",
+      { className: "dpd-docs" },
+      (docs || []).length === 0 ? h("div", { className: "dpd-empty" }, t("docs.empty")) : (docs || []).map((item) => {
+        const active = item.id === activeDocId;
+        const name = item.name || t("docs.untitled");
+        return h(
+          "div",
+          {
+            key: item.id,
+            className: "dpd-docRow" + (active ? " active" : ""),
+            onClick: () => onOpenDoc(item.id)
+          },
+          h("span", { className: "dot" }, h(IconDesign, { size: 13 })),
+          h(
+            "div",
+            { className: "dpd-docMain" },
+            renamingDoc === item.id ? h("input", {
+              className: "nmInput",
+              value: docNameValue,
+              autoFocus: true,
+              onClick: (e) => e.stopPropagation(),
+              onChange: (e) => setDocNameValue(e.target.value),
+              onBlur: () => commitDocRename(item),
+              onKeyDown: (e) => {
+                e.stopPropagation();
+                if (e.key === "Enter") commitDocRename(item);
+                else if (e.key === "Escape") setRenamingDoc(null);
+              }
+            }) : h(
+              "span",
+              {
+                className: "nm",
+                title: t("docs.rename"),
+                onDoubleClick: (e) => {
+                  e.stopPropagation();
+                  setRenamingDoc(item.id);
+                  setDocNameValue(item.name || "");
+                }
+              },
+              name
+            ),
+            h(
+              "span",
+              { className: "meta" },
+              `${item.pages} ${t("docs.pages")}` + (item.updatedAt ? ` \xB7 ${docTime(item.updatedAt)}` : "")
+            )
+          ),
+          h(
+            "div",
+            { className: "dpd-docActions" },
+            docAction(IconPencil, t("docs.rename"), () => {
+              setRenamingDoc(item.id);
+              setDocNameValue(item.name || "");
+            }),
+            docAction(IconCopy, t("docs.duplicate"), () => onDuplicateDoc(item.id)),
+            docAction(IconDownload, t("docs.export"), () => onExportDoc(item.id)),
+            docAction(IconTrash, t("docs.delete"), () => {
+              if (window.confirm(t("docs.deleteConfirm"))) onDeleteDoc(item.id);
+            })
+          )
+        );
+      })
+    )
   );
   const pagesBody = h(
     "div",
@@ -6744,13 +7614,14 @@ function LeftView(props) {
       })
     )
   );
-  const sectionContent = section === "pages" ? pagesBody : section === "components" ? componentsBody : section === "layers" ? layersBody : null;
+  const sectionContent = section === "docs" ? docsBody : section === "pages" ? pagesBody : section === "components" ? componentsBody : section === "layers" ? layersBody : null;
   const left = h(
     "div",
     { className: "dpd-leftcol" },
     h(
       "div",
       { className: "dpd-rail" },
+      railBtn("docs", IconDesign, t("docs.title")),
       railBtn("pages", IconPages, t("pages.title")),
       railBtn("components", IconComponents, t("library.title")),
       railBtn("layers", IconLayers, t("layers.title"))
@@ -7012,14 +7883,41 @@ function ProductDesignPanel(props = {}) {
   });
   const adoptRef = useRef(() => {
   });
-  const { doc, docRef, setDoc, mapEl, setEl, undo, redo, canUndo, canRedo, pushPastSnapshot } = useDocument({
+  const {
+    doc,
+    docId,
+    docRef,
+    setDoc,
+    mapEl,
+    setEl,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    pushPastSnapshot,
+    switchDoc
+  } = useDocument({
     sessionId,
     t,
     resetTransient: () => resetTransientRef.current(),
     onAdopt: (next) => adoptRef.current(next)
   });
+  const docs = useDocs({
+    sessionId,
+    activeDocId: docId,
+    t,
+    onSwitch: switchDoc,
+    onStatus: (ok, message) => setToast({ ok, message: t(message || (ok ? "export.done" : "export.failed")) })
+  });
   const prefs = useUiPrefs();
   const activePage = activePageOf(doc);
+  const stateBase = activePage && activePage.variantOf ? doc.pages.find((page) => page.id === activePage.variantOf) || null : activePage;
+  const pageState = activePage && activePage.variantOf ? activePage.stateKey : "normal";
+  const statePageIds = {
+    loading: statePageId(doc, stateBase ? stateBase.id : "", "loading"),
+    empty: statePageId(doc, stateBase ? stateBase.id : "", "empty"),
+    error: statePageId(doc, stateBase ? stateBase.id : "", "error")
+  };
   const selection = useSelection({ setDoc, activePage });
   const { selIds, setSelIds, selEntries, sel, selBoxes, multiBounds, topSelectedEntries } = selection;
   const actions = useEditorActions({
@@ -7052,15 +7950,14 @@ function ProductDesignPanel(props = {}) {
   });
   const text = useTextEditing({ setDoc });
   const { editing, editingRef, setEditing } = text;
-  const previewState = usePreview({ docRef, setDoc, setSelIds, setEditing, t });
+  const previewState = usePreview({ docRef, setSelIds, setEditing, t });
   const {
     preview,
     togglePreview,
     exitPreview,
     back,
     closeOverlay,
-    pageState,
-    setPageState,
+    showState,
     ui,
     setUi,
     setUiFor,
@@ -7082,8 +7979,49 @@ function ProductDesignPanel(props = {}) {
         return kept.length === ids.length ? ids : kept;
       });
       setDoc(
-        (current) => current.activePageId === id ? current : { ...current, activePageId: id }
+        (current) => current.activePageId === id ? current : { ...current, activePageId: id },
+        false
       );
+    },
+    [docRef, setDoc, setSelIds]
+  );
+  const switchPageState = useCallback2(
+    (key) => {
+      const current = activePageOf(docRef.current);
+      if (!current) return;
+      const base = current.variantOf ? docRef.current.pages.find((page) => page.id === current.variantOf) : current;
+      if (!base) return;
+      if (key === "normal") {
+        setActivePage(base.id);
+        return;
+      }
+      const existing = statePageId(docRef.current, base.id, key);
+      if (existing) {
+        setActivePage(existing);
+        return;
+      }
+      const out = addStateVariant(docRef.current, base.id, key, {
+        name: `${base.name} \xB7 ${t("state." + key)}`,
+        id: uid2
+      });
+      if (out.created) {
+        setDoc(out.doc);
+        setSelIds([]);
+      }
+    },
+    [docRef, setActivePage, setDoc, setSelIds, t]
+  );
+  const deleteStateVariant = useCallback2(
+    (key) => {
+      const current = activePageOf(docRef.current);
+      if (!current) return;
+      const base = current.variantOf ? docRef.current.pages.find((page) => page.id === current.variantOf) : current;
+      if (!base) return;
+      const out = removeStateVariant(docRef.current, base.id, key);
+      if (out.removedId) {
+        setDoc(out.doc);
+        setSelIds([]);
+      }
     },
     [docRef, setDoc, setSelIds]
   );
@@ -7106,6 +8044,7 @@ function ProductDesignPanel(props = {}) {
     previewState.setPreview(false);
     previewState.setPreviewStack([]);
     previewState.setPreviewOverlay(null);
+    previewState.setUi({});
     setEditing(null);
   };
   adoptRef.current = (nextDoc) => {
@@ -7209,6 +8148,14 @@ function ProductDesignPanel(props = {}) {
     setCtxMenu({ x: event.clientX, y: event.clientY });
   }
   const viewPage = preview ? doc.pages.find((page) => page.id === previewStack[previewStack.length - 1]) || activePage : activePage;
+  const previewBase = viewPage && viewPage.variantOf ? doc.pages.find((page) => page.id === viewPage.variantOf) || null : viewPage;
+  const previewStateKey = viewPage && viewPage.variantOf ? viewPage.stateKey : "normal";
+  const previewStateIds = {
+    loading: statePageId(doc, previewBase ? previewBase.id : "", "loading"),
+    empty: statePageId(doc, previewBase ? previewBase.id : "", "empty"),
+    error: statePageId(doc, previewBase ? previewBase.id : "", "error")
+  };
+  const hasPreviewState = previewStateKey !== "normal" || Object.values(previewStateIds).some(Boolean);
   const crumbEntry = selEntries[0];
   const breadcrumb = activePage ? [
     { id: activePage.id, label: activePage.name },
@@ -7255,7 +8202,7 @@ function ProductDesignPanel(props = {}) {
       activePage,
       setPreset: actions.setPreset,
       pageState,
-      setPageState,
+      setPageState: switchPageState,
       zoom: prefs.zoom,
       setZoom: prefs.setZoom,
       preview,
@@ -7295,7 +8242,19 @@ function ProductDesignPanel(props = {}) {
         setEl,
         onLayerMove: actions.moveLayer,
         layerQuery,
-        setLayerQuery
+        setLayerQuery,
+        docs: docs.docs,
+        docsReady: docs.ready,
+        docsError: docs.error,
+        activeDocId: docId,
+        onOpenDoc: switchDoc,
+        onCreateDoc: docs.create,
+        onDuplicateDoc: docs.duplicate,
+        onRenameDoc: docs.rename,
+        onDeleteDoc: docs.remove,
+        onImportDoc: docs.importFile,
+        onExportDoc: docs.exportDoc,
+        onRefreshDocs: docs.refresh
       }),
       h(CanvasView, {
         t,
@@ -7307,7 +8266,6 @@ function ProductDesignPanel(props = {}) {
         multiBounds,
         sel,
         preview,
-        pageState,
         ui,
         canvasRef,
         spaceRef,
@@ -7344,7 +8302,9 @@ function ProductDesignPanel(props = {}) {
         sel,
         selCount: selEntries.length,
         activePage,
-        pageState,
+        statePageIds,
+        switchPageState,
+        deleteStateVariant,
         resizeMode: prefs.resizeMode,
         setResizeMode: prefs.setResizeMode,
         fitContentToFrame: actions.fitContentToFrame,
@@ -7358,7 +8318,6 @@ function ProductDesignPanel(props = {}) {
         setPreset: actions.setPreset,
         renameActivePage: actions.renameActivePage,
         patchActiveFrame: actions.patchActiveFrame,
-        patchPageStates: actions.patchStates,
         alignSelection: actions.alignSelection,
         distributeSelection: actions.distributeSelection,
         groupSelection: actions.groupSelection,
@@ -7369,6 +8328,25 @@ function ProductDesignPanel(props = {}) {
         startResizeRight
       })
     ),
+    preview && hasPreviewState ? h(
+      "div",
+      { className: "dpd-stateBar" },
+      ["normal", ...PAGE_STATE_KEYS].map((key) => {
+        const available = key === "normal" || !!previewStateIds[key];
+        return h(
+          "button",
+          {
+            key,
+            type: "button",
+            className: previewStateKey === key ? "active" : "",
+            disabled: !available,
+            title: available ? t("state." + key) : t("preview.noState"),
+            onClick: () => showState(key)
+          },
+          t("state." + key)
+        );
+      })
+    ) : null,
     preview && previewStack.length > 1 ? h(
       "div",
       { className: "dpd-previewNav" },
@@ -7393,12 +8371,45 @@ function ProductDesignPanel(props = {}) {
   );
 }
 
+// src/client/ui/heroEntry.js
+function HeroDesignEntry(props) {
+  const t = useT();
+  return h(
+    "button",
+    {
+      type: "button",
+      title: t("hero.open"),
+      "aria-label": t("hero.open"),
+      onClick: props.open,
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        height: 28,
+        padding: "0 10px",
+        borderRadius: 999,
+        border: "1px solid var(--dsw-alias-border-l1, #e5e6eb)",
+        background: "var(--dsw-alias-bg-base, #ffffff)",
+        color: "var(--dsw-alias-label-secondary, #4b5563)",
+        font: "inherit",
+        fontSize: 12,
+        lineHeight: 1,
+        cursor: "pointer",
+        whiteSpace: "nowrap"
+      }
+    },
+    h(IconDesign, { size: 14 }),
+    t("hero.open")
+  );
+}
+
 // src/client/index.js
 var inject = ["slots", "layout"];
 var openFullScreen = () => {
 };
 var backToConversation = () => {
 };
+var pendingSessionId = "";
 function ProductDesignView(props) {
   return h(ProductDesignPanel, {
     sessionId: props && props.sessionId,
@@ -7407,7 +8418,12 @@ function ProductDesignView(props) {
   });
 }
 function ProductDesignMain() {
-  return h(ProductDesignPanel, { onCollapse: () => backToConversation() });
+  const adapterSessionId = useSessionId();
+  if (adapterSessionId) pendingSessionId = "";
+  return h(ProductDesignPanel, {
+    sessionId: adapterSessionId || pendingSessionId,
+    onCollapse: () => backToConversation()
+  });
 }
 function apply(ctx) {
   setAppCtx(ctx);
@@ -7489,6 +8505,27 @@ function apply(ctx) {
           key: PANEL_ID
         },
         ProductDesignMain
+      )
+    )
+  );
+  disposers.push(
+    slots.inject(
+      "conversation.hero.options",
+      () => slots.register(
+        {
+          name: "conversation.hero.options",
+          id: "dsh-product-design.hero",
+          order: 10,
+          locale: NS,
+          inject: (sessionId) => ({
+            sessionId,
+            open: () => {
+              pendingSessionId = sessionId || "";
+              openFullScreen();
+            }
+          })
+        },
+        HeroDesignEntry
       )
     )
   );

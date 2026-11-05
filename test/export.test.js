@@ -188,3 +188,102 @@ describe('PNG 渲染输入', () => {
     expect(renderElement(el({ hidden: true }), { t })).toBe('');
   });
 });
+
+describe('图片导出', () => {
+  const imageDoc = () => ({
+    name: 'Image demo',
+    activePageId: 'p1',
+    pages: [
+      page('p1', '图片页', [
+        el({
+          id: 'pic',
+          type: 'image',
+          w: 200,
+          h: 120,
+          props: {
+            src: 'https://example.com/a.png?x=1&y=2',
+            fit: 'contain',
+            alt: '封面',
+          },
+        }),
+      ]),
+    ],
+  });
+
+  it('HTML 导出渲染真实图片并转义 URL', () => {
+    const html = buildHtml(imageDoc(), { t });
+    expect(html).toContain('<img src="https://example.com/a.png?x=1&amp;y=2"');
+    expect(html).toContain('object-fit:contain');
+    expect(html).not.toContain('repeating-linear-gradient');
+  });
+
+  it('React 导出渲染 img 且 JSX 可解析', () => {
+    const source = buildReact(imageDoc(), { t });
+    expect(source).toContain('<img src={"https://example.com/a.png?x=1&y=2"}');
+    expect(source).toContain('object-contain');
+    expect(() => transformSync(source, { loader: 'jsx', format: 'esm' })).not.toThrow();
+  });
+
+  it('没有 src 时保留占位图', () => {
+    const html = buildHtml(
+      { ...imageDoc(), pages: [page('p1', '占位', [el({ type: 'image', props: {} })])] },
+      { t },
+    );
+    expect(html).toContain('repeating-linear-gradient');
+    expect(html).not.toContain('<img');
+  });
+});
+
+describe('页面状态变体导出', () => {
+  const stateDoc = () => ({
+    name: 'States',
+    activePageId: 'p1',
+    pages: [
+      page('p1', '首页', [el({ id: 'baseText', type: 'text', props: { text: '正常内容' } })]),
+      {
+        ...page('v1', '首页 · 空状态', [
+          el({ id: 'emptyText', type: 'text', props: { text: '还没有内容' } }),
+        ]),
+        variantOf: 'p1',
+        stateKey: 'empty',
+        states: {},
+      },
+    ],
+  });
+
+  it('HTML 导出包含变体页、状态切换条，导航只列基础页', () => {
+    const html = buildHtml(stateDoc(), { t });
+    expect(html).toContain('data-variant-of="p1"');
+    expect(html).toContain('data-state-key="empty"');
+    expect(html).toContain('id="statebar"');
+    expect(html).toContain('data-go="p1"');
+    expect(html).not.toContain('data-go="v1"');
+    expect(html).toContain('还没有内容');
+  });
+
+  it('HTML 运行时可以在基础页与状态变体之间切换', () => {
+    const dom = new JSDOM(buildHtml(stateDoc(), { t }), { runScripts: 'dangerously' });
+    const d = dom.window.document;
+    const active = () => d.querySelector('.dpd-page.active').getAttribute('data-page');
+    expect(active()).toBe('p1');
+    const empty = d.querySelector('#statebar button[data-state="empty"]');
+    expect(empty.disabled).toBe(false);
+    expect(d.querySelector('#statebar button[data-state="loading"]').disabled).toBe(true);
+    empty.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    expect(active()).toBe('v1');
+    d.querySelector('#statebar button[data-state="normal"]').dispatchEvent(
+      new dom.window.MouseEvent('click', { bubbles: true }),
+    );
+    expect(active()).toBe('p1');
+    dom.window.close();
+  });
+
+  it('React 导出带上状态映射与切换按钮', () => {
+    const source = buildReact(stateDoc(), { t });
+    expect(source).toContain('const BASE_OF = {"v1":"p1"};');
+    expect(source).toContain('const STATE_PAGES = {"p1":{"empty":"v1"}};');
+    expect(source).toContain('switchState');
+    expect(source).toContain('stateTarget');
+    expect(() => transformSync(source, { loader: 'jsx', format: 'esm' })).not.toThrow();
+  });
+});

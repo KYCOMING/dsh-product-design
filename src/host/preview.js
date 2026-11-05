@@ -3,6 +3,7 @@
  * compact preview of the page the model just edited.
  */
 
+import { basePages } from '../shared/page-states.js';
 import { emptyDoc, ensureDoc } from './model.js';
 
 /** Build the inline preview descriptor attached to an apply result. */
@@ -25,7 +26,7 @@ function productPreviewMeta(store, results) {
     title: page.name || 'Product design',
     pageId: page.id,
     pageIndex: index,
-    pageCount: doc.pages.length,
+    pageCount: basePages(doc).length,
     page: { id: page.id, name: page.name, frame: page.frame, elements: page.elements },
     revision: snapshot.revision,
   };

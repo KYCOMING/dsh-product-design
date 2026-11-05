@@ -195,13 +195,58 @@ describe('host 文档 reducer', () => {
     expect(out.pages[1].elements).toHaveLength(0);
   });
 
-  it('set_page_states 写入可编辑的状态文案', () => {
-    const { doc } = applyOps(emptyDoc(), [{ kind: 'add_page' }]);
+  it('add_page_state 生成真实变体页，delete_page_state 删除并回到基础页', () => {
+    const { doc } = applyOps(emptyDoc(), [
+      { kind: 'add_page', name: 'Home' },
+      { kind: 'add_element', type: 'text', props: { text: 'hi' } },
+    ]);
     const pageId = doc.pages[0].id;
     const out = applyOps(doc, [
-      { kind: 'set_page_states', pageId, states: { empty: { title: '还没有项目' } } },
+      { kind: 'add_page_state', pageId, key: 'empty', name: '空状态' },
     ]).doc;
-    expect(out.pages[0].states.empty.title).toBe('还没有项目');
-    expect(out.pages[0].states.empty.desc).toBe('');
+    expect(out.pages).toHaveLength(2);
+    const base = out.pages.find((page) => page.id === pageId);
+    const variantId = base.states.empty;
+    const variant = out.pages.find((page) => page.id === variantId);
+    expect(variant.variantOf).toBe(pageId);
+    expect(variant.stateKey).toBe('empty');
+    expect(variant.name).toBe('空状态');
+    expect(variant.elements).toHaveLength(1);
+    expect(variant.elements[0].id).not.toBe(base.elements[0].id);
+    expect(out.activePageId).toBe(variantId);
+
+    const removed = applyOps(out, [{ kind: 'delete_page_state', pageId, key: 'empty' }]).doc;
+    expect(removed.pages).toHaveLength(1);
+    expect(removed.pages[0].states.empty).toBeUndefined();
+    expect(removed.activePageId).toBe(pageId);
+  });
+
+  it('复制页面会带上状态变体，删除基础页会一起删除变体', () => {
+    const { doc } = applyOps(emptyDoc(), [{ kind: 'add_page', name: 'Home' }]);
+    const pageId = doc.pages[0].id;
+    const withState = applyOps(doc, [{ kind: 'add_page_state', pageId, key: 'empty' }]).doc;
+    const duplicated = applyOps(withState, [{ kind: 'duplicate_page', pageId }]).doc;
+    expect(duplicated.pages).toHaveLength(4);
+    const copy = duplicated.pages.find((page) => page.id === duplicated.activePageId);
+    expect(copy.states.empty).toBeTruthy();
+    const copyVariant = duplicated.pages.find((page) => page.id === copy.states.empty);
+    expect(copyVariant.variantOf).toBe(copy.id);
+
+    const removed = applyOps(duplicated, [{ kind: 'delete_page', pageId }]).doc;
+    expect(removed.pages).toHaveLength(2);
+    expect(removed.pages.some((page) => page.id === pageId)).toBe(false);
+  });
+
+  it('改画板尺寸会同步状态变体', () => {
+    const { doc } = applyOps(emptyDoc(), [{ kind: 'add_page', name: 'Home' }]);
+    const pageId = doc.pages[0].id;
+    const withState = applyOps(doc, [{ kind: 'add_page_state', pageId, key: 'empty' }]).doc;
+    const resized = applyOps(withState, [
+      { kind: 'set_page_frame', pageId, preset: 'desktop' },
+    ]).doc;
+    for (const page of resized.pages) {
+      expect(page.frame.w).toBe(1280);
+      expect(page.frame.h).toBe(800);
+    }
   });
 });

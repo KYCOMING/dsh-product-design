@@ -5,6 +5,7 @@ import {
   normalizeLayout,
   reflowPage,
 } from '../shared/layout.js';
+import { normalizeStateLinks, PAGE_STATE_KEYS, repairPageStates } from '../shared/page-states.js';
 import { API_PREFIX, defaultState, STORAGE_KEY, TYPE_INFO, UI_KEY } from './constants.js';
 
 // ------------------------------------------------------------------
@@ -38,14 +39,6 @@ function makeEl(type, x, y, w, hh, props, state) {
   return el;
 }
 
-function emptyStates() {
-  return {
-    loading: { text: '' },
-    empty: { title: '', desc: '', action: '' },
-    error: { title: '', desc: '', action: '' },
-  };
-}
-
 function starterElements(t) {
   return [
     makeEl('navbar', 0, 0, 390, 56),
@@ -71,7 +64,7 @@ function defaultDoc(t) {
     id: uid(),
     name: t ? t('pages.default') + ' 1' : 'Page 1',
     frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
-    states: emptyStates(),
+    states: {},
     elements: starterElements(t),
   };
   return { name: '', pages: [page], activePageId: page.id };
@@ -88,21 +81,6 @@ function normalizeInteractions(raw) {
     out.push(next);
   }
   return out;
-}
-
-function normalizeStates(raw) {
-  const src = raw && typeof raw === 'object' ? raw : {};
-  const pick = (key, fields) => {
-    const value = src[key] && typeof src[key] === 'object' ? src[key] : {};
-    const out = {};
-    for (const field of fields) out[field] = typeof value[field] === 'string' ? value[field] : '';
-    return out;
-  };
-  return {
-    loading: pick('loading', ['text']),
-    empty: pick('empty', ['title', 'desc', 'action']),
-    error: pick('error', ['title', 'desc', 'action']),
-  };
 }
 
 function normalizeElement(raw) {
@@ -145,7 +123,7 @@ function normalizeDoc(doc) {
     .filter((p) => p && Array.isArray(p.elements))
     .map((p) => {
       const fr = p.frame || {};
-      return {
+      const page = {
         id: p.id || uid(),
         name: p.name || 'Page',
         frame: {
@@ -154,15 +132,24 @@ function normalizeDoc(doc) {
           preset: fr.preset || 'mobile',
           background: fr.background || '#ffffff',
         },
-        states: normalizeStates(p.states),
+        states: normalizeStateLinks(p.states),
         elements: normalizeElements(p.elements),
       };
+      if (p.variantOf && PAGE_STATE_KEYS.includes(p.stateKey)) {
+        page.variantOf = p.variantOf;
+        page.stateKey = p.stateKey;
+      }
+      return page;
     });
   if (!pages.length) return null;
-  const activePageId = pages.some((p) => p.id === doc.activePageId)
-    ? doc.activePageId
-    : pages[0].id;
-  return { name: doc.name || '', pages: pages.map(reflowPage), activePageId };
+  const out = {
+    name: doc.name || '',
+    pages: pages.map(reflowPage),
+    activePageId: pages.some((p) => p.id === doc.activePageId) ? doc.activePageId : pages[0].id,
+  };
+  repairPageStates(out);
+  if (!out.pages.some((p) => p.id === out.activePageId)) out.activePageId = out.pages[0].id;
+  return out;
 }
 
 function docStorageKey(sessionId) {
@@ -252,15 +239,4 @@ function apiFetch(path, init, sessionId) {
   );
 }
 
-export {
-  apiFetch,
-  defaultDoc,
-  emptyStates,
-  loadDoc,
-  loadUi,
-  makeEl,
-  normalizeDoc,
-  saveDoc,
-  saveUi,
-  uid,
-};
+export { apiFetch, defaultDoc, loadDoc, loadUi, makeEl, normalizeDoc, saveDoc, saveUi, uid };

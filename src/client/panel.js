@@ -1,4 +1,11 @@
 import { findElementEntry } from '../shared/elements.js';
+import {
+  addStateVariant,
+  PAGE_STATE_KEYS,
+  removeStateVariant,
+  statePageId,
+} from '../shared/page-states.js';
+import { useDocs } from './docs.js';
 import { activePageOf } from './domain/document.js';
 import { buildMenuItems } from './editor/contextMenuItems.js';
 import { useClipboard } from './editor/useClipboard.js';
@@ -12,6 +19,7 @@ import { useSelection } from './editor/useSelection.js';
 import { useTextEditing } from './editor/useTextEditing.js';
 import { useUiPrefs } from './editor/useUiPrefs.js';
 import { useT } from './i18n.js';
+import { uid } from './model.js';
 import { h, useCallback, useEffect, useRef, useState } from './react.js';
 import { useSessionId } from './session.js';
 import { StyleBlock } from './styles.js';
@@ -42,16 +50,47 @@ function ProductDesignPanel(props = {}) {
   // callbacks need setters that live in later hooks, so route them via refs.
   const resetTransientRef = useRef(() => {});
   const adoptRef = useRef(() => {});
-  const { doc, docRef, setDoc, mapEl, setEl, undo, redo, canUndo, canRedo, pushPastSnapshot } =
-    useDocument({
-      sessionId,
-      t,
-      resetTransient: () => resetTransientRef.current(),
-      onAdopt: (next) => adoptRef.current(next),
-    });
+  const {
+    doc,
+    docId,
+    docRef,
+    setDoc,
+    mapEl,
+    setEl,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    pushPastSnapshot,
+    switchDoc,
+  } = useDocument({
+    sessionId,
+    t,
+    resetTransient: () => resetTransientRef.current(),
+    onAdopt: (next) => adoptRef.current(next),
+  });
+
+  const docs = useDocs({
+    sessionId,
+    activeDocId: docId,
+    t,
+    onSwitch: switchDoc,
+    onStatus: (ok, message) =>
+      setToast({ ok, message: t(message || (ok ? 'export.done' : 'export.failed')) }),
+  });
 
   const prefs = useUiPrefs();
   const activePage = activePageOf(doc);
+  const stateBase =
+    activePage && activePage.variantOf
+      ? doc.pages.find((page) => page.id === activePage.variantOf) || null
+      : activePage;
+  const pageState = activePage && activePage.variantOf ? activePage.stateKey : 'normal';
+  const statePageIds = {
+    loading: statePageId(doc, stateBase ? stateBase.id : '', 'loading'),
+    empty: statePageId(doc, stateBase ? stateBase.id : '', 'empty'),
+    error: statePageId(doc, stateBase ? stateBase.id : '', 'error'),
+  };
   const selection = useSelection({ setDoc, activePage });
   const { selIds, setSelIds, selEntries, sel, selBoxes, multiBounds, topSelectedEntries } =
     selection;
@@ -88,15 +127,14 @@ function ProductDesignPanel(props = {}) {
   });
   const text = useTextEditing({ setDoc });
   const { editing, editingRef, setEditing } = text;
-  const previewState = usePreview({ docRef, setDoc, setSelIds, setEditing, t });
+  const previewState = usePreview({ docRef, setSelIds, setEditing, t });
   const {
     preview,
     togglePreview,
     exitPreview,
     back,
     closeOverlay,
-    pageState,
-    setPageState,
+    showState,
     ui,
     setUi,
     setUiFor,
@@ -118,9 +156,56 @@ function ProductDesignPanel(props = {}) {
         const kept = ids.filter((item) => !!findElementEntry(page.elements, item));
         return kept.length === ids.length ? ids : kept;
       });
-      setDoc((current) =>
-        current.activePageId === id ? current : { ...current, activePageId: id },
+      setDoc(
+        (current) => (current.activePageId === id ? current : { ...current, activePageId: id }),
+        false,
       );
+    },
+    [docRef, setDoc, setSelIds],
+  );
+
+  const switchPageState = useCallback(
+    (key) => {
+      const current = activePageOf(docRef.current);
+      if (!current) return;
+      const base = current.variantOf
+        ? docRef.current.pages.find((page) => page.id === current.variantOf)
+        : current;
+      if (!base) return;
+      if (key === 'normal') {
+        setActivePage(base.id);
+        return;
+      }
+      const existing = statePageId(docRef.current, base.id, key);
+      if (existing) {
+        setActivePage(existing);
+        return;
+      }
+      const out = addStateVariant(docRef.current, base.id, key, {
+        name: `${base.name} · ${t('state.' + key)}`,
+        id: uid,
+      });
+      if (out.created) {
+        setDoc(out.doc);
+        setSelIds([]);
+      }
+    },
+    [docRef, setActivePage, setDoc, setSelIds, t],
+  );
+
+  const deleteStateVariant = useCallback(
+    (key) => {
+      const current = activePageOf(docRef.current);
+      if (!current) return;
+      const base = current.variantOf
+        ? docRef.current.pages.find((page) => page.id === current.variantOf)
+        : current;
+      if (!base) return;
+      const out = removeStateVariant(docRef.current, base.id, key);
+      if (out.removedId) {
+        setDoc(out.doc);
+        setSelIds([]);
+      }
     },
     [docRef, setDoc, setSelIds],
   );
@@ -145,6 +230,7 @@ function ProductDesignPanel(props = {}) {
     previewState.setPreview(false);
     previewState.setPreviewStack([]);
     previewState.setPreviewOverlay(null);
+    previewState.setUi({});
     setEditing(null);
   };
   adoptRef.current = (nextDoc) => {
@@ -261,6 +347,18 @@ function ProductDesignPanel(props = {}) {
   const viewPage = preview
     ? doc.pages.find((page) => page.id === previewStack[previewStack.length - 1]) || activePage
     : activePage;
+  const previewBase =
+    viewPage && viewPage.variantOf
+      ? doc.pages.find((page) => page.id === viewPage.variantOf) || null
+      : viewPage;
+  const previewStateKey = viewPage && viewPage.variantOf ? viewPage.stateKey : 'normal';
+  const previewStateIds = {
+    loading: statePageId(doc, previewBase ? previewBase.id : '', 'loading'),
+    empty: statePageId(doc, previewBase ? previewBase.id : '', 'empty'),
+    error: statePageId(doc, previewBase ? previewBase.id : '', 'error'),
+  };
+  const hasPreviewState =
+    previewStateKey !== 'normal' || Object.values(previewStateIds).some(Boolean);
   const crumbEntry = selEntries[0];
   const breadcrumb = activePage
     ? [
@@ -323,7 +421,7 @@ function ProductDesignPanel(props = {}) {
           activePage,
           setPreset: actions.setPreset,
           pageState,
-          setPageState,
+          setPageState: switchPageState,
           zoom: prefs.zoom,
           setZoom: prefs.setZoom,
           preview,
@@ -366,6 +464,18 @@ function ProductDesignPanel(props = {}) {
             onLayerMove: actions.moveLayer,
             layerQuery,
             setLayerQuery,
+            docs: docs.docs,
+            docsReady: docs.ready,
+            docsError: docs.error,
+            activeDocId: docId,
+            onOpenDoc: switchDoc,
+            onCreateDoc: docs.create,
+            onDuplicateDoc: docs.duplicate,
+            onRenameDoc: docs.rename,
+            onDeleteDoc: docs.remove,
+            onImportDoc: docs.importFile,
+            onExportDoc: docs.exportDoc,
+            onRefreshDocs: docs.refresh,
           }),
       h(CanvasView, {
         t,
@@ -377,7 +487,6 @@ function ProductDesignPanel(props = {}) {
         multiBounds,
         sel,
         preview,
-        pageState,
         ui,
         canvasRef,
         spaceRef,
@@ -416,7 +525,9 @@ function ProductDesignPanel(props = {}) {
             sel,
             selCount: selEntries.length,
             activePage,
-            pageState,
+            statePageIds,
+            switchPageState,
+            deleteStateVariant,
             resizeMode: prefs.resizeMode,
             setResizeMode: prefs.setResizeMode,
             fitContentToFrame: actions.fitContentToFrame,
@@ -430,7 +541,6 @@ function ProductDesignPanel(props = {}) {
             setPreset: actions.setPreset,
             renameActivePage: actions.renameActivePage,
             patchActiveFrame: actions.patchActiveFrame,
-            patchPageStates: actions.patchStates,
             alignSelection: actions.alignSelection,
             distributeSelection: actions.distributeSelection,
             groupSelection: actions.groupSelection,
@@ -441,6 +551,27 @@ function ProductDesignPanel(props = {}) {
             startResizeRight,
           }),
     ),
+    preview && hasPreviewState
+      ? h(
+          'div',
+          { className: 'dpd-stateBar' },
+          ['normal', ...PAGE_STATE_KEYS].map((key) => {
+            const available = key === 'normal' || !!previewStateIds[key];
+            return h(
+              'button',
+              {
+                key,
+                type: 'button',
+                className: previewStateKey === key ? 'active' : '',
+                disabled: !available,
+                title: available ? t('state.' + key) : t('preview.noState'),
+                onClick: () => showState(key),
+              },
+              t('state.' + key),
+            );
+          }),
+        )
+      : null,
     preview && previewStack.length > 1
       ? h(
           'div',

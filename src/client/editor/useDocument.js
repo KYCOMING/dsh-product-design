@@ -1,9 +1,9 @@
 /**
  * Document state: history, reflow, persistence and Host synchronisation.
  *
- * The Host is authoritative when reachable; otherwise the panel degrades to a
- * localStorage-only document. Remote changes (an agent tool call) arrive over
- * SSE and are recorded as their own undo step.
+ * The Host owns a library of design documents; a Session only points at the
+ * document it currently shows. This hook loads the Session's active document,
+ * follows its change stream, and exposes `switchDoc` for the document library.
  */
 
 import { reflowDoc } from '../../shared/layout.js';
@@ -27,6 +27,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
   const [doc, setDocState] = useState(() => loadDoc(sessionId) || defaultDoc(t));
+  const [docId, setDocId] = useState('');
   // Latest doc mirrored in a ref so imperative handlers always read the
   // current value instead of a stale closure.
   const docRef = useRef(doc);
@@ -37,7 +38,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
   const lastEditRef = useRef(0);
   const [, bumpHist] = useState(0);
   // Host sync state: when reachable the Host owns the document.
-  const hostRef = useRef({ on: false, revision: 0, suppressSave: false });
+  const hostRef = useRef({ on: false, revision: 0, docId: '', suppressSave: false });
 
   function pushPastSnapshot(snapshot) {
     const h = histRef.current;
@@ -121,7 +122,27 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     bumpHist((v) => v + 1);
   }
 
-  function adoptRemoteDoc(nd) {
+  /** Render a Host snapshot without treating it as a local edit. */
+  function applySnapshot(snap, { resetHistory } = {}) {
+    if (!snap || !snap.doc) return false;
+    const nd = normalizeDoc(snap.doc);
+    if (!nd) return false;
+    hostRef.current.on = true;
+    hostRef.current.revision = Number(snap.revision) || 0;
+    hostRef.current.docId = snap.docId || hostRef.current.docId;
+    hostRef.current.suppressSave = true;
+    if (resetHistory) {
+      histRef.current = { past: [], future: [] };
+      bumpHist((v) => v + 1);
+    }
+    setDocId(hostRef.current.docId);
+    docRef.current = nd;
+    setDocState(nd);
+    onAdopt(nd);
+    return true;
+  }
+
+  function adoptRemoteDoc(nd, nextDocId) {
     const prev = docRef.current;
     // Ignore the echo of our own save: SSE can beat the POST response, and the
     // re-fetched document is then byte-for-byte what we already render.
@@ -129,9 +150,75 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     // A change that is not a local edit becomes its own undo step.
     if (prev && Date.now() - lastEditRef.current > 800) pushPastSnapshot(prev);
     hostRef.current.suppressSave = true;
+    if (nextDocId) hostRef.current.docId = nextDocId;
+    setDocId(hostRef.current.docId);
     docRef.current = nd;
     setDocState(nd);
     onAdopt(nd);
+  }
+
+  /** Fetch the Session's current document from the Host. */
+  async function refreshFromHost(sid) {
+    const got = await apiFetch('/doc', undefined, sid);
+    if (!got || got.status !== 200 || !got.body) return null;
+    const body = got.body;
+    hostRef.current.on = true;
+    hostRef.current.revision = Number(body.revision) || 0;
+    hostRef.current.docId = body.docId || '';
+    setDocId(hostRef.current.docId);
+    if (body.doc && Array.isArray(body.doc.pages) && body.doc.pages.length > 0) {
+      const nd = normalizeDoc(body.doc);
+      if (nd) {
+        hostRef.current.suppressSave = true;
+        docRef.current = nd;
+        setDocState(nd);
+        onAdopt(nd);
+      }
+      return body;
+    }
+    // A brand-new document has no pages yet: seed the sample so the canvas is
+    // never empty on first open.
+    const seeded = defaultDoc(t);
+    hostRef.current.suppressSave = true;
+    docRef.current = seeded;
+    setDocState(seeded);
+    const res = await apiFetch(
+      '/doc',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          baseRevision: hostRef.current.revision,
+          docId: hostRef.current.docId,
+          doc: seeded,
+          sessionId: sid,
+        }),
+      },
+      sid,
+    );
+    if (res && res.status === 200 && res.body) {
+      hostRef.current.revision = res.body.revision;
+    }
+    return body;
+  }
+
+  /** Switch the Session to another design document. */
+  async function switchDoc(nextDocId) {
+    const sid = sessionIdRef.current;
+    if (!nextDocId || nextDocId === hostRef.current.docId) return false;
+    const res = await apiFetch(
+      '/session/doc',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid, docId: nextDocId }),
+      },
+      sid,
+    );
+    if (!res || res.status !== 200 || !res.body) return false;
+    const ok = applySnapshot(res.body, { resetHistory: true });
+    if (ok) resetTransient();
+    return ok;
   }
 
   // Host sync: when the Host half is reachable the document is authoritative
@@ -154,6 +241,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             baseRevision: hostRef.current.revision,
+            docId: hostRef.current.docId,
             doc: doc,
             sessionId: sid,
           }),
@@ -167,7 +255,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
           const nd = normalizeDoc(res.body.doc);
           if (nd) {
             hostRef.current.revision = res.body.revision;
-            adoptRemoteDoc(nd);
+            adoptRemoteDoc(nd, res.body.docId);
           }
         }
       });
@@ -183,7 +271,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     let source = null;
     const sid = sessionId;
     const localDoc = loadDoc(sid) || defaultDoc(t);
-    hostRef.current = { on: false, revision: 0, suppressSave: true };
+    hostRef.current = { on: false, revision: 0, docId: '', suppressSave: true };
+    setDocId('');
     docRef.current = localDoc;
     setDocState(localDoc);
     resetTransient();
@@ -198,32 +287,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
         if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500));
       }
       if (cancelled || !got || got.status !== 200 || !got.body) return;
-      hostRef.current.on = true;
-      hostRef.current.revision = got.body.revision || 0;
-      if (got.body.doc) {
-        const nd = normalizeDoc(got.body.doc);
-        if (nd) {
-          hostRef.current.suppressSave = true;
-          docRef.current = nd;
-          setDocState(nd);
-        }
-      } else {
-        const seeded = await apiFetch(
-          '/doc',
-          {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              baseRevision: hostRef.current.revision,
-              doc: docRef.current,
-              sessionId: sid,
-            }),
-          },
-          sid,
-        );
-        if (seeded && seeded.status === 200 && seeded.body)
-          hostRef.current.revision = seeded.body.revision;
-      }
+      await refreshFromHost(sid);
       if (cancelled || typeof window.EventSource !== 'function') return;
       try {
         const eventsUrl = new URL(API_PREFIX + '/events', window.location.href);
@@ -236,18 +300,22 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
           } catch {
             data = null;
           }
-          if (
-            !data ||
-            typeof data.revision !== 'number' ||
-            data.revision === hostRef.current.revision
-          )
-            return;
+          if (!data || typeof data.revision !== 'number') return;
+          const docChanged = data.docId && data.docId !== hostRef.current.docId;
+          if (!docChanged && data.revision === hostRef.current.revision) return;
           apiFetch('/doc', undefined, sid).then((snap) => {
             if (!snap || snap.status !== 200 || !snap.body || !snap.body.doc) return;
+            const nextId = snap.body.docId || '';
+            if (nextId && nextId !== hostRef.current.docId) {
+              hostRef.current.revision = snap.body.revision;
+              applySnapshot(snap.body, { resetHistory: true });
+              resetTransient();
+              return;
+            }
             const nd = normalizeDoc(snap.body.doc);
             if (!nd) return;
             hostRef.current.revision = snap.body.revision;
-            adoptRemoteDoc(nd);
+            adoptRemoteDoc(nd, nextId);
           });
         };
       } catch {
@@ -268,6 +336,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
 
   return {
     doc,
+    docId,
     docRef,
     setDoc,
     mapEl,
@@ -279,5 +348,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt }) {
     canRedo: histRef.current.future.length > 0,
     pushPastSnapshot,
     adoptRemoteDoc,
+    switchDoc,
+    refreshFromHost,
   };
 }

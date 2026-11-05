@@ -22,6 +22,60 @@ export function buildSvg(page, ctx, scale = 2) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w * factor}" height="${h * factor}" viewBox="0 0 ${w} ${h}"><foreignObject x="0" y="0" width="${w}" height="${h}">${html}</foreignObject></svg>`;
 }
 
+function clonePage(page) {
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(page);
+    } catch {
+      /* fall through */
+    }
+  }
+  return JSON.parse(JSON.stringify(page));
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('image read failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Remote images must become data URLs, otherwise the canvas is tainted. */
+async function inlineImages(page) {
+  const copy = clonePage(page);
+  const tasks = [];
+  const walk = (elements) => {
+    for (const el of elements || []) {
+      const src = el && el.props && el.props.src;
+      if (el.type === 'image' && typeof src === 'string' && /^https?:/i.test(src)) {
+        tasks.push(
+          (async () => {
+            try {
+              const res = await fetch(src, {
+                signal:
+                  typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+                    ? AbortSignal.timeout(4000)
+                    : undefined,
+              });
+              if (!res.ok) throw new Error('image fetch failed');
+              el.props.src = await blobToDataUrl(await res.blob());
+            } catch {
+              // Keep the SVG renderable: fall back to the striped placeholder.
+              el.props.src = '';
+            }
+          })(),
+        );
+      }
+      if (Array.isArray(el.children)) walk(el.children);
+    }
+  };
+  walk(copy.elements);
+  await Promise.all(tasks);
+  return copy;
+}
+
 /** Rasterise one page to a PNG blob. */
 export async function renderPagePng(page, ctx, scale = 2) {
   if (typeof document === 'undefined') throw new Error('png export requires a browser');
@@ -36,11 +90,12 @@ export async function renderPagePng(page, ctx, scale = 2) {
       /* ignore */
     }
   }
-  const frame = page.frame || { w: 390, h: 844, background: '#ffffff' };
+  const exportPage = await inlineImages(page);
+  const frame = exportPage.frame || { w: 390, h: 844, background: '#ffffff' };
   const w = Math.max(1, Math.round(frame.w));
   const h = Math.max(1, Math.round(frame.h));
   const factor = Math.max(1, Math.min(4, Number(scale) || 1));
-  const svg = buildSvg(page, ctx, factor);
+  const svg = buildSvg(exportPage, ctx, factor);
   // A data: URL keeps the SVG same-origin for Chromium; a blob: URL makes a
   // canvas with foreignObject content tainted, so toBlob() would throw.
   const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);

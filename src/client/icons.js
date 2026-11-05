@@ -34,7 +34,19 @@ const IconEye = () =>
     h('circle', { cx: 8, cy: 8, r: 1.8 }),
   );
 const IconPencil = () => h(Svg, null, h('path', { d: 'M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z' }));
+const IconDesign = () =>
+  h(
+    Svg,
+    null,
+    h('rect', { x: 1.5, y: 2, width: 13, height: 11.5, rx: 2 }),
+    h('path', { d: 'M1.5 5.4h13' }),
+    h('rect', { x: 3.6, y: 8, width: 4, height: 3.2, rx: 0.6 }),
+    h('circle', { cx: 10.6, cy: 9.6, r: 1.4 }),
+  );
 const IconTrash = () => h(Svg, null, h('path', { d: 'M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4' }));
+const IconDownload = () => h(Svg, null, h('path', { d: 'M8 2v8M4.5 7L8 10.5 11.5 7M2.5 13.5h11' }));
+const IconUpload = () =>
+  h(Svg, null, h('path', { d: 'M8 10.5V2M4.5 5.5L8 2l3.5 3.5M2.5 13.5h11' }));
 const IconCopy = () =>
   h(
     Svg,
@@ -113,6 +125,8 @@ export {
   IconBack,
   IconComponents,
   IconCopy,
+  IconDesign,
+  IconDownload,
   IconEye,
   IconFront,
   IconLayers,
@@ -124,6 +138,7 @@ export {
   IconRedo,
   IconTrash,
   IconUndo,
+  IconUpload,
   libGlyph,
   Svg,
 };
