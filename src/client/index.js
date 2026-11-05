@@ -1,11 +1,28 @@
 import { registerProductDesignCards, setCanvasOpener } from './cards.js';
 import { NS, PANEL_ID } from './constants.js';
 import { activeLocale, DICT, pickDict, setAppCtx } from './i18n.js';
-import { ProductDesignIcon } from './icons.js';
 import { ProductDesignPanel } from './panel.js';
+import { h } from './react.js';
 import { setSessionSource } from './session.js';
 
 export const inject = ['slots', 'layout'];
+
+// Filled by apply(); module-level component identities stay stable across
+// renders (defining components inside apply would remount the whole editor).
+let openFullScreen = () => {};
+let backToConversation = () => {};
+
+function ProductDesignView(props) {
+  return h(ProductDesignPanel, {
+    sessionId: props && props.sessionId,
+    embedded: true,
+    onExpand: () => openFullScreen(),
+  });
+}
+
+function ProductDesignMain() {
+  return h(ProductDesignPanel, { onCollapse: () => backToConversation() });
+}
 
 export function apply(ctx) {
   setAppCtx(ctx);
@@ -19,14 +36,21 @@ export function apply(ctx) {
   };
   bindSession(ctx);
   if (typeof ctx.inject === 'function') ctx.inject(['uiSession'], bindSession);
-  setCanvasOpener(() => {
+
+  const layoutService = () => {
     try {
-      const layout = ctx.get('layout');
-      if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID);
+      return ctx.get('layout');
     } catch {
-      /* layout service unavailable */
+      return null;
     }
-  });
+  };
+  const selectPanel = (id) => {
+    const layout = layoutService();
+    if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(id);
+  };
+  openFullScreen = () => selectPanel(PANEL_ID);
+  backToConversation = () => selectPanel(null);
+  setCanvasOpener(openFullScreen);
 
   let loc = null;
   try {
@@ -64,15 +88,17 @@ export function apply(ctx) {
   disposers.push(registerProductDesignCards(ctx));
 
   disposers.push(
-    slots.inject('sidebar.panellist', () =>
+    slots.inject('conversation.view', () =>
       slots.register(
         {
-          name: 'sidebar.panellist',
+          name: 'conversation.view',
           id: PANEL_ID,
-          order: 30,
+          order: 20,
+          locale: NS,
           label: () => pickDict(activeLocale(), 'entry.label'),
+          inject: (sessionId) => ({ sessionId }),
         },
-        ProductDesignIcon,
+        ProductDesignView,
       ),
     ),
   );
@@ -84,7 +110,7 @@ export function apply(ctx) {
           name: 'main',
           key: PANEL_ID,
         },
-        ProductDesignPanel,
+        ProductDesignMain,
       ),
     ),
   );

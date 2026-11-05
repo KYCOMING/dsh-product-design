@@ -6,6 +6,8 @@ import { h } from './react.js';
 const CSS = [
   '.dpd-root{position:relative;display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}',
   '.dpd-root *{box-sizing:border-box}',
+  '.dpd-root.dpd-embedded{height:100%;min-height:min(720px,calc(100vh - 220px))}',
+  '.dpd-root.dpd-embedded .dpd-toolbar{padding:6px 10px}',
   '.dpd-root button,.dpd-root input,.dpd-root select{font-family:inherit}',
   '.dpd-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);flex-wrap:wrap;flex-shrink:0}',
   '.dpd-brand{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13.5px;margin-right:2px;color:var(--dsw-alias-label-primary,#111)}',

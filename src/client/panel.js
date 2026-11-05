@@ -28,9 +28,10 @@ import { ToolbarView } from './ui/toolbar.js';
  * the presentational components under `ui/*` and owns only transient layout
  * state (panel widths, layer search, context-menu position).
  */
-function ProductDesignPanel() {
+function ProductDesignPanel(props = {}) {
   const t = useT();
-  const sessionId = useSessionId();
+  const adapterSessionId = useSessionId();
+  const sessionId = props.sessionId || adapterSessionId;
   const canvasRef = useRef(null);
   const spaceRef = useRef(false);
   const [layerQuery, setLayerQuery] = useState('');
@@ -308,7 +309,8 @@ function ProductDesignPanel() {
   return h(
     'div',
     {
-      className: 'dpd-root' + (preview ? ' dpd-previewMode' : ''),
+      className:
+        'dpd-root' + (preview ? ' dpd-previewMode' : '') + (props.embedded ? ' dpd-embedded' : ''),
       'data-dsh-plugin': 'product-design',
     },
     h(StyleBlock),
@@ -336,6 +338,8 @@ function ProductDesignPanel() {
           onExportPng: exporter.exportPng,
           onExportHtml: exporter.exportHtml,
           onExportReact: exporter.exportReact,
+          onExpand: props.onExpand,
+          onCollapse: props.onCollapse,
         }),
     h(
       'div',

@@ -1,6 +1,6 @@
 # dsh-product-design
 
-侧边栏里的「简化版 Figma」产品设计画布。用于产品设计需求沟通：在画布上直接搭原型，组件可交互、可切换状态，并预览整页的加载 / 空 / 错误状态。
+会话标签页里的「简化版 Figma」产品设计画布。用于产品设计需求沟通：在画布上直接搭原型，组件可交互、可切换状态，并预览整页的加载 / 空 / 错误状态。
 
 > DSH 插件（DeepSeek Harness）。客户端半由 `src/client` 构建为单文件模块，通过 `window.__ModuleLoader__` 挂载侧边栏入口与主页面。
 
@@ -18,7 +18,7 @@ dsh plugin --profile web add github:KYCOMING/dsh-product-design
 
 没有 `dsh` 命令时：打开 **插件 → 添加插件**，输入 `github:KYCOMING/dsh-product-design`。
 
-安装后在「插件」页确认 `dsh-product-design` 已启用，然后重启 DSH（Host 半不会热加载）。侧边栏出现「产品设计」图标。
+安装后在「插件」页确认 `dsh-product-design` 已启用，然后重启 DSH（Host 半不会热加载）。打开一个已有消息的会话，顶部标签栏会出现「产品设计」，点击即可在该会话里编辑设计稿；也可以在画布内点「全屏」进入独立画布。
 
 卸载：
 
@@ -79,6 +79,7 @@ dsh plugin --profile desktop remove dsh-product-design
 - **网格 + 缩放**：画布小方格网格随缩放变化；`Ctrl/⌘ + 滚轮` 缩放，普通滚轮滚动。
 - **编辑体验**：撤销 / 重做（含 AI 改动）、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
 - **对话内产品预览（Visualize 风格）**：AI 调用 `product_design_apply` 后，聊天回合末尾会出现当前页面的产品缩略卡片，可一键「打开画布」；无需先手动打开画布。
+- **会话标签页**：产品设计是会话顶部的一个视图标签（与 Chat 并列），不再占用侧边栏；画布内可一键「全屏」，全屏模式可「返回会话」。
 - **多会话独立设计稿**：每个会话拥有自己的设计稿；切换会话时画布自动切换，互不覆盖。
 - **自动保存**：设计稿持久化到 Host（按会话分目录）和 `localStorage`（`doc:v3:<sessionId>`）。
 
@@ -128,7 +129,7 @@ dsh plugin --profile desktop remove dsh-product-design
 dsh-product-design/
 ├─ src/
 │  ├─ client/                 # 浏览器半
-│  │  ├─ index.js             # 入口：apply(ctx) 注册 slot / locale / 对话内卡片
+│  │  ├─ index.js             # 入口：注册会话视图标签 / 全屏面板 / locale / 对话卡片
 │  │  ├─ panel.js             # 组合根：只负责把 hooks 接到展示组件上（~450 行）
 │  │  ├─ domain/              # 纯逻辑：无 React、无 DOM，可单测
 │  │  │  ├─ tree.js           #   元素树不可变操作（增删改、复制、重挂载）

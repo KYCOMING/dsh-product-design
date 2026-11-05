@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **产品设计改为会话视图标签**：注册 `conversation.view`（id `dsh-product-design`，order 20），与 Chat / Trajectory 并列在会话顶部；移除 `sidebar.panellist` 入口，不再出现「选中会话→点侧边栏→跳走」的割裂感。视图内提供「全屏」进入独立画布，全屏提供「返回会话」。
 - **导出 PNG**：当前页按 1× / 2× 光栅化，使用模型渲染 → SVG `foreignObject` → canvas，无第三方依赖。
 - **导出单文件 HTML 原型**：内嵌全部页面与一段运行时，支持页面跳转、返回、弹层，以及开关 / 复选框 / 标签页 / 下拉的交互；双击即可在浏览器打开。
 - **导出 React + Tailwind**：生成单个 `Prototype.jsx`，每页一个组件，自由布局用绝对定位、Auto Layout 用 flex，按钮/输入框使用语义标签，并带一个 `useState` 页面路由；产物通过 esbuild JSX 解析校验。

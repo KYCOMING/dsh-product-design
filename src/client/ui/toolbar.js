@@ -40,6 +40,8 @@ export function ToolbarView(props) {
     onExportPng,
     onExportHtml,
     onExportReact,
+    onExpand,
+    onCollapse,
   } = props;
 
   const toolbar = h(
@@ -164,6 +166,20 @@ export function ToolbarView(props) {
       },
       h(IconPlus),
     ),
+    onCollapse
+      ? h(
+          'button',
+          { className: 'dpd-btn', type: 'button', onClick: onCollapse },
+          '← ' + t('toolbar.backToChat'),
+        )
+      : null,
+    onExpand
+      ? h(
+          'button',
+          { className: 'dpd-btn', type: 'button', onClick: onExpand },
+          t('toolbar.expand'),
+        )
+      : null,
     h(ExportMenu, {
       t,
       onPng: onExportPng,

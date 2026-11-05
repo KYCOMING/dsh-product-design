@@ -9,20 +9,27 @@ beforeEach(() => {
 });
 
 describe('插件注册', () => {
-  it('注册侧边栏入口与主页面两个 slot', () => {
+  it('注册会话视图标签与主页面 slot，不再占用侧边栏', () => {
     const { registered } = loadPlugin();
-    const entry = registered.find((r) => r.slot === 'sidebar.panellist');
+    const view = registered.find((r) => r.slot === 'conversation.view');
     const main = registered.find((r) => r.slot === 'main');
-    expect(entry?.config?.id).toBe('dsh-product-design');
+    expect(view?.config?.id).toBe('dsh-product-design');
+    expect(view?.config?.order).toBe(20);
+    expect(view?.config?.label()).toBe('产品设计');
     expect(main?.config?.key).toBe('dsh-product-design');
+    expect(registered.some((r) => r.slot === 'sidebar.panellist')).toBe(false);
     const cards = registered.find((r) => r.slot === 'conversation.chat.turnTail');
     expect(cards?.config?.id).toBe('dsh-product-design-cards');
   });
 
-  it('侧边栏图标可渲染', () => {
-    const { icon } = loadPlugin();
-    const html = renderToStaticMarkup(React.createElement(icon, { size: 16 }));
-    expect(html).toContain('<svg');
+  it('会话视图渲染画布，并提供全屏入口', () => {
+    const { registered } = loadPlugin();
+    const view = registered.find((r) => r.slot === 'conversation.view');
+    const html = renderToStaticMarkup(React.createElement(view.component, { sessionId: '' }));
+    expect(html).toContain('dpd-root');
+    expect(html).toContain('dpd-embedded');
+    expect(html).toContain('全屏');
+    expect(html).not.toContain('返回会话');
   });
 });
 

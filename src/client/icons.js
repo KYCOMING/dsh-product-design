@@ -1,4 +1,3 @@
-import { PANEL_ID } from './constants.js';
 import { h } from './react.js';
 
 // ------------------------------------------------------------------
@@ -110,32 +109,6 @@ function libGlyph(type) {
   return map[type] || map.text;
 }
 
-// ------------------------------------------------------------------
-// sidebar panel glyph
-// ------------------------------------------------------------------
-function ProductDesignIcon(props) {
-  const size = props && props.size;
-  return h(
-    'svg',
-    {
-      viewBox: '0 0 16 16',
-      width: size || 16,
-      height: size || 16,
-      fill: 'none',
-      stroke: 'currentColor',
-      strokeWidth: 1.2,
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      'aria-hidden': true,
-      'data-dsh-panel-entry': PANEL_ID,
-    },
-    h('rect', { x: 1.5, y: 2, width: 13, height: 11.5, rx: 2 }),
-    h('path', { d: 'M1.5 5.4h13' }),
-    h('rect', { x: 3.6, y: 8, width: 4, height: 3.2, rx: 0.6 }),
-    h('circle', { cx: 10.6, cy: 9.6, r: 1.4 }),
-  );
-}
-
 export {
   IconBack,
   IconComponents,
@@ -152,6 +125,5 @@ export {
   IconTrash,
   IconUndo,
   libGlyph,
-  ProductDesignIcon,
   Svg,
 };

@@ -405,6 +405,8 @@ var DICT = {
     "toolbar.panHint": "\u7A7A\u683C / \u4E2D\u952E\u62D6\u62FD\u5E73\u79FB\u753B\u5E03",
     "toolbar.snap": "\u78C1\u5438",
     "toolbar.export": "\u5BFC\u51FA",
+    "toolbar.expand": "\u5168\u5C4F",
+    "toolbar.backToChat": "\u8FD4\u56DE\u4F1A\u8BDD",
     "export.png1x": "PNG \u56FE\u7247\uFF081\xD7\uFF09",
     "export.png2x": "PNG \u56FE\u7247\uFF082\xD7\uFF09",
     "export.html": "HTML \u539F\u578B\uFF08\u5355\u6587\u4EF6\uFF09",
@@ -603,6 +605,8 @@ var DICT = {
     "toolbar.panHint": "Hold Space / middle-drag to pan the canvas",
     "toolbar.snap": "Snap",
     "toolbar.export": "Export",
+    "toolbar.expand": "Full screen",
+    "toolbar.backToChat": "Back to chat",
     "export.png1x": "PNG image (1\xD7)",
     "export.png2x": "PNG image (2\xD7)",
     "export.html": "HTML prototype (single file)",
@@ -1660,126 +1664,6 @@ function registerProductDesignCards(ctx) {
       }
     }
   };
-}
-
-// src/client/icons.js
-function Svg(props) {
-  const { size, children, ...rest } = props;
-  return h(
-    "svg",
-    Object.assign(
-      {
-        width: size || 14,
-        height: size || 14,
-        viewBox: "0 0 16 16",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: 1.5,
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        "aria-hidden": true
-      },
-      rest
-    ),
-    children
-  );
-}
-var IconPlus = () => h(Svg, null, h("path", { d: "M8 3v10M3 8h10" }));
-var IconMinus = () => h(Svg, null, h("path", { d: "M3 8h10" }));
-var IconEye = () => h(
-  Svg,
-  null,
-  h("path", { d: "M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" }),
-  h("circle", { cx: 8, cy: 8, r: 1.8 })
-);
-var IconPencil = () => h(Svg, null, h("path", { d: "M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z" }));
-var IconTrash = () => h(Svg, null, h("path", { d: "M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4" }));
-var IconCopy = () => h(
-  Svg,
-  null,
-  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.4 }),
-  h("path", { d: "M3 11V4a1 1 0 0 1 1-1h7" })
-);
-var IconFront = () => h(
-  Svg,
-  null,
-  h("rect", { x: 3, y: 3, width: 8, height: 8, rx: 1.2 }),
-  h("path", { d: "M8 8h5v5" })
-);
-var IconBack = () => h(
-  Svg,
-  null,
-  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.2 }),
-  h("path", { d: "M3 8V3h5" })
-);
-var IconUndo = () => h(Svg, null, h("path", { d: "M3.2 8.4a5 5 0 1 1 1.5 3.3M3 4.6V8h3.4" }));
-var IconRedo = () => h(Svg, null, h("path", { d: "M12.8 8.4a5 5 0 1 0-1.5 3.3M13 4.6V8H9.6" }));
-var IconPages = () => h(
-  Svg,
-  null,
-  h("rect", { x: 3, y: 1.8, width: 10, height: 12.4, rx: 1.6 }),
-  h("path", { d: "M3 5.2h10M5.4 8.2h5.2M5.4 10.8h3.4" })
-);
-var IconComponents = () => h(
-  Svg,
-  null,
-  h("rect", { x: 2, y: 2, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 9, y: 2, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 2, y: 9, width: 5, height: 5, rx: 1 }),
-  h("rect", { x: 9, y: 9, width: 5, height: 5, rx: 1 })
-);
-var IconLayers = () => h(
-  Svg,
-  null,
-  h("path", { d: "M8 2l6 3-6 3-6-3 6-3z" }),
-  h("path", { d: "M2 8l6 3 6-3M2 11l6 3 6-3" })
-);
-var IconMagnet = () => h(
-  Svg,
-  null,
-  h("path", { d: "M3 2v6a5 5 0 0 0 10 0V2" }),
-  h("path", { d: "M3 2H1.5M13 2h1.5M3 6h3M10 6h3" })
-);
-function libGlyph(type) {
-  const map = {
-    container: h("path", { d: "M2 3.5h12v9H2zM4.5 6h7v4h-7z" }),
-    group: h("path", { d: "M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z" }),
-    button: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 2 }),
-    input: h("rect", { x: 2, y: 4.5, width: 12, height: 7, rx: 1.6 }),
-    card: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
-    navbar: h("path", { d: "M2 4h12M2 4v8h12V4M6 7h4" }),
-    tabs: h("path", { d: "M2 5h12M5 5v6M10 5v6" }),
-    toggle: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 3 }),
-    checkbox: h("rect", { x: 3, y: 3, width: 10, height: 10, rx: 2 }),
-    avatar: h("circle", { cx: 8, cy: 8, r: 5 }),
-    text: h("path", { d: "M3 4h10M8 4v8M5.5 12h5" }),
-    image: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
-    badge: h("rect", { x: 2, y: 6, width: 12, height: 4, rx: 2 }),
-    select: h("path", { d: "M2 4.5h12v7H2zM10 8l1.5 1.5L13 8" })
-  };
-  return map[type] || map.text;
-}
-function ProductDesignIcon(props) {
-  const size = props && props.size;
-  return h(
-    "svg",
-    {
-      viewBox: "0 0 16 16",
-      width: size || 16,
-      height: size || 16,
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: 1.2,
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      "aria-hidden": true,
-      "data-dsh-panel-entry": PANEL_ID
-    },
-    h("rect", { x: 1.5, y: 2, width: 13, height: 11.5, rx: 2 }),
-    h("path", { d: "M1.5 5.4h13" }),
-    h("rect", { x: 3.6, y: 8, width: 4, height: 3.2, rx: 0.6 }),
-    h("circle", { cx: 10.6, cy: 9.6, r: 1.4 })
-  );
 }
 
 // src/shared/layout.js
@@ -4948,6 +4832,8 @@ function useSessionId() {
 var CSS2 = [
   ".dpd-root{position:relative;display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}",
   ".dpd-root *{box-sizing:border-box}",
+  ".dpd-root.dpd-embedded{height:100%;min-height:min(720px,calc(100vh - 220px))}",
+  ".dpd-root.dpd-embedded .dpd-toolbar{padding:6px 10px}",
   ".dpd-root button,.dpd-root input,.dpd-root select{font-family:inherit}",
   ".dpd-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#e5e6eb);background:var(--dsw-alias-bg-layer-1,#fafafa);flex-wrap:wrap;flex-shrink:0}",
   ".dpd-brand{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13.5px;margin-right:2px;color:var(--dsw-alias-label-primary,#111)}",
@@ -5109,6 +4995,104 @@ var CSS2 = [
 ].join("\n");
 function StyleBlock() {
   return h("style", { dangerouslySetInnerHTML: { __html: CSS2 } });
+}
+
+// src/client/icons.js
+function Svg(props) {
+  const { size, children, ...rest } = props;
+  return h(
+    "svg",
+    Object.assign(
+      {
+        width: size || 14,
+        height: size || 14,
+        viewBox: "0 0 16 16",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: 1.5,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        "aria-hidden": true
+      },
+      rest
+    ),
+    children
+  );
+}
+var IconPlus = () => h(Svg, null, h("path", { d: "M8 3v10M3 8h10" }));
+var IconMinus = () => h(Svg, null, h("path", { d: "M3 8h10" }));
+var IconEye = () => h(
+  Svg,
+  null,
+  h("path", { d: "M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" }),
+  h("circle", { cx: 8, cy: 8, r: 1.8 })
+);
+var IconPencil = () => h(Svg, null, h("path", { d: "M11 2.5l2.5 2.5L5 13.5 2 14l.5-3L11 2.5z" }));
+var IconTrash = () => h(Svg, null, h("path", { d: "M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4" }));
+var IconCopy = () => h(
+  Svg,
+  null,
+  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.4 }),
+  h("path", { d: "M3 11V4a1 1 0 0 1 1-1h7" })
+);
+var IconFront = () => h(
+  Svg,
+  null,
+  h("rect", { x: 3, y: 3, width: 8, height: 8, rx: 1.2 }),
+  h("path", { d: "M8 8h5v5" })
+);
+var IconBack = () => h(
+  Svg,
+  null,
+  h("rect", { x: 5, y: 5, width: 8, height: 8, rx: 1.2 }),
+  h("path", { d: "M3 8V3h5" })
+);
+var IconUndo = () => h(Svg, null, h("path", { d: "M3.2 8.4a5 5 0 1 1 1.5 3.3M3 4.6V8h3.4" }));
+var IconRedo = () => h(Svg, null, h("path", { d: "M12.8 8.4a5 5 0 1 0-1.5 3.3M13 4.6V8H9.6" }));
+var IconPages = () => h(
+  Svg,
+  null,
+  h("rect", { x: 3, y: 1.8, width: 10, height: 12.4, rx: 1.6 }),
+  h("path", { d: "M3 5.2h10M5.4 8.2h5.2M5.4 10.8h3.4" })
+);
+var IconComponents = () => h(
+  Svg,
+  null,
+  h("rect", { x: 2, y: 2, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 9, y: 2, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 2, y: 9, width: 5, height: 5, rx: 1 }),
+  h("rect", { x: 9, y: 9, width: 5, height: 5, rx: 1 })
+);
+var IconLayers = () => h(
+  Svg,
+  null,
+  h("path", { d: "M8 2l6 3-6 3-6-3 6-3z" }),
+  h("path", { d: "M2 8l6 3 6-3M2 11l6 3 6-3" })
+);
+var IconMagnet = () => h(
+  Svg,
+  null,
+  h("path", { d: "M3 2v6a5 5 0 0 0 10 0V2" }),
+  h("path", { d: "M3 2H1.5M13 2h1.5M3 6h3M10 6h3" })
+);
+function libGlyph(type) {
+  const map = {
+    container: h("path", { d: "M2 3.5h12v9H2zM4.5 6h7v4h-7z" }),
+    group: h("path", { d: "M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z" }),
+    button: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 2 }),
+    input: h("rect", { x: 2, y: 4.5, width: 12, height: 7, rx: 1.6 }),
+    card: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
+    navbar: h("path", { d: "M2 4h12M2 4v8h12V4M6 7h4" }),
+    tabs: h("path", { d: "M2 5h12M5 5v6M10 5v6" }),
+    toggle: h("rect", { x: 2, y: 5, width: 12, height: 6, rx: 3 }),
+    checkbox: h("rect", { x: 3, y: 3, width: 10, height: 10, rx: 2 }),
+    avatar: h("circle", { cx: 8, cy: 8, r: 5 }),
+    text: h("path", { d: "M3 4h10M8 4v8M5.5 12h5" }),
+    image: h("rect", { x: 2, y: 3, width: 12, height: 10, rx: 1.6 }),
+    badge: h("rect", { x: 2, y: 6, width: 12, height: 4, rx: 2 }),
+    select: h("path", { d: "M2 4.5h12v7H2zM10 8l1.5 1.5L13 8" })
+  };
+  return map[type] || map.text;
 }
 
 // src/client/overlay.js
@@ -6854,7 +6838,9 @@ function ToolbarView(props) {
     toggleSnap,
     onExportPng,
     onExportHtml,
-    onExportReact
+    onExportReact,
+    onExpand,
+    onCollapse
   } = props;
   const toolbar = h(
     "div",
@@ -6978,6 +6964,16 @@ function ToolbarView(props) {
       },
       h(IconPlus)
     ),
+    onCollapse ? h(
+      "button",
+      { className: "dpd-btn", type: "button", onClick: onCollapse },
+      "\u2190 " + t("toolbar.backToChat")
+    ) : null,
+    onExpand ? h(
+      "button",
+      { className: "dpd-btn", type: "button", onClick: onExpand },
+      t("toolbar.expand")
+    ) : null,
     h(ExportMenu, {
       t,
       onPng: onExportPng,
@@ -7003,9 +6999,10 @@ function ToolbarView(props) {
 }
 
 // src/client/panel.js
-function ProductDesignPanel() {
+function ProductDesignPanel(props = {}) {
   const t = useT();
-  const sessionId = useSessionId();
+  const adapterSessionId = useSessionId();
+  const sessionId = props.sessionId || adapterSessionId;
   const canvasRef = useRef(null);
   const spaceRef = useRef(false);
   const [layerQuery, setLayerQuery] = useState2("");
@@ -7247,7 +7244,7 @@ function ProductDesignPanel() {
   return h(
     "div",
     {
-      className: "dpd-root" + (preview ? " dpd-previewMode" : ""),
+      className: "dpd-root" + (preview ? " dpd-previewMode" : "") + (props.embedded ? " dpd-embedded" : ""),
       "data-dsh-plugin": "product-design"
     },
     h(StyleBlock),
@@ -7272,7 +7269,9 @@ function ProductDesignPanel() {
       toggleSnap,
       onExportPng: exporter.exportPng,
       onExportHtml: exporter.exportHtml,
-      onExportReact: exporter.exportReact
+      onExportReact: exporter.exportReact,
+      onExpand: props.onExpand,
+      onCollapse: props.onCollapse
     }),
     h(
       "div",
@@ -7396,6 +7395,20 @@ function ProductDesignPanel() {
 
 // src/client/index.js
 var inject = ["slots", "layout"];
+var openFullScreen = () => {
+};
+var backToConversation = () => {
+};
+function ProductDesignView(props) {
+  return h(ProductDesignPanel, {
+    sessionId: props && props.sessionId,
+    embedded: true,
+    onExpand: () => openFullScreen()
+  });
+}
+function ProductDesignMain() {
+  return h(ProductDesignPanel, { onCollapse: () => backToConversation() });
+}
 function apply(ctx) {
   setAppCtx(ctx);
   const bindSession = (scope) => {
@@ -7407,13 +7420,20 @@ function apply(ctx) {
   };
   bindSession(ctx);
   if (typeof ctx.inject === "function") ctx.inject(["uiSession"], bindSession);
-  setCanvasOpener(() => {
+  const layoutService = () => {
     try {
-      const layout = ctx.get("layout");
-      if (layout && typeof layout.selectPanel === "function") layout.selectPanel(PANEL_ID);
+      return ctx.get("layout");
     } catch {
+      return null;
     }
-  });
+  };
+  const selectPanel = (id) => {
+    const layout = layoutService();
+    if (layout && typeof layout.selectPanel === "function") layout.selectPanel(id);
+  };
+  openFullScreen = () => selectPanel(PANEL_ID);
+  backToConversation = () => selectPanel(null);
+  setCanvasOpener(openFullScreen);
   let loc = null;
   try {
     loc = ctx.get("locale");
@@ -7446,15 +7466,17 @@ function apply(ctx) {
   disposers.push(registerProductDesignCards(ctx));
   disposers.push(
     slots.inject(
-      "sidebar.panellist",
+      "conversation.view",
       () => slots.register(
         {
-          name: "sidebar.panellist",
+          name: "conversation.view",
           id: PANEL_ID,
-          order: 30,
-          label: () => pickDict(activeLocale(), "entry.label")
+          order: 20,
+          locale: NS,
+          label: () => pickDict(activeLocale(), "entry.label"),
+          inject: (sessionId) => ({ sessionId })
         },
-        ProductDesignIcon
+        ProductDesignView
       )
     )
   );
@@ -7466,7 +7488,7 @@ function apply(ctx) {
           name: "main",
           key: PANEL_ID
         },
-        ProductDesignPanel
+        ProductDesignMain
       )
     )
   );
