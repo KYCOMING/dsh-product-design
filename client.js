@@ -130,8 +130,8 @@ function boundsOfEntries(entries) {
   if (minX === Infinity) return null;
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
-function pointInBox(x, y, box, pad = 0) {
-  return !!box && x >= box.x - pad && x <= box.x + box.w + pad && y >= box.y - pad && y <= box.y + box.h + pad;
+function pointInBox(x, y, box2, pad = 0) {
+  return !!box2 && x >= box2.x - pad && x <= box2.x + box2.w + pad && y >= box2.y - pad && y <= box2.y + box2.h + pad;
 }
 function findDropContainer(entries, excludeIds, x, y) {
   let best = null;
@@ -404,6 +404,11 @@ var DICT = {
     "toolbar.redo": "\u91CD\u505A (\u21E7\u2318Z)",
     "toolbar.panHint": "\u7A7A\u683C / \u4E2D\u952E\u62D6\u62FD\u5E73\u79FB\u753B\u5E03",
     "toolbar.snap": "\u78C1\u5438",
+    "toolbar.export": "\u5BFC\u51FA",
+    "export.png1x": "PNG \u56FE\u7247\uFF081\xD7\uFF09",
+    "export.png2x": "PNG \u56FE\u7247\uFF082\xD7\uFF09",
+    "export.html": "HTML \u539F\u578B\uFF08\u5355\u6587\u4EF6\uFF09",
+    "export.react": "React + Tailwind",
     "frame.title": "\u753B\u5E03\u5C3A\u5BF8",
     "frame.mobile": "\u624B\u673A 390\xD7844",
     "frame.tablet": "\u5E73\u677F 768\xD71024",
@@ -595,6 +600,11 @@ var DICT = {
     "toolbar.redo": "Redo (\u21E7\u2318Z)",
     "toolbar.panHint": "Hold Space / middle-drag to pan the canvas",
     "toolbar.snap": "Snap",
+    "toolbar.export": "Export",
+    "export.png1x": "PNG image (1\xD7)",
+    "export.png2x": "PNG image (2\xD7)",
+    "export.html": "HTML prototype (single file)",
+    "export.react": "React + Tailwind",
     "frame.title": "Frame size",
     "frame.mobile": "Phone 390\xD7844",
     "frame.tablet": "Tablet 768\xD71024",
@@ -1878,9 +1888,9 @@ function layoutChildren(container) {
     else if (l.align === "end") cross += innerCross - crossOf(kid);
     const main = Math.round(cursor);
     cursor += mainOf(kid) + gap;
-    const box = row ? { x: main, y: Math.round(cross) } : { x: Math.round(cross), y: main };
-    if (kid.x === box.x && kid.y === box.y) return kid;
-    return { ...kid, x: box.x, y: box.y };
+    const box2 = row ? { x: main, y: Math.round(cross) } : { x: Math.round(cross), y: main };
+    if (kid.x === box2.x && kid.y === box2.y) return kid;
+    return { ...kid, x: box2.x, y: box2.y };
   });
   const placedChanged = placed.some((kid, i) => kid !== next[i]);
   return placedChanged || next !== kids ? placed : kids;
@@ -3051,6 +3061,886 @@ function useEditorActions({
   };
 }
 
+// src/client/export/download.js
+function safeFileName(value, fallback = "design") {
+  const name = String(value || "").replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
+  return name || fallback;
+}
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1e3);
+}
+function downloadText(text, filename, type = "text/plain;charset=utf-8") {
+  downloadBlob(new Blob([text], { type }), filename);
+}
+
+// src/client/export/render.js
+var ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+function escapeHtml(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ESCAPES[ch]);
+}
+function css(style) {
+  return Object.entries(style).filter(([, value]) => value !== null && value !== void 0 && value !== "").map(([key, value]) => `${key.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase())}:${value}`).join(";");
+}
+var px = (n) => `${Math.round(Number(n) || 0)}px`;
+function interactionAttrs(el) {
+  const link = (el.interactions || [])[0];
+  if (!link) return "";
+  if (link.action === "navigate")
+    return ` data-nav="${escapeHtml(link.targetPageId)}" role="button" tabindex="0"`;
+  if (link.action === "back") return ' data-back="1" role="button" tabindex="0"';
+  if (link.action === "openOverlay")
+    return ` data-overlay="${escapeHtml(link.targetPageId)}" role="button" tabindex="0"`;
+  return "";
+}
+function box(el, style, inner, attrs = "") {
+  const merged = {
+    position: "absolute",
+    left: px(el.x),
+    top: px(el.y),
+    width: px(el.w),
+    height: px(el.h),
+    boxSizing: "border-box",
+    opacity: el.opacity == null ? 1 : el.opacity,
+    ...style
+  };
+  return `<div data-el="${escapeHtml(el.id)}"${attrs} style="${css(merged)}">${inner}</div>`;
+}
+function dots() {
+  return '<svg width="18" height="18" viewBox="0 0 16 16" fill="#6b7280" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg>';
+}
+function imageIcon() {
+  return '<svg width="38%" height="38%" viewBox="0 0 24 24" fill="none" stroke="#b3b9c6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>';
+}
+function chevron() {
+  return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#6b7280" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>';
+}
+function renderElement(el, ctx) {
+  if (!el || el.hidden) return "";
+  const t = ctx.t;
+  const p = el.props || {};
+  const acc = p.color || ACCENT;
+  const state = el.state || "default";
+  const attrs = interactionAttrs(el);
+  if (el.type === "container" || el.type === "group") {
+    const inner = (el.children || []).map((child) => renderElement(child, ctx)).join("");
+    const style = el.type === "container" ? {
+      background: p.background || "#ffffff",
+      borderRadius: px(p.radius != null ? p.radius : 12),
+      overflow: p.clipContent === false ? "visible" : "hidden"
+    } : {};
+    return box(el, style, inner, attrs);
+  }
+  if (el.type === "button") {
+    let bg = acc;
+    let fg = "#ffffff";
+    if (state === "disabled") {
+      bg = "#c9ccd4";
+      fg = "#f7f8fa";
+    }
+    const inner = `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;padding:0 12px;overflow:hidden;white-space:nowrap">${escapeHtml(p.text || t("sample.button"))}</span>`;
+    return box(
+      el,
+      {
+        background: bg,
+        color: fg,
+        borderRadius: px(p.radius != null ? p.radius : 8),
+        fontWeight: 600,
+        fontSize: px(p.fontSize || 14),
+        overflow: "hidden"
+      },
+      inner,
+      ` data-role="button"${attrs}`
+    );
+  }
+  if (el.type === "input") {
+    const disabled = state === "disabled";
+    const error = state === "error";
+    const focused = state === "focus";
+    const filled = state === "filled";
+    const value = p.text || (filled ? t("sample.filled") : t("sample.placeholder"));
+    const field = {
+      width: "100%",
+      height: "100%",
+      boxSizing: "border-box",
+      padding: "0 12px",
+      border: `1.5px solid ${error ? "#e5484d" : focused ? acc : "#d6d9e2"}`,
+      borderRadius: px(p.radius != null ? p.radius : 8),
+      background: disabled ? "#f4f5f7" : "#ffffff",
+      color: filled ? "#1a1d26" : "#9aa1ad",
+      fontSize: px(p.fontSize || 14),
+      fontFamily: "inherit",
+      outline: "none",
+      boxShadow: focused ? `0 0 0 3px ${rgba(acc, 0.18)}` : "none"
+    };
+    if (ctx.raster) {
+      return box(
+        el,
+        { ...field, display: "flex", alignItems: "center" },
+        `<span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(value)}</span>`
+      );
+    }
+    return box(
+      el,
+      {},
+      `<input data-role="input" value="${filled ? escapeHtml(value) : ""}" placeholder="${escapeHtml(value)}" ${disabled ? "disabled" : ""} style="${css(field)}" />`
+    );
+  }
+  if (el.type === "card") {
+    const hover = state === "hover";
+    const inner = `<div style="display:flex;flex-direction:column;gap:6px;height:100%;padding:14px;box-sizing:border-box;overflow:hidden">
+      <div style="font-size:15px;font-weight:600;color:#161a22;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(p.text || t("sample.card"))}</div>
+      <div style="font-size:12.5px;color:#6b7280;line-height:1.5;overflow:hidden">${escapeHtml(t("sample.cardSub"))}</div>
+      <div style="margin-top:auto;height:6px;background:#eef0f5;border-radius:999px;overflow:hidden"><div style="width:62%;height:100%;background:${acc};border-radius:999px"></div></div>
+    </div>`;
+    return box(
+      el,
+      {
+        background: "#ffffff",
+        border: "1px solid #eceef3",
+        borderRadius: px(p.radius != null ? p.radius : 12),
+        boxShadow: hover ? "0 10px 26px rgba(17,24,39,.14)" : "0 1px 3px rgba(17,24,39,.06)",
+        overflow: "hidden"
+      },
+      inner,
+      attrs
+    );
+  }
+  if (el.type === "navbar") {
+    const inner = `<div style="display:flex;align-items:center;gap:8px;height:100%;padding:0 16px;box-sizing:border-box">
+      <div style="flex:1;font-size:16px;font-weight:600;color:#161a22;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(p.text || t("sample.navbar"))}</div>${dots()}
+    </div>`;
+    return box(
+      el,
+      { background: "#ffffff", borderBottom: "1px solid #eceef3", overflow: "hidden" },
+      inner,
+      attrs
+    );
+  }
+  if (el.type === "tabs") {
+    const labels = (p.text || t("sample.tabs")).split(",").map((label) => label.trim());
+    const inner = `<div class="dpd-tabs" data-tabs="1" style="display:flex;align-items:stretch;height:100%;border-bottom:1px solid #eceef3;background:#fff;--on:${acc}">
+      ${labels.map(
+      (label, index) => `<div class="dpd-tab${index === 0 ? " active" : ""}" data-tab="${index}" role="button" tabindex="0" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:13.5px;box-sizing:border-box;white-space:nowrap;overflow:hidden;color:${index === 0 ? acc : "#6b7280"};font-weight:${index === 0 ? 600 : 500};border-bottom:2px solid ${index === 0 ? acc : "transparent"}">${escapeHtml(label)}</div>`
+    ).join("")}
+    </div>`;
+    return box(el, { overflow: "hidden" }, inner, attrs);
+  }
+  if (el.type === "toggle") {
+    const on = state === "on";
+    const knob = Math.max(12, (el.h || 26) - 6);
+    const travel = Math.max(0, (el.w || 48) - knob - 6);
+    const inner = `<span class="knob" style="position:absolute;top:3px;left:3px;width:${knob}px;height:${knob}px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s ease;transform:translateX(${on ? travel : 0}px)"></span>`;
+    return box(
+      el,
+      {
+        background: on ? acc : "#d5d8df",
+        borderRadius: "999px",
+        "--on": acc,
+        "--tx": `${travel}px`,
+        transition: "background .18s ease"
+      },
+      inner,
+      ` data-toggle="1" data-on="${on ? "1" : "0"}"${attrs}`
+    );
+  }
+  if (el.type === "checkbox") {
+    const checked = state === "checked";
+    const inner = `<span class="box" style="width:20px;height:20px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:${checked ? acc : "#fff"};border:1.5px solid ${checked ? acc : "#c9ccd4"}"><svg class="tick" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:${checked ? 1 : 0}"><path d="M2 6l2.5 2.5L10 3"/></svg></span><span style="font-size:13.5px;color:#333a45;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(p.text || t("sample.checkbox"))}</span>`;
+    return box(
+      el,
+      { display: "flex", alignItems: "center", gap: "8px", overflow: "hidden", "--on": acc },
+      inner,
+      ` class="dpd-check" data-check="1" data-checked="${checked ? "1" : "0"}"${attrs}`
+    );
+  }
+  if (el.type === "avatar") {
+    const initial = (p.text || "U").trim().slice(0, 2).toUpperCase();
+    const inner = `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:${Math.max(12, Math.round((el.h || 48) * 0.34))}px;overflow:hidden">${escapeHtml(initial)}</span>`;
+    return box(
+      el,
+      {
+        borderRadius: "50%",
+        background: `linear-gradient(135deg,${shade(acc, 0.15)},${acc})`,
+        overflow: "hidden"
+      },
+      inner,
+      attrs
+    );
+  }
+  if (el.type === "text") {
+    const inner = `<div style="width:100%;height:100%;display:flex;align-items:center;font-size:${px(p.fontSize || 18)};font-weight:${p.fontWeight || 600};color:${p.color || "#161a22"};line-height:1.3;white-space:pre-wrap;overflow:hidden;text-align:${p.textAlign || "left"}">${escapeHtml(p.text || t("sample.text"))}</div>`;
+    return box(el, {}, inner, attrs);
+  }
+  if (el.type === "image") {
+    return box(
+      el,
+      {
+        borderRadius: px(p.radius != null ? p.radius : 10),
+        background: "repeating-linear-gradient(45deg,#eef0f5,#eef0f5 10px,#e6e9f0 10px,#e6e9f0 20px)",
+        border: "1px solid #e6e9f0",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden"
+      },
+      imageIcon(),
+      attrs
+    );
+  }
+  if (el.type === "badge") {
+    const inner = `<span style="display:inline-flex;align-items:center;height:100%;padding:0 10px;border-radius:999px;background:${rgba(acc, 0.14)};color:${shade(acc, -0.12)};font-size:12px;font-weight:700;letter-spacing:.03em">${escapeHtml(p.text || "NEW")}</span>`;
+    return box(el, { display: "flex", alignItems: "center" }, inner, attrs);
+  }
+  if (el.type === "select") {
+    const open = state === "open";
+    const options = [t("sample.opt1"), t("sample.opt2"), t("sample.opt3")];
+    const inner = `<div class="dpd-select" data-select="1" style="position:relative;width:100%;height:100%">
+      <div class="field" style="display:flex;width:100%;height:100%;align-items:center;justify-content:space-between;padding:0 12px;box-sizing:border-box;border:1.5px solid ${open ? acc : "#d6d9e2"};border-radius:8px;background:#fff;font-size:14px;color:#333a45">
+        <span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(p.text || t("sample.select"))}</span>${chevron()}
+      </div>
+      <div class="menu" style="display:${open ? "block" : "none"};position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #eceef3;border-radius:8px;box-shadow:0 10px 24px rgba(17,24,39,.14);padding:4px;z-index:5">
+        ${options.map(
+      (option, index) => `<div style="padding:7px 10px;font-size:13.5px;color:#333a45;border-radius:5px;background:${index === 0 ? rgba(acc, 0.1) : "transparent"}">${escapeHtml(option)}</div>`
+    ).join("")}
+      </div>
+    </div>`;
+    return box(el, { overflow: "visible" }, inner, attrs);
+  }
+  return box(el, {}, "");
+}
+function renderPageBody(page, ctx) {
+  return (page.elements || []).map((el) => renderElement(el, ctx)).join("");
+}
+function renderPage(page, ctx) {
+  const frame = page.frame || { w: 390, h: 844, background: "#ffffff" };
+  return `<div class="dpd-page" data-page="${escapeHtml(page.id)}" style="position:relative;width:${px(frame.w)};height:${px(frame.h)};background:${frame.background || "#ffffff"};overflow:hidden">${renderPageBody(page, ctx)}</div>`;
+}
+
+// src/client/export/html.js
+var CSS = `
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:#e9ebf0;color:#111827;display:flex;flex-direction:column}
+#stage{flex:1;display:flex;align-items:center;justify-content:center;padding:32px 16px 16px;overflow:auto}
+#pages{position:relative;filter:drop-shadow(0 14px 44px rgba(17,24,39,.20))}
+.dpd-page{display:none;border-radius:18px;overflow:hidden}
+.dpd-page.active{display:block}
+#bar{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 16px 16px}
+#bar button{border:1px solid #d6d9e2;background:#fff;color:#374151;border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
+#bar button.active{background:#6366f1;border-color:transparent;color:#fff}
+#bar .spacer{width:8px}
+#overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:50}
+#overlay.open{display:flex}
+#overlayBackdrop{position:absolute;inset:0;background:rgba(17,24,39,.38)}
+#overlayHost{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(17,24,39,.4)}
+#overlayHost .dpd-page{display:block}
+.dpd-tabs .dpd-tab{border-bottom:2px solid transparent;color:#6b7280;font-weight:500;cursor:pointer}
+.dpd-tabs .dpd-tab.active{color:var(--on);border-bottom-color:var(--on);font-weight:600}
+.dpd-check .tick{opacity:0;transition:opacity .15s}
+.dpd-check[data-checked="1"] .tick{opacity:1}
+.dpd-select .menu{display:none}
+.dpd-select.open .menu{display:block}
+[data-role="button"]{cursor:pointer;transition:filter .15s}
+[data-role="button"]:hover{filter:brightness(.94)}
+[data-role="input"]:focus{border-color:#6366f1!important}
+[data-nav],[data-back],[data-overlay]{cursor:pointer}
+`;
+var RUNTIME = `
+(function(){
+  var pages = Array.prototype.slice.call(document.querySelectorAll('#pages .dpd-page'));
+  var byId = {};
+  pages.forEach(function(page){ byId[page.getAttribute('data-page')] = page; });
+  var stack = [];
+  var overlay = document.getElementById('overlay');
+  var overlayHost = document.getElementById('overlayHost');
+
+  function show(id, push){
+    var page = byId[id];
+    if(!page) return;
+    pages.forEach(function(candidate){ candidate.classList.toggle('active', candidate === page); });
+    if(push) stack.push(id);
+    var buttons = document.querySelectorAll('#bar button[data-go]');
+    for(var i=0;i<buttons.length;i++){
+      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-go') === id);
+    }
+  }
+  function back(){
+    if(stack.length > 1){ stack.pop(); show(stack[stack.length-1], false); }
+  }
+  function closeOverlay(){
+    overlay.classList.remove('open');
+    overlayHost.innerHTML = '';
+  }
+  function openOverlay(id){
+    var page = byId[id];
+    if(!page) return;
+    overlayHost.innerHTML = '';
+    var clone = page.cloneNode(true);
+    clone.classList.add('active');
+    overlayHost.appendChild(clone);
+    var rect = page.getBoundingClientRect();
+    var scale = Math.min(1, (window.innerHeight * 0.8) / Math.max(1, rect.height), (window.innerWidth * 0.8) / Math.max(1, rect.width));
+    overlayHost.style.width = Math.round(rect.width * scale) + 'px';
+    overlayHost.style.height = Math.round(rect.height * scale) + 'px';
+    clone.style.transformOrigin = 'top left';
+    clone.style.transform = 'scale(' + scale + ')';
+    overlay.classList.add('open');
+  }
+
+  document.addEventListener('click', function(event){
+    var target = event.target;
+    var nav = target.closest('[data-nav]');
+    if(nav){ show(nav.getAttribute('data-nav'), true); return; }
+    var backEl = target.closest('[data-back]');
+    if(backEl){ back(); return; }
+    var overlayEl = target.closest('[data-overlay]');
+    if(overlayEl){ openOverlay(overlayEl.getAttribute('data-overlay')); return; }
+    var toggle = target.closest('[data-toggle]');
+    if(toggle){
+      var on = toggle.getAttribute('data-on') === '1';
+      toggle.setAttribute('data-on', on ? '0' : '1');
+      toggle.style.background = on ? '#d5d8df' : (toggle.style.getPropertyValue('--on') || '#6366f1');
+      var knob = toggle.querySelector('.knob');
+      if(knob){ knob.style.transform = 'translateX(' + (on ? '0px' : (toggle.style.getPropertyValue('--tx') || '0px')) + ')'; }
+      return;
+    }
+    var check = target.closest('[data-check]');
+    if(check){
+      var checked = check.getAttribute('data-checked') === '1';
+      check.setAttribute('data-checked', checked ? '0' : '1');
+      var box = check.querySelector('.box');
+      var onColor = check.style.getPropertyValue('--on') || '#6366f1';
+      if(box){
+        box.style.background = checked ? '#fff' : onColor;
+        box.style.borderColor = checked ? '#c9ccd4' : onColor;
+      }
+      var tick = check.querySelector('.tick');
+      if(tick){ tick.style.opacity = checked ? '0' : '1'; }
+      return;
+    }
+    var tab = target.closest('[data-tab]');
+    if(tab){
+      var group = tab.closest('.dpd-tabs');
+      var onColor = group.style.getPropertyValue('--on') || '#6366f1';
+      var tabs = group.querySelectorAll('[data-tab]');
+      for(var i=0;i<tabs.length;i++){
+        var active = tabs[i] === tab;
+        tabs[i].classList.toggle('active', active);
+        tabs[i].style.color = active ? onColor : '#6b7280';
+        tabs[i].style.fontWeight = active ? '600' : '500';
+        tabs[i].style.borderBottom = '2px solid ' + (active ? onColor : 'transparent');
+      }
+      return;
+    }
+    var field = target.closest('[data-select] .field');
+    if(field){
+      var root = field.parentNode;
+      var menu = root.querySelector('.menu');
+      if(menu){ menu.style.display = menu.style.display === 'none' ? 'block' : 'none'; }
+      return;
+    }
+    if(target.closest('#overlayBackdrop')){ closeOverlay(); }
+  });
+
+  document.addEventListener('keydown', function(event){
+    if(event.key === 'Escape') closeOverlay();
+  });
+
+  var bar = document.getElementById('bar');
+  bar.addEventListener('click', function(event){
+    var go = event.target.closest('[data-go]');
+    if(go){ stack = [go.getAttribute('data-go')]; show(go.getAttribute('data-go'), false); }
+    var reset = event.target.closest('[data-reset]');
+    if(reset && stack.length){ show(stack[0], false); stack = [stack[0]]; }
+  });
+
+  if(pages.length){ stack = [pages[0].getAttribute('data-page')]; show(stack[0], false); }
+})();
+`;
+function buildHtml(doc, ctx) {
+  const title = escapeHtml(doc.name || ctx.t("app.title"));
+  const pages = (doc.pages || []).map((page) => renderPage(page, ctx)).join("");
+  const buttons = (doc.pages || []).map(
+    (page) => `<button type="button" data-go="${escapeHtml(page.id)}">${escapeHtml(page.name)}</button>`
+  ).join("");
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title}</title>
+<style>${CSS}</style>
+</head>
+<body>
+<main id="stage"><div id="pages">${pages}</div></main>
+<div id="overlay"><div id="overlayBackdrop"></div><div id="overlayHost"></div></div>
+<nav id="bar">${buttons}<span class="spacer"></span><button type="button" data-reset="1">\u21BA</button></nav>
+<script>${RUNTIME}<\/script>
+</body>
+</html>`;
+}
+
+// src/client/export/png.js
+var FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
+function buildSvg(page, ctx, scale = 2) {
+  const frame = page.frame || { w: 390, h: 844, background: "#ffffff" };
+  const w = Math.max(1, Math.round(frame.w));
+  const h2 = Math.max(1, Math.round(frame.h));
+  const factor = Math.max(1, Math.min(4, Number(scale) || 1));
+  const body = renderPageBody(page, { ...ctx, raster: true });
+  const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:${w}px;height:${h2}px;overflow:hidden;background:${escapeHtml(frame.background || "#ffffff")};font-family:${FONT}">${body}</div>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w * factor}" height="${h2 * factor}" viewBox="0 0 ${w} ${h2}"><foreignObject x="0" y="0" width="${w}" height="${h2}">${html}</foreignObject></svg>`;
+}
+async function renderPagePng(page, ctx, scale = 2) {
+  if (typeof document === "undefined") throw new Error("png export requires a browser");
+  if (document.fonts && document.fonts.ready) {
+    try {
+      await document.fonts.ready;
+    } catch {
+    }
+  }
+  const frame = page.frame || { w: 390, h: 844, background: "#ffffff" };
+  const w = Math.max(1, Math.round(frame.w));
+  const h2 = Math.max(1, Math.round(frame.h));
+  const factor = Math.max(1, Math.min(4, Number(scale) || 1));
+  const svg = buildSvg(page, ctx, factor);
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  try {
+    const image = await loadImage(url);
+    const canvas = document.createElement("canvas");
+    canvas.width = w * factor;
+    canvas.height = h2 * factor;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("canvas unavailable");
+    context.fillStyle = frame.background || "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => blob ? resolve(blob) : reject(new Error("png encode failed")),
+        "image/png"
+      );
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("png render failed"));
+    image.src = url;
+  });
+}
+
+// src/client/export/react.js
+var cls = (...parts) => parts.filter(Boolean).join(" ");
+function safeName(value, fallback) {
+  const cleaned = String(value || "").replace(/[^a-zA-Z0-9\u4e00-\u9fa5]+/g, " ").trim();
+  if (!cleaned) return fallback;
+  if (/^[0-9]/.test(cleaned)) return fallback + cleaned;
+  return cleaned.replace(/\s+/g, "");
+}
+function componentNames(pages) {
+  const used = /* @__PURE__ */ new Set();
+  return pages.map((page, index) => {
+    let base = safeName(page.name, `Page${index + 1}`);
+    base = base.charAt(0).toUpperCase() + base.slice(1);
+    let name = base;
+    let suffix = 2;
+    while (used.has(name)) name = `${base}${suffix++}`;
+    used.add(name);
+    return name;
+  });
+}
+function interactionProps(el) {
+  const link = (el.interactions || [])[0];
+  if (!link) return "";
+  if (link.action === "navigate") return ` onClick={() => onNavigate('${link.targetPageId}')}`;
+  if (link.action === "back") return " onClick={onBack}";
+  if (link.action === "openOverlay") return ` onClick={() => onOverlay('${link.targetPageId}')}`;
+  return "";
+}
+function boxClasses(el, options = {}) {
+  const parts = [];
+  if (options.flow) {
+    parts.push("relative");
+  } else {
+    parts.push("absolute", `left-[${el.x}px]`, `top-[${el.y}px]`);
+  }
+  if (!options.skipSize) {
+    parts.push(`w-[${el.w}px]`, `h-[${el.h}px]`);
+  }
+  if (el.opacity != null && el.opacity !== 1) parts.push(`opacity-[${el.opacity}]`);
+  return parts.join(" ");
+}
+function stackClasses(layout) {
+  const padding = layout.padding || { t: 0, r: 0, b: 0, l: 0 };
+  const uniform = padding.t === padding.r && padding.r === padding.b && padding.b === padding.l;
+  const parts = [
+    "flex",
+    layout.direction === "row" ? "flex-row" : "flex-col",
+    `gap-[${layout.gap || 0}px]`,
+    `justify-${layout.justify === "between" ? "between" : layout.justify || "start"}`,
+    `items-${layout.align || "start"}`
+  ];
+  if (uniform) {
+    if (padding.t) parts.push(`p-[${padding.t}px]`);
+  } else {
+    if (padding.t) parts.push(`pt-[${padding.t}px]`);
+    if (padding.r) parts.push(`pr-[${padding.r}px]`);
+    if (padding.b) parts.push(`pb-[${padding.b}px]`);
+    if (padding.l) parts.push(`pl-[${padding.l}px]`);
+  }
+  return parts.join(" ");
+}
+function childClasses(el, parentLayout) {
+  const flow = parentLayout && parentLayout.mode === "stack";
+  if (!flow) return boxClasses(el);
+  const parts = [];
+  if (parentLayout.align === "stretch") {
+    parts.push(parentLayout.direction === "row" ? "h-full" : "w-full");
+  } else {
+    parts.push(`w-[${el.w}px]`, `h-[${el.h}px]`);
+  }
+  if (el.opacity != null && el.opacity !== 1) parts.push(`opacity-[${el.opacity}]`);
+  return parts.join(" ");
+}
+function textOf(el, fallback) {
+  return JSON.stringify(el.props && el.props.text || fallback);
+}
+function renderElement2(el, ctx, parentLayout) {
+  if (!el || el.hidden) return "";
+  const p = el.props || {};
+  const acc = p.color || ACCENT;
+  const state = el.state || "default";
+  const size = childClasses(el, parentLayout);
+  const inter = interactionProps(el);
+  const pad = "  ".repeat(ctx.depth);
+  if (el.type === "container" || el.type === "group") {
+    const flow = el.layout && el.layout.mode === "stack";
+    const style = el.type === "container" ? [
+      p.background ? `bg-[${p.background}]` : "bg-white",
+      `rounded-[${p.radius != null ? p.radius : 12}px]`,
+      p.clipContent === false ? "" : "overflow-hidden"
+    ] : [];
+    const layoutCls = flow ? stackClasses(el.layout) : "";
+    const children = (el.children || []).map((child) => renderElement2(child, { ...ctx, depth: ctx.depth + 1 }, el.layout)).join("\n");
+    return `${pad}<div className={${JSON.stringify(cls(size, ...style, layoutCls))}}${inter}>
+${children}
+${pad}</div>`;
+  }
+  if (el.type === "button") {
+    const bg = state === "disabled" ? "bg-[#c9ccd4]" : `bg-[${acc}]`;
+    const fg = state === "disabled" ? "text-[#f7f8fa]" : "text-white";
+    return `${pad}<button type="button" className={${JSON.stringify(
+      cls(
+        size,
+        bg,
+        fg,
+        `rounded-[${p.radius != null ? p.radius : 8}px]`,
+        `text-[${p.fontSize || 14}px]`,
+        "font-semibold",
+        "flex items-center justify-center px-3 overflow-hidden whitespace-nowrap"
+      )
+    )}}${inter}>{${textOf(el, ctx.t("sample.button"))}}</button>`;
+  }
+  if (el.type === "input") {
+    const disabled = state === "disabled" ? " disabled" : "";
+    return `${pad}<input${disabled} placeholder={${textOf(el, ctx.t("sample.placeholder"))}} className={${JSON.stringify(
+      cls(
+        size,
+        "rounded-[8px]",
+        "border-[1.5px]",
+        "border-[#d6d9e2]",
+        "bg-white",
+        "px-3",
+        `text-[${p.fontSize || 14}px]`,
+        "text-[#1a1d26]",
+        "outline-none",
+        "focus:border-[#6366f1]"
+      )
+    )}} />`;
+  }
+  if (el.type === "card") {
+    const inner = [
+      `${pad}  <div className="text-[15px] font-semibold text-[#161a22] truncate">{${textOf(el, ctx.t("sample.card"))}}</div>`,
+      `${pad}  <div className="text-[12.5px] text-[#6b7280] leading-normal">{${JSON.stringify(ctx.t("sample.cardSub"))}}</div>`,
+      `${pad}  <div className="mt-auto h-1.5 rounded-full bg-[#eef0f5] overflow-hidden"><div className="h-full w-[62%] rounded-full bg-[${acc}]" /></div>`
+    ].join("\n");
+    return `${pad}<div className={${JSON.stringify(
+      cls(
+        size,
+        "rounded-[12px]",
+        "border",
+        "border-[#eceef3]",
+        "bg-white",
+        "p-3.5",
+        "shadow-sm",
+        "flex",
+        "flex-col",
+        "gap-1.5",
+        "overflow-hidden"
+      )
+    )}}${inter}>
+${inner}
+${pad}</div>`;
+  }
+  if (el.type === "navbar") {
+    return `${pad}<header className={${JSON.stringify(
+      cls(
+        size,
+        "flex",
+        "items-center",
+        "gap-2",
+        "px-4",
+        "bg-white",
+        "border-b",
+        "border-[#eceef3]"
+      )
+    )}}${inter}>
+${pad}  <div className="flex-1 text-[16px] font-semibold text-[#161a22] truncate">{${textOf(el, ctx.t("sample.navbar"))}}</div>
+${pad}  <span className="flex gap-1 text-[#6b7280]"><span>\u25CF</span><span>\u25CF</span><span>\u25CF</span></span>
+${pad}</header>`;
+  }
+  if (el.type === "tabs") {
+    const labels = String(p.text || ctx.t("sample.tabs")).split(",").map((label) => label.trim());
+    const items = labels.map(
+      (label, index) => `${pad}  <button type="button" className={${JSON.stringify(
+        cls(
+          "flex-1",
+          "py-3",
+          "text-[13.5px]",
+          index === 0 ? "font-semibold" : "font-medium",
+          index === 0 ? "border-b-2" : "border-b-2 border-transparent",
+          index === 0 ? "text-[#6366f1]" : "text-[#6b7280]"
+        )
+      )}}>${JSON.stringify(label)}</button>`
+    ).join("\n");
+    return `${pad}<nav className={${JSON.stringify(cls(size, "flex", "bg-white", "border-b", "border-[#eceef3]"))}}${inter}>
+${items}
+${pad}</nav>`;
+  }
+  if (el.type === "toggle") {
+    const on = state === "on";
+    const knob = Math.max(12, (el.h || 26) - 6);
+    const travel = Math.max(0, (el.w || 48) - knob - 6);
+    return `${pad}<div className={${JSON.stringify(cls(size, "rounded-full", "relative", on ? `bg-[${acc}]` : "bg-[#d5d8df]"))}}${inter}>
+${pad}  <span className={${JSON.stringify(
+      cls(
+        "absolute",
+        "top-[3px]",
+        "left-[3px]",
+        `w-[${knob}px]`,
+        `h-[${knob}px]`,
+        "rounded-full",
+        "bg-white",
+        "shadow",
+        on ? `translate-x-[${travel}px]` : ""
+      )
+    )}} />
+${pad}</div>`;
+  }
+  if (el.type === "checkbox") {
+    const checked = state === "checked";
+    return `${pad}<label className={${JSON.stringify(cls(size, "flex", "items-center", "gap-2"))}}${inter}>
+${pad}  <span className={${JSON.stringify(cls("w-5", "h-5", "rounded-[5px]", "flex", "items-center", "justify-center", checked ? `bg-[${acc}]` : "bg-white", "border", checked ? "border-transparent" : "border-[#c9ccd4]"))}}>${checked ? '<span className="text-white text-[12px]">\u2713</span>' : ""}</span>
+${pad}  <span className="text-[13.5px] text-[#333a45] truncate">{${textOf(el, ctx.t("sample.checkbox"))}}</span>
+${pad}</label>`;
+  }
+  if (el.type === "avatar") {
+    const initial = ((p.text || "U").trim().slice(0, 2) || "U").toUpperCase();
+    const fontSize = Math.max(12, Math.round((el.h || 48) * 0.34));
+    return `${pad}<div className={${JSON.stringify(
+      cls(
+        size,
+        "rounded-full",
+        "flex",
+        "items-center",
+        "justify-center",
+        "text-white",
+        "font-semibold",
+        `text-[${fontSize}px]`
+      )
+    )}} style={{ background: 'linear-gradient(135deg, ${shade(acc, 0.15)}, ${acc})' }}>${JSON.stringify(initial)}</div>`;
+  }
+  if (el.type === "text") {
+    return `${pad}<p className={${JSON.stringify(
+      cls(
+        size,
+        "flex",
+        "items-center",
+        `text-[${p.fontSize || 18}px]`,
+        p.fontWeight ? `font-[${p.fontWeight}]` : "font-semibold",
+        `text-[${p.color || "#161a22"}]`,
+        "leading-[1.3]",
+        "whitespace-pre-wrap",
+        "overflow-hidden"
+      )
+    )}}${inter}>{${textOf(el, ctx.t("sample.text"))}}</p>`;
+  }
+  if (el.type === "image") {
+    return `${pad}<div className={${JSON.stringify(
+      cls(
+        size,
+        "rounded-[10px]",
+        "border",
+        "border-[#e6e9f0]",
+        "bg-slate-100",
+        "flex",
+        "items-center",
+        "justify-center",
+        "text-[#b3b9c6]",
+        "text-2xl"
+      )
+    )}}${inter}>\u25A7</div>`;
+  }
+  if (el.type === "badge") {
+    return `${pad}<span className={${JSON.stringify(
+      cls(
+        size,
+        "inline-flex",
+        "items-center",
+        "justify-center",
+        "rounded-full",
+        "px-2.5",
+        "text-[12px]",
+        "font-bold",
+        "tracking-wide"
+      )
+    )}} style={{ background: '${rgba(acc, 0.14)}', color: '${shade(acc, -0.12)}' }}>{${textOf(el, "NEW")}}</span>`;
+  }
+  if (el.type === "select") {
+    return `${pad}<div className={${JSON.stringify(
+      cls(
+        size,
+        "flex",
+        "items-center",
+        "justify-between",
+        "rounded-[8px]",
+        "border-[1.5px]",
+        "border-[#d6d9e2]",
+        "bg-white",
+        "px-3",
+        "text-[14px]",
+        "text-[#333a45]"
+      )
+    )}}${inter}>
+${pad}  <span className="truncate">{${textOf(el, ctx.t("sample.select"))}}</span>
+${pad}  <span className="text-[#6b7280]">\u25BE</span>
+${pad}</div>`;
+  }
+  return `${pad}<div className={${JSON.stringify(size)}} />`;
+}
+function buildReact(doc, ctx) {
+  const pages = doc.pages || [];
+  const names = componentNames(pages);
+  const components = pages.map((page, index) => {
+    const frame = page.frame || { w: 390, h: 844, background: "#ffffff" };
+    const body = (page.elements || []).map((el) => renderElement2(el, { depth: 3, t: ctx.t }, null)).join("\n");
+    return `// ${page.name} \xB7 ${frame.w}\xD7${frame.h}
+function ${names[index]}({ onNavigate, onBack, onOverlay }) {
+  return (
+    <div className="relative w-[${frame.w}px] h-[${frame.h}px] bg-[${frame.background || "#ffffff"}] overflow-hidden">
+${body}
+    </div>
+  );
+}`;
+  }).join("\n\n");
+  const registry = pages.map((page, index) => `  '${page.id}': ${names[index]},`).join("\n");
+  const first = pages[0] ? pages[0].id : "";
+  const source = `// Generated by dsh-product-design.
+// ${doc.name || "Prototype"} \u2014 ${pages.length} page(s). Tailwind CSS required.
+import { useState } from 'react';
+
+${components}
+
+const PAGES = {
+${registry}
+};
+
+export default function App() {
+  const [page, setPage] = useState('${first}');
+  const [stack, setStack] = useState(['${first}']);
+  const [overlay, setOverlay] = useState(null);
+
+  const navigate = (id) => {
+    setStack((current) => [...current, id]);
+    setPage(id);
+  };
+  const back = () => {
+    setStack((current) => {
+      if (current.length <= 1) return current;
+      const next = current.slice(0, -1);
+      setPage(next[next.length - 1]);
+      return next;
+    });
+  };
+
+  const Current = PAGES[page] || PAGES['${first}'];
+  const Overlay = overlay ? PAGES[overlay] : null;
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-8">
+      <div className="rounded-2xl shadow-2xl overflow-hidden">
+        <Current onNavigate={navigate} onBack={back} onOverlay={setOverlay} />
+      </div>
+      {Overlay ? (
+        <div
+          className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-8"
+          onClick={() => setOverlay(null)}
+        >
+          <div className="rounded-2xl shadow-2xl overflow-hidden" onClick={(event) => event.stopPropagation()}>
+            <Overlay onNavigate={navigate} onBack={back} onOverlay={setOverlay} />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+`;
+  return source.replace(/className=\{("(?:[^"\\]|\\.)*")\}/g, "className=$1").replace(/placeholder=\{("(?:[^"\\]|\\.)*")\}/g, "placeholder=$1");
+}
+
+// src/client/editor/useExport.js
+function useExport({ doc, activePage, t }) {
+  const exportPng = useCallback2(
+    async (scale = 2) => {
+      if (!activePage) return;
+      const blob = await renderPagePng(activePage, { t }, scale);
+      const base = safeFileName(doc.name || activePage.name, "design");
+      downloadBlob(blob, `${base}-${safeFileName(activePage.name, "page")}-${scale}x.png`);
+    },
+    [activePage, doc.name, t]
+  );
+  const exportHtml = useCallback2(() => {
+    const html = buildHtml(doc, { t });
+    downloadText(
+      html,
+      `${safeFileName(doc.name, "design")}-prototype.html`,
+      "text/html;charset=utf-8"
+    );
+  }, [doc, t]);
+  const exportReact = useCallback2(() => {
+    const source = buildReact(doc, { t });
+    downloadText(
+      source,
+      `${safeFileName(doc.name, "design")}-prototype.jsx`,
+      "text/javascript;charset=utf-8"
+    );
+  }, [doc, t]);
+  return { exportPng, exportHtml, exportReact };
+}
+
 // src/shared/snapping.js
 var SNAP_THRESHOLD = 5;
 function xCandidates(targets) {
@@ -3087,18 +3977,18 @@ function bestSnap(movingPositions, candidates, threshold) {
 function span(aStart, aEnd, bStart, bEnd) {
   return { from: Math.min(aStart, bStart), to: Math.max(aEnd, bEnd) };
 }
-function snapMoveBox(box, targets, threshold = SNAP_THRESHOLD) {
+function snapMoveBox(box2, targets, threshold = SNAP_THRESHOLD) {
   const xs = xCandidates(targets);
   const ys = yCandidates(targets);
   const movingX = [
-    { pos: box.x, edge: "left" },
-    { pos: box.x + box.w / 2, edge: "centerX" },
-    { pos: box.x + box.w, edge: "right" }
+    { pos: box2.x, edge: "left" },
+    { pos: box2.x + box2.w / 2, edge: "centerX" },
+    { pos: box2.x + box2.w, edge: "right" }
   ];
   const movingY = [
-    { pos: box.y, edge: "top" },
-    { pos: box.y + box.h / 2, edge: "centerY" },
-    { pos: box.y + box.h, edge: "bottom" }
+    { pos: box2.y, edge: "top" },
+    { pos: box2.y + box2.h / 2, edge: "centerY" },
+    { pos: box2.y + box2.h, edge: "bottom" }
   ];
   const sx = bestSnap(movingX, xs, threshold);
   const sy = bestSnap(movingY, ys, threshold);
@@ -3107,20 +3997,20 @@ function snapMoveBox(box, targets, threshold = SNAP_THRESHOLD) {
   const guides = [];
   if (sx) {
     const t = sx.candidate.target;
-    const v = span(box.y + dy, box.y + box.h + dy, t.y, t.y + t.h);
+    const v = span(box2.y + dy, box2.y + box2.h + dy, t.y, t.y + t.h);
     guides.push({ axis: "x", pos: sx.candidate.pos, from: v.from, to: v.to });
   }
   if (sy) {
     const t = sy.candidate.target;
-    const h2 = span(box.x + dx, box.x + box.w + dx, t.x, t.x + t.w);
+    const h2 = span(box2.x + dx, box2.x + box2.w + dx, t.x, t.x + t.w);
     guides.push({ axis: "y", pos: sy.candidate.pos, from: h2.from, to: h2.to });
   }
   return { dx, dy, guides };
 }
-function snapResizeBox(box, dir, targets, threshold = SNAP_THRESHOLD) {
+function snapResizeBox(box2, dir, targets, threshold = SNAP_THRESHOLD) {
   const xCands = xCandidates(targets);
   const yCands = yCandidates(targets);
-  const next = { ...box };
+  const next = { ...box2 };
   const guides = [];
   const snapEdge = (value, candidates, axis, spanStart, spanEnd, targetSpan) => {
     let best = null;
@@ -3273,8 +4163,8 @@ function useGestures({
     const entries = ids.map((id) => allEntries.find((entry) => entry.el.id === id)).filter(Boolean);
     const top = entries.filter((entry) => !isUnderAny(entry, ids));
     if (!top.length) return;
-    const box = boundsOfEntries(top);
-    if (!box) return;
+    const box2 = boundsOfEntries(top);
+    if (!box2) return;
     const origins = new Map(top.map((entry) => [entry.el.id, { x: entry.el.x, y: entry.el.y }]));
     const exclude = /* @__PURE__ */ new Set();
     for (const entry of top) {
@@ -3293,7 +4183,7 @@ function useGestures({
       let dy = Math.round((e2.clientY - sy) / zoomNow);
       if (snapRef.current) {
         const snapped = snapMoveBox(
-          { x: box.x + dx, y: box.y + dy, w: box.w, h: box.h },
+          { x: box2.x + dx, y: box2.y + dy, w: box2.w, h: box2.h },
           targets,
           SNAP_THRESHOLD / zoomNow
         );
@@ -3504,16 +4394,16 @@ function useGestures({
       mapEl(
         el.id,
         (cur) => {
-          const box = {
+          const box2 = {
             ...cur,
             x: Math.round(next.x - parentAbsX),
             y: Math.round(next.y - parentAbsY),
             w: nextW,
             h: nextH
           };
-          if (!startChildren) return box;
+          if (!startChildren) return box2;
           return {
-            ...box,
+            ...box2,
             children: startChildren.map((child) => resizeElement(child, ow, oh, nextW, nextH))
           };
         },
@@ -3550,18 +4440,18 @@ function useGestures({
         y: (e2.clientY - rect.top) / zoomNow
       };
       if (Math.abs(cur.x - start.x) > 1 || Math.abs(cur.y - start.y) > 1) moved = true;
-      const box = {
+      const box2 = {
         x: Math.min(start.x, cur.x),
         y: Math.min(start.y, cur.y),
         w: Math.abs(cur.x - start.x),
         h: Math.abs(cur.y - start.y)
       };
-      setMarquee({ pageId: page.id, ...box });
+      setMarquee({ pageId: page.id, ...box2 });
       const entries = collectElementEntries(page.elements).filter(
         (entry) => entry.depth === 0 && !entry.el.hidden
       );
       const ids = entries.filter(
-        (entry) => entry.absX < box.x + box.w && entry.absX + entry.w > box.x && entry.absY < box.y + box.h && entry.absY + entry.h > box.y
+        (entry) => entry.absX < box2.x + box2.w && entry.absX + entry.w > box2.x && entry.absY < box2.y + box2.h && entry.absY + entry.h > box2.y
       ).map((entry) => entry.el.id);
       setSelIds(Array.from(/* @__PURE__ */ new Set([...baseSel, ...ids])));
     };
@@ -4038,7 +4928,7 @@ function useSessionId() {
 }
 
 // src/client/styles.js
-var CSS = [
+var CSS2 = [
   ".dpd-root{position:relative;display:flex;flex-direction:column;height:100%;width:100%;min-height:0;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111);font-size:13px;font-family:inherit;overflow:hidden}",
   ".dpd-root *{box-sizing:border-box}",
   ".dpd-root button,.dpd-root input,.dpd-root select{font-family:inherit}",
@@ -4192,10 +5082,14 @@ var CSS = [
   ".dpd-overlayFrame{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(17,24,39,.4)}",
   ".dpd-previewNav{position:absolute;top:16px;left:16px;z-index:120;display:flex;gap:6px}",
   ".dpd-previewNav button{border:none;border-radius:999px;padding:7px 13px;background:rgba(17,24,39,.58);color:#fff;font:inherit;font-size:12px;cursor:pointer;opacity:.65}",
-  ".dpd-previewNav button:hover{opacity:1;background:rgba(17,24,39,.82)}"
+  ".dpd-previewNav button:hover{opacity:1;background:rgba(17,24,39,.82)}",
+  ".dpd-exportMenu{position:relative;display:inline-flex}",
+  ".dpd-exportPop{position:absolute;right:0;top:calc(100% + 6px);z-index:300;min-width:190px;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:9px;box-shadow:0 10px 30px rgba(17,24,39,.16);padding:4px;display:flex;flex-direction:column}",
+  ".dpd-exportPop button{border:none;background:transparent;color:var(--dsw-alias-label-primary,#111);font:inherit;font-size:12px;text-align:left;padding:7px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}",
+  ".dpd-exportPop button:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}"
 ].join("\n");
 function StyleBlock() {
-  return h("style", { dangerouslySetInnerHTML: { __html: CSS } });
+  return h("style", { dangerouslySetInnerHTML: { __html: CSS2 } });
 }
 
 // src/client/overlay.js
@@ -4478,16 +5372,16 @@ function CanvasView(props) {
   const frameNodes = visiblePages.map((p) => {
     const pageActive = p.id === activePage.id;
     const els = renderElements(p.elements, p.id);
-    const selectionNodes = !preview && pageActive ? selBoxes.map((box) => {
+    const selectionNodes = !preview && pageActive ? selBoxes.map((box2) => {
       const single = selBoxes.length === 1;
       const node = sel;
       const showHandles = single && node && !node.locked;
       return h(
         "div",
         {
-          key: "sel-" + box.id,
+          key: "sel-" + box2.id,
           className: "dpd-selBox" + (single ? "" : " multi"),
-          style: { left: box.x, top: box.y, width: box.w, height: box.h }
+          style: { left: box2.x, top: box2.y, width: box2.w, height: box2.h }
         },
         showHandles ? HANDLES.map(
           ([dir, cur]) => h("div", {
@@ -5739,16 +6633,16 @@ function LeftView(props) {
       { className: "dpd-layers" },
       layerRows.length === 0 ? h("div", { className: "dpd-empty" }, t("layers.empty")) : layerRows.map(({ el, depth, label }) => {
         const isDrop = dropTarget && dropTarget.id === el.id;
-        let cls = "dpd-layer";
-        if (selectedSet.has(el.id)) cls += " active";
-        if (el.hidden) cls += " off";
-        if (dragId === el.id) cls += " dragging";
-        if (isDrop) cls += " drop-" + dropTarget.position;
+        let cls2 = "dpd-layer";
+        if (selectedSet.has(el.id)) cls2 += " active";
+        if (el.hidden) cls2 += " off";
+        if (dragId === el.id) cls2 += " dragging";
+        if (isDrop) cls2 += " drop-" + dropTarget.position;
         return h(
           "div",
           {
             key: el.id,
-            className: cls,
+            className: cls2,
             draggable: true,
             style: { paddingLeft: 8 + depth * 16 },
             onClick: () => {
@@ -5868,6 +6762,50 @@ function LeftView(props) {
   return left;
 }
 
+// src/client/ui/exportmenu.js
+function ExportMenu(props) {
+  const { t, onPng, onHtml, onReact } = props;
+  const [open, setOpen] = useState2(false);
+  const ref = useRef(null);
+  useEffect2(() => {
+    if (!open) return void 0;
+    const close = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [open]);
+  const run = (fn) => () => {
+    setOpen(false);
+    Promise.resolve(fn()).catch(() => {
+    });
+  };
+  return h(
+    "div",
+    { className: "dpd-exportMenu", ref },
+    h(
+      "button",
+      {
+        className: "dpd-btn" + (open ? " primary" : ""),
+        type: "button",
+        "aria-haspopup": "menu",
+        "aria-expanded": open,
+        onClick: () => setOpen((value) => !value)
+      },
+      t("toolbar.export")
+    ),
+    open ? h(
+      "div",
+      { className: "dpd-exportPop", role: "menu" },
+      h("button", { type: "button", onClick: run(() => onPng(1)) }, t("export.png1x")),
+      h("button", { type: "button", onClick: run(() => onPng(2)) }, t("export.png2x")),
+      h("div", { className: "dpd-ctxsep" }),
+      h("button", { type: "button", onClick: run(onHtml) }, t("export.html")),
+      h("button", { type: "button", onClick: run(onReact) }, t("export.react"))
+    ) : null
+  );
+}
+
 // src/client/ui/toolbar.js
 var stateLabels = {
   normal: "state.normal",
@@ -5894,7 +6832,10 @@ function ToolbarView(props) {
     canRedo,
     setSelId,
     snapEnabled,
-    toggleSnap
+    toggleSnap,
+    onExportPng,
+    onExportHtml,
+    onExportReact
   } = props;
   const toolbar = h(
     "div",
@@ -6018,6 +6959,12 @@ function ToolbarView(props) {
       },
       h(IconPlus)
     ),
+    h(ExportMenu, {
+      t,
+      onPng: onExportPng,
+      onHtml: onExportHtml,
+      onReact: onExportReact
+    }),
     h(
       "button",
       {
@@ -6069,6 +7016,7 @@ function ProductDesignPanel() {
     setSelIds,
     resizeMode: prefs.resizeMode
   });
+  const exporter = useExport({ doc, activePage, t });
   const clipboard = useClipboard({
     docRef,
     setDoc,
@@ -6287,7 +7235,10 @@ function ProductDesignPanel() {
       canRedo,
       setSelId: selection.selectOnly,
       snapEnabled: prefs.snapEnabled,
-      toggleSnap
+      toggleSnap,
+      onExportPng: exporter.exportPng,
+      onExportHtml: exporter.exportHtml,
+      onExportReact: exporter.exportReact
     }),
     h(
       "div",

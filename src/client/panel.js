@@ -4,6 +4,7 @@ import { buildMenuItems } from './editor/contextMenuItems.js';
 import { useClipboard } from './editor/useClipboard.js';
 import { useDocument } from './editor/useDocument.js';
 import { useEditorActions } from './editor/useEditorActions.js';
+import { useExport } from './editor/useExport.js';
 import { useGestures } from './editor/useGestures.js';
 import { useKeyboardShortcuts } from './editor/useKeyboard.js';
 import { usePreview } from './editor/usePreview.js';
@@ -65,6 +66,7 @@ function ProductDesignPanel() {
     resizeMode: prefs.resizeMode,
   });
 
+  const exporter = useExport({ doc, activePage, t });
   const clipboard = useClipboard({
     docRef,
     setDoc,
@@ -314,6 +316,9 @@ function ProductDesignPanel() {
           setSelId: selection.selectOnly,
           snapEnabled: prefs.snapEnabled,
           toggleSnap,
+          onExportPng: exporter.exportPng,
+          onExportHtml: exporter.exportHtml,
+          onExportReact: exporter.exportReact,
         }),
     h(
       'div',

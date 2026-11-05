@@ -158,6 +158,10 @@ const CSS = [
   '.dpd-previewNav{position:absolute;top:16px;left:16px;z-index:120;display:flex;gap:6px}',
   '.dpd-previewNav button{border:none;border-radius:999px;padding:7px 13px;background:rgba(17,24,39,.58);color:#fff;font:inherit;font-size:12px;cursor:pointer;opacity:.65}',
   '.dpd-previewNav button:hover{opacity:1;background:rgba(17,24,39,.82)}',
+  '.dpd-exportMenu{position:relative;display:inline-flex}',
+  '.dpd-exportPop{position:absolute;right:0;top:calc(100% + 6px);z-index:300;min-width:190px;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-border-l1,#e5e6eb);border-radius:9px;box-shadow:0 10px 30px rgba(17,24,39,.16);padding:4px;display:flex;flex-direction:column}',
+  '.dpd-exportPop button{border:none;background:transparent;color:var(--dsw-alias-label-primary,#111);font:inherit;font-size:12px;text-align:left;padding:7px 9px;border-radius:6px;cursor:pointer;white-space:nowrap}',
+  '.dpd-exportPop button:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}',
 ].join('\n');
 
 function StyleBlock() {

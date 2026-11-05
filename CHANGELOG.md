@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Added
+- **导出 PNG**：当前页按 1× / 2× 光栅化，使用模型渲染 → SVG `foreignObject` → canvas，无第三方依赖。
+- **导出单文件 HTML 原型**：内嵌全部页面与一段运行时，支持页面跳转、返回、弹层，以及开关 / 复选框 / 标签页 / 下拉的交互；双击即可在浏览器打开。
+- **导出 React + Tailwind**：生成单个 `Prototype.jsx`，每页一个组件，自由布局用绝对定位、Auto Layout 用 flex，按钮/输入框使用语义标签，并带一个 `useState` 页面路由；产物通过 esbuild JSX 解析校验。
 - **约束（Constraints）**：元素新增 `constraints: { h, v }`，支持左/右固定、左右拉伸、居中、按比例；画板与容器尺寸变化时递归求解。默认 `left/top`，导航栏/标签页/卡片/图片/输入框/容器默认左右拉伸。`set_page_frame` 支持 `resizeMode: constraints|scale|none`（默认 constraints）。
 - **Auto Layout**：容器/编组新增 `layout: { mode:'stack', direction, gap, padding, align, justify }`，子元素坐标由布局接管；拖动子元素改为调整顺序。新增 `src/shared/layout.js`，Host reducer 与客户端共用同一套求解与重排逻辑。
 - **原型交互（页面跳转）**：元素支持 `interactions: [{ action: navigate|back|openOverlay, targetPageId }]`，右侧属性面板可增删改；预览里点击即可走通流程，带返回栈与弹层，`Esc` 逐层退出。

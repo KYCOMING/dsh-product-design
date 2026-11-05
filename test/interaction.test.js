@@ -233,6 +233,23 @@ describe('属性面板', () => {
   });
 });
 
+describe('导出菜单', () => {
+  it('工具栏列出 PNG / HTML / React 三种导出', async () => {
+    await mountWith({
+      name: '',
+      activePageId: 'p1',
+      pages: [page('p1', 'P', [el({ props: { text: 'Hi' } })])],
+    });
+    await click(btnText('导出'));
+    const menu = one('.dpd-exportPop');
+    expect(menu).toBeTruthy();
+    const text = menu.textContent;
+    expect(text).toContain('PNG');
+    expect(text).toContain('HTML 原型');
+    expect(text).toContain('React + Tailwind');
+  });
+});
+
 describe('原型交互', () => {
   it('预览里点击带 navigate 的元素会跳到目标页，并可返回', async () => {
     await mountWith({

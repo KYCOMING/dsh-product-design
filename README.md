@@ -74,12 +74,25 @@ dsh plugin --profile desktop remove dsh-product-design
 - **组件状态**：每个组件有独立状态集（如按钮 默认/悬停/按下/禁用，输入框 默认/聚焦/已填写/错误/禁用…），在右侧属性面板切换预览。
 - **预览模式**：一键进入「只看产品」的干净视图——隐藏工具栏与左右侧栏、只显示当前画板、不显示网格与页面标签；组件真实响应悬停 / 按下 / 点击，开关、复选框、标签页、下拉可交互。`Esc` 或右上角「退出预览」返回编辑器。
 - **原型交互**：给任意元素配置 `点击 → 跳转页面 / 返回 / 打开为弹层`，预览里可以真的走通一条流程（带返回栈，`Esc` 逐层退出）。
+- **导出**：工具栏「导出」支持三种产物——当前页 PNG（1× / 2×）、单文件可交互 HTML 原型、React + Tailwind 组件文件。全部在浏览器内生成，不上传任何数据。
 - **页面状态**：顶部「正常 / 加载中 / 空状态 / 错误」一键切换整页效果；三种状态的标题/说明/按钮文案可在右侧属性面板逐页编辑，AI 也能通过 `set_page_states` 写入。
 - **网格 + 缩放**：画布小方格网格随缩放变化；`Ctrl/⌘ + 滚轮` 缩放，普通滚轮滚动。
 - **编辑体验**：撤销 / 重做（含 AI 改动）、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
 - **对话内产品预览（Visualize 风格）**：AI 调用 `product_design_apply` 后，聊天回合末尾会出现当前页面的产品缩略卡片，可一键「打开画布」；无需先手动打开画布。
 - **多会话独立设计稿**：每个会话拥有自己的设计稿；切换会话时画布自动切换，互不覆盖。
 - **自动保存**：设计稿持久化到 Host（按会话分目录）和 `localStorage`（`doc:v3:<sessionId>`）。
+
+## 导出
+
+工具栏「导出」提供三种产物，全部在浏览器内生成，不上传数据：
+
+| 格式 | 内容 |
+| --- | --- |
+| PNG（1× / 2×） | 当前页光栅图；模型渲染 → SVG `foreignObject` → canvas，无第三方依赖 |
+| HTML 原型 | 单文件，内嵌全部页面与运行时：页面跳转、返回、弹层，开关/复选框/标签页/下拉可交互，双击即可打开 |
+| React + Tailwind | 单文件 `Prototype.jsx`：每页一个组件，自由布局用绝对定位、Auto Layout 用 flex，按钮/输入框为语义标签，带 `useState` 页面路由 |
+
+导出使用独立的「干净」渲染器（`src/client/export/render.js`），不会把编辑器辅助线、图层标签、选中框带进产物。
 
 ## 快捷键
 
@@ -130,13 +143,21 @@ dsh-product-design/
 │  │  │  ├─ useTextEditing.js #   就地编辑
 │  │  │  ├─ useKeyboard.js    #   全局快捷键映射
 │  │  │  ├─ useUiPrefs.js     #   zoom / 磁吸 / 面板宽度 / 尺寸策略
+│  │  │  ├─ useExport.js      #   PNG / HTML / React 导出命令
 │  │  │  └─ contextMenuItems.js # 右键菜单命令表
+│  │  ├─ export/              # 导出：模型 → PNG / HTML / React+Tailwind
+│  │  │  ├─ render.js         #   干净 HTML 渲染（无编辑器辅助线，HTML/PNG 共用）
+│  │  │  ├─ html.js           #   单文件交互原型 + 运行时
+│  │  │  ├─ png.js            #   SVG foreignObject → canvas
+│  │  │  ├─ react.js          #   JSX + Tailwind 生成器
+│  │  │  └─ download.js       #   下载 / 文件名
 │  │  ├─ ui/                  # 展示层：纯渲染 + 回调
 │  │  │  ├─ toolbar.js
 │  │  │  ├─ left.js           #   活动栏 + 页面/组件库/图层
 │  │  │  ├─ canvas.js         #   多画板画布 + 就地编辑器 + 弹层
 │  │  │  ├─ inspector.js      #   右侧属性面板
-│  │  │  └─ contextmenu.js
+│  │  │  ├─ contextmenu.js
+│  │  │  └─ exportmenu.js
 │  │  ├─ react.js  constants.js  i18n.js  color.js  icons.js  styles.js
 │  │  ├─ model.js             # 文档归一化 / localStorage / Host API 调用
 │  │  ├─ widgets.js           # 组件渲染

@@ -8,6 +8,7 @@ import {
   IconUndo,
 } from '../icons.js';
 import { h } from '../react.js';
+import { ExportMenu } from './exportmenu.js';
 
 const stateLabels = {
   normal: 'state.normal',
@@ -36,6 +37,9 @@ export function ToolbarView(props) {
     setSelId,
     snapEnabled,
     toggleSnap,
+    onExportPng,
+    onExportHtml,
+    onExportReact,
   } = props;
 
   const toolbar = h(
@@ -160,6 +164,12 @@ export function ToolbarView(props) {
       },
       h(IconPlus),
     ),
+    h(ExportMenu, {
+      t,
+      onPng: onExportPng,
+      onHtml: onExportHtml,
+      onReact: onExportReact,
+    }),
     h(
       'button',
       {
