@@ -15,180 +15,50 @@
  */
 
 import {
-  boundsOfEntries,
-  cloneElementDeep,
   collectElementEntries,
-  descendantIds,
   findElementEntry,
   isContainerType,
-  reorderInTree,
+  removeElementsFromTree,
 } from '../shared/elements.js';
-import { normalizeConstraints, normalizeLayout, reflowPage } from '../shared/layout.js';
+import { newId } from '../shared/id.js';
+import { reflowPage } from '../shared/layout.js';
+import { basePages, PAGE_STATE_KEYS, statePageId } from '../shared/page-states.js';
 import {
-  addStateVariant,
-  basePageOf,
-  basePages,
-  duplicatePageDeep,
-  normalizeStateLinks,
-  PAGE_STATE_KEYS,
-  removePageDeep,
-  removeStateVariant,
-  repairPageStates,
-  resizePageFamily,
-  statePageId,
-} from '../shared/page-states.js';
+  emptyDoc,
+  normalizeElement,
+  normalizePage,
+  normalizeDoc as schemaNormalizeDoc,
+} from '../shared/schema.js';
+import { createArrangeHandlers } from './model/ops/arrange.js';
+import { createElementsHandlers } from './model/ops/elements.js';
+import { createPagesHandlers } from './model/ops/pages.js';
 
-const ELEMENT_TYPES = {
-  container: [320, 240],
-  group: [200, 120],
-  button: [132, 44],
-  input: [260, 44],
-  card: [300, 120],
-  navbar: [390, 56],
-  tabs: [390, 48],
-  toggle: [48, 28],
-  checkbox: [130, 24],
-  avatar: [56, 56],
-  text: [200, 30],
-  image: [300, 160],
-  badge: [64, 24],
-  select: [220, 44],
-};
-
-const ELEMENT_STATES = {
-  container: ['default'],
-  group: ['default'],
-  button: ['default', 'hover', 'active', 'disabled'],
-  input: ['default', 'focus', 'filled', 'error', 'disabled'],
-  card: ['default', 'hover'],
-  navbar: ['default'],
-  tabs: ['default'],
-  toggle: ['on', 'off'],
-  checkbox: ['unchecked', 'checked'],
-  avatar: ['default'],
-  text: ['default'],
-  image: ['default'],
-  badge: ['default'],
-  select: ['default', 'open', 'disabled'],
-};
-
-const PRESETS = {
-  mobile: [390, 844],
-  tablet: [768, 1024],
-  desktop: [1280, 800],
-};
-
-const INTERACTION_ACTIONS = ['navigate', 'back', 'openOverlay'];
-
-let seq = 0;
-function newId(prefix) {
-  seq += 1;
-  const rnd =
-    typeof globalThis.crypto?.randomUUID === 'function'
-      ? globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 8)
-      : Math.random().toString(36).slice(2, 10);
-  return prefix + Date.now().toString(36) + seq.toString(36) + rnd;
-}
-
+// ---- shared coercion helpers (used by the op reducer below) ----
 const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 const num = (v, d) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
 };
 const str = (v, d) => (typeof v === 'string' ? v : d);
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-function normalizeInteractions(raw) {
-  if (!Array.isArray(raw)) return [];
-  const out = [];
-  for (const item of raw) {
-    if (!isObj(item)) continue;
-    const action = INTERACTION_ACTIONS.includes(item.action) ? item.action : null;
-    if (!action) continue;
-    const next = { trigger: 'click', action };
-    if (action !== 'back') next.targetPageId = str(item.targetPageId, '');
-    out.push(next);
-  }
-  return out;
-}
-
-export function emptyDoc() {
-  return { name: '', pages: [], activePageId: null };
-}
-
-function defaultStateFor(type) {
-  if (type === 'toggle') return 'on';
-  if (type === 'checkbox') return 'unchecked';
-  return 'default';
-}
-
-function ensureElement(raw) {
-  const e = isObj(raw) ? raw : {};
-  const type = ELEMENT_TYPES[e.type] ? e.type : 'text';
-  const [dw, dh] = ELEMENT_TYPES[type];
-  const states = ELEMENT_STATES[type] || ['default'];
-  const out = {
-    id: str(e.id, '') || newId('e'),
-    type,
-    name: str(e.name, ''),
-    x: num(e.x, 0),
-    y: num(e.y, 0),
-    w: Math.max(12, num(e.w, dw)),
-    h: Math.max(8, num(e.h, dh)),
-    hidden: e.hidden === true,
-    locked: e.locked === true,
-    opacity: clamp01(num(e.opacity, 1)),
-    state: states.includes(e.state) ? e.state : defaultStateFor(type),
-    props: isObj(e.props) ? clone(e.props) : {},
-    interactions: normalizeInteractions(e.interactions),
-    constraints: normalizeConstraints(e.constraints, type),
-  };
-  if (isContainerType(type)) {
-    out.layout = normalizeLayout(e.layout);
-    out.children = Array.isArray(e.children) ? e.children.filter(isObj).map(ensureElement) : [];
-  }
-  return out;
-}
-
-function ensurePage(raw) {
-  const p = isObj(raw) ? raw : {};
-  const frame = isObj(p.frame) ? p.frame : {};
-  const preset = PRESETS[frame.preset] ? frame.preset : 'mobile';
-  const size = PRESETS[preset];
-  const out = {
-    id: str(p.id, '') || newId('p'),
-    name: str(p.name, 'Page'),
-    frame: {
-      w: Math.max(1, num(frame.w, size[0])),
-      h: Math.max(1, num(frame.h, size[1])),
-      preset,
-      background: str(frame.background, '#ffffff'),
-    },
-    states: {},
-    elements: Array.isArray(p.elements) ? p.elements.filter(isObj).map(ensureElement) : [],
-  };
-  const variantOf = str(p.variantOf, '');
-  const stateKey = PAGE_STATE_KEYS.includes(p.stateKey) ? p.stateKey : '';
-  if (variantOf && stateKey) {
-    out.variantOf = variantOf;
-    out.stateKey = stateKey;
-  } else {
-    out.states = normalizeStateLinks(p.states);
-  }
-  return out;
-}
+// Normalization is delegated to shared/schema.js so the client and host can
+// never drift. The host keeps empty documents and does not reflow here
+// (reflow happens explicitly inside applyOps).
+const ensureElement = (raw) => normalizeElement(raw, { elementId: () => newId('e') });
+const ensurePage = (raw) =>
+  normalizePage(raw, { elementId: () => newId('e'), pageId: () => newId('p') });
 
 /** Coerce any stored/raw value into a valid document (drops unknown junk). */
 export function ensureDoc(raw) {
-  const doc = isObj(raw) ? clone(raw) : emptyDoc();
-  doc.pages = Array.isArray(doc.pages) ? doc.pages.filter(isObj).map(ensurePage) : [];
-  doc.name = str(doc.name, '');
-  repairPageStates(doc);
-  if (!doc.pages.some((p) => p.id === doc.activePageId)) {
-    doc.activePageId = doc.pages.length ? doc.pages[0].id : null;
-  }
-  return doc;
+  return schemaNormalizeDoc(raw, {
+    allowEmpty: true,
+    reflow: false,
+    elementId: () => newId('e'),
+    pageId: () => newId('p'),
+  });
 }
+
+export { emptyDoc };
 
 function clone(x) {
   if (typeof structuredClone === 'function') {
@@ -243,356 +113,31 @@ function requirePageById(doc, pageId, opIndex, label) {
 function applyOne(doc, op, index, state) {
   if (!isObj(op)) throw new Error(`op[${index}] must be an object`);
   const kind = op.kind;
-
-  if (kind === 'set_document_name') {
-    doc.name = str(op.name, '');
-    return { op: index, kind };
-  }
-
-  if (kind === 'add_page') {
-    const preset = PRESETS[op.preset] ? op.preset : 'mobile';
-    const size = PRESETS[preset];
-    const page = ensurePage({
-      id: newId('p'),
-      name: str(op.name, `Page ${basePages(doc).length + 1}`),
-      frame: {
-        w: Math.max(1, num(op.width, size[0])),
-        h: Math.max(1, num(op.height, size[1])),
-        preset,
-        background: str(op.background, '#ffffff'),
-      },
-      elements: [],
-    });
-    doc.pages.push(page);
-    doc.activePageId = page.id;
-    return { op: index, kind, pageId: page.id, name: page.name };
-  }
-
-  if (kind === 'duplicate_page') {
-    const source = requirePageById(doc, op.pageId, index, 'duplicate_page');
-    const out = duplicatePageDeep(doc, source.id, { suffix: 'copy', id: newId });
-    doc.pages = out.pages;
-    doc.activePageId = out.activePageId;
-    const copy = doc.pages.find((page) => page.id === out.activePageId);
-    if (copy && op.name !== undefined) copy.name = str(op.name, copy.name);
-    return { op: index, kind, pageId: copy ? copy.id : '', name: copy ? copy.name : '' };
-  }
-
-  if (kind === 'delete_page') {
-    const page = doc.pages.find((p) => p.id === op.pageId);
-    if (!page) throw new Error(`op[${index}] delete_page: unknown page "${op.pageId}"`);
-    const out = removePageDeep(doc, page.id);
-    doc.pages = out.pages;
-    doc.activePageId = out.activePageId;
-    return { op: index, kind, pageId: page.id };
-  }
-
-  if (kind === 'rename_page') {
-    const page = findPage(doc, op, index);
-    page.name = str(op.name, page.name);
-    return { op: index, kind, pageId: page.id };
-  }
-
-  if (kind === 'set_active_page') {
-    const page = requirePageById(doc, op.pageId, index, 'set_active_page');
-    doc.activePageId = page.id;
-    return { op: index, kind, pageId: page.id };
-  }
-
-  if (kind === 'set_page_frame') {
-    const page = findPage(doc, op, index);
-    const preset = PRESETS[op.preset] ? op.preset : page.frame.preset;
-    const size = PRESETS[preset] || [page.frame.w, page.frame.h];
-    const nw = Math.max(1, num(op.width, op.preset ? size[0] : page.frame.w));
-    const nh = Math.max(1, num(op.height, op.preset ? size[1] : page.frame.h));
-    const mode = ['constraints', 'scale', 'none'].includes(op.resizeMode)
-      ? op.resizeMode
-      : 'constraints';
-    const resized = resizePageFamily(doc, page.id, nw, nh, mode, preset);
-    doc.pages = resized.pages;
-    const target = doc.pages.find((candidate) => candidate.id === page.id);
-    if (target) {
-      target.frame = {
-        ...target.frame,
-        background: str(op.background, target.frame.background),
-      };
-    }
-    return { op: index, kind, pageId: page.id, resizeMode: mode };
-  }
-
-  if (kind === 'add_page_state') {
-    const page = findPage(doc, op, index);
-    const key = PAGE_STATE_KEYS.includes(op.key) ? op.key : null;
-    if (!key) throw new Error(`op[${index}] add_page_state: unknown state "${op.key}"`);
-    const out = addStateVariant(doc, page.id, key, { name: str(op.name, ''), id: newId });
-    if (!out.pageId) throw new Error(`op[${index}] add_page_state: no base page for "${page.id}"`);
-    doc.pages = out.doc.pages;
-    doc.activePageId = out.doc.activePageId;
-    const base = basePageOf(doc, out.pageId);
-    return {
-      op: index,
-      kind,
-      pageId: out.pageId,
-      basePageId: base ? base.id : '',
-      created: out.created,
-    };
-  }
-
-  if (kind === 'delete_page_state') {
-    const page = findPage(doc, op, index);
-    const key = PAGE_STATE_KEYS.includes(op.key) ? op.key : null;
-    if (!key) throw new Error(`op[${index}] delete_page_state: unknown state "${op.key}"`);
-    const out = removeStateVariant(doc, page.id, key);
-    if (!out.removedId) throw new Error(`op[${index}] delete_page_state: no such variant`);
-    doc.pages = out.doc.pages;
-    doc.activePageId = out.doc.activePageId;
-    return { op: index, kind, pageId: out.removedId };
-  }
-
-  if (kind === 'clear_page') {
-    const page = findPage(doc, op, index);
-    page.elements = [];
-    return { op: index, kind, pageId: page.id };
-  }
-
-  if (kind === 'add_element') {
-    const page = findPage(doc, op, index);
-    const type = ELEMENT_TYPES[op.type] ? op.type : null;
-    if (!type) throw new Error(`op[${index}] add_element: unknown type "${op.type}"`);
-    const containerId = op.containerId === '@last' ? state.lastContainerId : op.containerId;
-    const target = containerId ? findElementEntry(page.elements, containerId) : null;
-    if (containerId && (!target || !isContainerType(target.el.type)))
-      throw new Error(`op[${index}] add_element: unknown container "${containerId}"`);
-    const [dw, dh] = ELEMENT_TYPES[type];
-    const fullWidth = type === 'navbar' || type === 'tabs';
-    const boundW = target ? target.el.w : page.frame.w;
-    const targetList = target ? target.el.children || [] : page.elements;
-    const w = Math.max(12, num(op.w, fullWidth ? boundW : dw));
-    const n = targetList.length;
-    const el = ensureElement({
-      id: newId('e'),
-      type,
-      name: str(op.name, ''),
-      x: num(op.x, target ? 16 : fullWidth ? 0 : 24),
-      y: num(op.y, 24 + (n % 10) * 18),
-      w,
-      h: Math.max(8, num(op.h, dh)),
-      hidden: op.hidden === true,
-      locked: op.locked === true,
-      opacity: num(op.opacity, 1),
-      state: op.state,
-      props: op.props,
-      interactions: op.interactions,
-      constraints: op.constraints,
-      layout: op.layout,
-    });
-    if (target) target.el.children = [...(target.el.children || []), el];
-    else page.elements.push(el);
-    if (type === 'container') state.lastContainerId = el.id;
-    return { op: index, kind, pageId: page.id, elementId: el.id, type };
-  }
-
-  if (kind === 'add_container') {
-    const page = findPage(doc, op, index);
-    const containerId = op.containerId === '@last' ? state.lastContainerId : op.containerId;
-    const target = containerId ? findElementEntry(page.elements, containerId) : null;
-    if (containerId && (!target || !isContainerType(target.el.type)))
-      throw new Error(`op[${index}] add_container: unknown container "${containerId}"`);
-    const boundW = target ? target.el.w : page.frame.w;
-    const boundH = target ? target.el.h : page.frame.h;
-    const n = (target ? target.el.children || [] : page.elements).length;
-    const el = ensureElement({
-      id: newId('e'),
-      type: 'container',
-      name: str(op.name, `Container ${n + 1}`),
-      x: num(op.x, Math.min(24, Math.max(0, boundW - 40))),
-      y: num(op.y, 24 + (n % 8) * 18),
-      w: Math.max(12, num(op.w, Math.min(320, boundW))),
-      h: Math.max(8, num(op.h, Math.min(240, boundH))),
-      hidden: op.hidden === true,
-      locked: op.locked === true,
-      opacity: num(op.opacity, 1),
-      constraints: op.constraints,
-      layout: op.layout,
-      props: {
-        name: str(op.name, `Container ${n + 1}`),
-        background: str(op.background, '#ffffff'),
-        radius: num(op.radius, 12),
-        clipContent: op.clipContent !== false,
-      },
-    });
-    if (target) target.el.children = [...(target.el.children || []), el];
-    else page.elements.push(el);
-    state.lastContainerId = el.id;
-    return { op: index, kind, pageId: page.id, elementId: el.id, type: 'container' };
-  }
-
-  if (kind === 'update_element') {
-    const page = findPageForElement(doc, op, index);
-    const entry = findElementEntry(page.elements, op.elementId);
-    if (!entry) throw new Error(`op[${index}] update_element: unknown element "${op.elementId}"`);
-    const el = entry.el;
-    if (op.x !== undefined) el.x = num(op.x, el.x);
-    if (op.y !== undefined) el.y = num(op.y, el.y);
-    if (op.w !== undefined) el.w = Math.max(12, num(op.w, el.w));
-    if (op.h !== undefined) el.h = Math.max(8, num(op.h, el.h));
-    if (op.name !== undefined) el.name = str(op.name, el.name);
-    if (op.hidden !== undefined) el.hidden = op.hidden === true;
-    if (op.locked !== undefined) el.locked = op.locked === true;
-    if (op.opacity !== undefined) el.opacity = clamp01(num(op.opacity, el.opacity));
-    if (op.state !== undefined && (ELEMENT_STATES[el.type] || []).includes(op.state))
-      el.state = op.state;
-    if (op.interactions !== undefined) el.interactions = normalizeInteractions(op.interactions);
-    if (op.constraints !== undefined)
-      el.constraints = normalizeConstraints(op.constraints, el.type);
-    if (op.layout !== undefined) el.layout = normalizeLayout(op.layout);
-    if (isObj(op.props)) el.props = { ...el.props, ...clone(op.props) };
-    return { op: index, kind, pageId: page.id, elementId: el.id };
-  }
-
-  if (kind === 'delete_element') {
-    const page = findPageForElement(doc, op, index);
-    const before = collectElementEntries(page.elements).length;
-    page.elements = removeElementById(page.elements, op.elementId);
-    if (collectElementEntries(page.elements).length === before)
-      throw new Error(`op[${index}] delete_element: unknown element "${op.elementId}"`);
-    return { op: index, kind, pageId: page.id, elementId: op.elementId };
-  }
-
-  if (kind === 'move_element') {
-    const page = findPageForElement(doc, op, index);
-    const entry = findElementEntry(page.elements, op.elementId);
-    if (!entry) throw new Error(`op[${index}] move_element: unknown element "${op.elementId}"`);
-    const containerId = op.containerId === undefined ? null : op.containerId;
-    if (containerId && containerId === op.elementId)
-      throw new Error(`op[${index}] move_element: cannot move an element into itself`);
-    if (containerId && descendantIds(entry.el).includes(containerId))
-      throw new Error(`op[${index}] move_element: cannot move into a descendant`);
-    const absX = entry.absX;
-    const absY = entry.absY;
-    const removed = removeElementById(page.elements, op.elementId);
-    const moved = { ...entry.el, x: 0, y: 0 };
-    if (containerId) {
-      const target = findElementEntry(removed, containerId);
-      if (!target || !isContainerType(target.el.type))
-        throw new Error(`op[${index}] move_element: unknown container "${containerId}"`);
-      moved.x = Math.round(absX - target.absX);
-      moved.y = Math.round(absY - target.absY);
-      const kids = (target.el.children || []).slice();
-      const at = Number.isFinite(op.index)
-        ? Math.max(0, Math.min(kids.length, Number(op.index)))
-        : kids.length;
-      kids.splice(at, 0, moved);
-      target.el.children = kids;
-    } else {
-      moved.x = Math.round(absX);
-      moved.y = Math.round(absY);
-      const at = Number.isFinite(op.index)
-        ? Math.max(0, Math.min(removed.length, Number(op.index)))
-        : removed.length;
-      removed.splice(at, 0, moved);
-    }
-    page.elements = removed;
-    return { op: index, kind, pageId: page.id, elementId: moved.id };
-  }
-
-  if (kind === 'reorder_element') {
-    const page = findPageForElement(doc, op, index);
-    const position = ['front', 'back', 'forward', 'backward'].includes(op.position)
-      ? op.position
-      : 'front';
-    if (!findElementEntry(page.elements, op.elementId))
-      throw new Error(`op[${index}] reorder_element: unknown element "${op.elementId}"`);
-    page.elements = reorderInTree(page.elements, op.elementId, position);
-    return { op: index, kind, pageId: page.id, elementId: op.elementId, position };
-  }
-
-  if (kind === 'group_elements') {
-    const page = findPageForElement(doc, op, index);
-    const ids = Array.isArray(op.elementIds) ? op.elementIds : [];
-    if (ids.length < 2) throw new Error(`op[${index}] group_elements: need at least two ids`);
-    const entries = ids.map((id) => findElementEntry(page.elements, id));
-    if (entries.some((entry) => !entry))
-      throw new Error(`op[${index}] group_elements: unknown element id`);
-    const list = entries[0].list;
-    if (!entries.every((entry) => entry.list === list))
-      throw new Error(`op[${index}] group_elements: elements must share a parent`);
-    const bounds = boundsOfEntries(entries);
-    const parentAbsX = entries[0].absX - entries[0].el.x;
-    const parentAbsY = entries[0].absY - entries[0].el.y;
-    const group = ensureElement({
-      id: newId('e'),
-      type: 'group',
-      name: str(op.name, 'Group'),
-      x: bounds.x - parentAbsX,
-      y: bounds.y - parentAbsY,
-      w: bounds.w,
-      h: bounds.h,
-    });
-    group.children = entries.map((entry) => {
-      const copy = cloneElementDeep(entry.el);
-      copy.x = entry.absX - bounds.x;
-      copy.y = entry.absY - bounds.y;
-      return copy;
-    });
-    const idSet = new Set(ids);
-    const insertAt = Math.min(...entries.map((entry) => entry.index));
-    const remaining = list.filter((el) => !idSet.has(el.id));
-    remaining.splice(insertAt, 0, group);
-    if (entries[0].parent) entries[0].parent.children = remaining;
-    else page.elements = remaining;
-    return { op: index, kind, pageId: page.id, groupId: group.id };
-  }
-
-  if (kind === 'ungroup_elements') {
-    const page = findPageForElement(doc, op, index);
-    const entry = findElementEntry(page.elements, op.elementId);
-    if (!entry) throw new Error(`op[${index}] ungroup_elements: unknown element "${op.elementId}"`);
-    if (entry.el.type !== 'group')
-      throw new Error(`op[${index}] ungroup_elements: element is not a group`);
-    const group = entry.el;
-    const kids = (group.children || []).map((child) => {
-      const copy = cloneElementDeep(child);
-      copy.x += group.x;
-      copy.y += group.y;
-      return copy;
-    });
-    const next = entry.list.slice();
-    next.splice(entry.index, 1, ...kids);
-    if (entry.parent) entry.parent.children = next;
-    else page.elements = next;
-    return { op: index, kind, pageId: page.id, elementIds: kids.map((kid) => kid.id) };
-  }
-
-  throw new Error(`op[${index}] has unknown kind "${kind}"`);
+  const handler = OP_HANDLERS[kind];
+  if (!handler) throw new Error(`op[${index}] has unknown kind "${kind}"`);
+  return handler(doc, op, index, state);
 }
 
-function removeElementById(elements, id) {
-  let changed = false;
-  const out = [];
-  for (const el of elements) {
-    if (el.id === id) {
-      changed = true;
-      continue;
-    }
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = removeElementById(el.children, id);
-      if (kids !== el.children) {
-        changed = true;
-        out.push({ ...el, children: kids });
-        continue;
-      }
-    }
-    out.push(el);
-  }
-  return changed ? out : elements;
-}
+const removeElementById = (elements, id) => removeElementsFromTree(elements, new Set([id]));
 
-/**
- * Apply an ordered operation list to a document.
- * @returns {{ doc: object, results: object[] }} the new document and per-op results.
- * @throws when any op is invalid (the caller decides whether to keep the old doc).
- */
+const DEPS = {
+  findPage,
+  findPageForElement,
+  requirePageById,
+  ensureElement,
+  ensurePage,
+  clone,
+  isObj,
+  num,
+  str,
+  removeElementById,
+};
+const OP_HANDLERS = {
+  ...createPagesHandlers(DEPS),
+  ...createElementsHandlers(DEPS),
+  ...createArrangeHandlers(DEPS),
+};
+
 export function applyOps(rawDoc, ops) {
   if (!Array.isArray(ops)) throw new Error('operations must be an array');
   if (ops.length === 0) throw new Error('operations must not be empty');

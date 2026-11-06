@@ -9,10 +9,10 @@
 import { reflowDoc } from '../../shared/layout.js';
 import { API_PREFIX } from '../constants.js';
 import { replaceInTree } from '../domain/tree.js';
-import { apiFetch, defaultDoc, loadDoc, normalizeDoc, saveDoc } from '../model.js';
+import { defaultDoc, loadDoc, normalizeDoc, saveDoc } from '../model.js';
 import { useCallback, useEffect, useRef, useState } from '../react.js';
-
-const HIST_LIMIT = 120;
+import { docApi } from './doc-client.js';
+import { HIST_LIMIT, pushSnapshot, recordEdit, redoStep, undoStep } from './docHistory.js';
 
 function sameDoc(a, b) {
   if (a === b) return true;
@@ -62,10 +62,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
   const conflictRef = useRef(null);
 
   function pushPastSnapshot(snapshot) {
-    const h = histRef.current;
-    h.past.push(snapshot);
-    if (h.past.length > HIST_LIMIT) h.past.shift();
-    h.future = [];
+    pushSnapshot(histRef.current, snapshot);
     lastKeyRef.current = { key: null, time: 0 };
     bumpHist((v) => v + 1);
   }
@@ -78,20 +75,10 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     const next = reflowDoc(raw);
     if (next === prev) return;
     if (mode !== false) {
-      const h = histRef.current;
-      let record = true;
-      if (typeof mode === 'string') {
-        const now = Date.now();
-        if (lastKeyRef.current.key === mode && now - lastKeyRef.current.time < 900) record = false;
-        lastKeyRef.current = { key: mode, time: now };
-      } else {
-        lastKeyRef.current = { key: null, time: 0 };
-      }
-      if (record) {
-        pushPastSnapshot(prev);
+      if (recordEdit(histRef.current, lastKeyRef.current, prev, mode)) {
         lastEditRef.current = Date.now();
       }
-      h.future = [];
+      bumpHist((v) => v + 1);
     }
     docRef.current = next;
     setDocState(next);
@@ -124,10 +111,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
   );
 
   function undo() {
-    const h = histRef.current;
-    if (!h.past.length) return;
-    const prev = h.past.pop();
-    h.future.push(docRef.current);
+    const prev = undoStep(histRef.current, docRef.current);
+    if (prev === null) return;
     docRef.current = prev;
     setDocState(prev);
     lastKeyRef.current = { key: null, time: 0 };
@@ -136,11 +121,8 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     else setSyncState('local');
   }
   function redo() {
-    const h = histRef.current;
-    if (!h.future.length) return;
-    const next = h.future.pop();
-    h.past.push(docRef.current);
-    if (h.past.length > HIST_LIMIT) h.past.shift();
+    const next = redoStep(histRef.current, docRef.current);
+    if (next === null) return;
     docRef.current = next;
     setDocState(next);
     lastKeyRef.current = { key: null, time: 0 };
@@ -201,7 +183,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
 
   /** Fetch the Session's current document from the Host. */
   async function refreshFromHost(sid) {
-    const got = await apiFetch('/doc', undefined, sid);
+    const got = await docApi.get(sid);
     if (!got || got.status !== 200 || !got.body) return null;
     const body = got.body;
     hostRef.current.on = true;
@@ -238,20 +220,11 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     setSyncState('saving');
     docRef.current = seeded;
     setDocState(seeded);
-    const res = await apiFetch(
-      '/doc',
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          baseRevision: hostRef.current.revision,
-          docId: hostRef.current.docId,
-          doc: seeded,
-          sessionId: sid,
-        }),
-      },
-      sid,
-    );
+    const res = await docApi.save(sid, {
+      baseRevision: hostRef.current.revision,
+      docId: hostRef.current.docId,
+      doc: seeded,
+    });
     if (res && res.status === 200 && res.body) {
       hostRef.current.revision = res.body.revision;
       setSyncState('saved');
@@ -267,15 +240,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
   async function switchDoc(nextDocId) {
     const sid = sessionIdRef.current;
     if (!nextDocId || nextDocId === hostRef.current.docId) return false;
-    const res = await apiFetch(
-      '/session/doc',
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionId: sid, docId: nextDocId }),
-      },
-      sid,
-    );
+    const res = await docApi.switchSession(sid, nextDocId);
     if (!res || res.status !== 200 || !res.body) return false;
     let ok = applySnapshot(res.body, { resetHistory: true });
     if (!ok) {
@@ -313,37 +278,30 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     }
     setSyncState('saving');
     const sid = sessionIdRef.current;
-    apiFetch(
-      '/doc',
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          baseRevision: hostRef.current.revision,
-          docId: hostRef.current.docId,
-          doc: docRef.current,
-          sessionId: sid,
-        }),
-      },
-      sid,
-    ).then((res) => {
-      if (res && res.status === 200 && res.body) {
-        hostRef.current.revision = res.body.revision;
-        setSyncState('saved');
-        return;
-      }
-      if (res && res.status === 409 && res.body && res.body.doc) {
-        conflictRef.current = {
-          remoteDoc: normalizeDoc(res.body.doc),
-          remoteRevision: res.body.revision,
-          remoteDocId: res.body.docId,
-        };
-        hostRef.current.revision = res.body.revision;
-        setSyncState('conflict');
-        return;
-      }
-      setSyncState(res ? 'offline' : 'local');
-    });
+    docApi
+      .save(sid, {
+        baseRevision: hostRef.current.revision,
+        docId: hostRef.current.docId,
+        doc: docRef.current,
+      })
+      .then((res) => {
+        if (res && res.status === 200 && res.body) {
+          hostRef.current.revision = res.body.revision;
+          setSyncState('saved');
+          return;
+        }
+        if (res && res.status === 409 && res.body && res.body.doc) {
+          conflictRef.current = {
+            remoteDoc: normalizeDoc(res.body.doc),
+            remoteRevision: res.body.revision,
+            remoteDocId: res.body.docId,
+          };
+          hostRef.current.revision = res.body.revision;
+          setSyncState('conflict');
+          return;
+        }
+        setSyncState(res ? 'offline' : 'local');
+      });
   }
 
   // Host sync: when the Host half is reachable the document is authoritative
@@ -367,39 +325,32 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     }
     setSyncState('saving');
     const timer = setTimeout(() => {
-      apiFetch(
-        '/doc',
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            baseRevision: hostRef.current.revision,
-            docId: hostRef.current.docId,
-            doc: doc,
-            sessionId: sid,
-          }),
-        },
-        sid,
-      ).then((res) => {
-        if (!res) {
-          setSyncState('offline');
-          return;
-        }
-        if (res.status === 200 && res.body) {
-          hostRef.current.revision = res.body.revision;
-          setSyncState('saved');
-        } else if (res.status === 409 && res.body && res.body.doc) {
-          conflictRef.current = {
-            remoteDoc: normalizeDoc(res.body.doc),
-            remoteRevision: res.body.revision,
-            remoteDocId: res.body.docId,
-          };
-          hostRef.current.revision = res.body.revision;
-          setSyncState('conflict');
-        } else {
-          setSyncState('offline');
-        }
-      });
+      docApi
+        .save(sid, {
+          baseRevision: hostRef.current.revision,
+          docId: hostRef.current.docId,
+          doc: doc,
+        })
+        .then((res) => {
+          if (!res) {
+            setSyncState('offline');
+            return;
+          }
+          if (res.status === 200 && res.body) {
+            hostRef.current.revision = res.body.revision;
+            setSyncState('saved');
+          } else if (res.status === 409 && res.body && res.body.doc) {
+            conflictRef.current = {
+              remoteDoc: normalizeDoc(res.body.doc),
+              remoteRevision: res.body.revision,
+              remoteDocId: res.body.docId,
+            };
+            hostRef.current.revision = res.body.revision;
+            setSyncState('conflict');
+          } else {
+            setSyncState('offline');
+          }
+        });
     }, 400);
     return () => clearTimeout(timer);
   }, [doc]);
@@ -427,7 +378,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
       const attempts = canStream ? 6 : 1;
       let got = null;
       for (let i = 0; i < attempts && !cancelled; i += 1) {
-        got = await apiFetch('/doc', undefined, sid);
+        got = await docApi.get(sid);
         if (got && got.status === 200 && got.body) break;
         if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1500));
       }
@@ -448,7 +399,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
           if (!data || typeof data.revision !== 'number') return;
           const docChanged = data.docId && data.docId !== hostRef.current.docId;
           if (!docChanged && data.revision === hostRef.current.revision) return;
-          apiFetch('/doc', undefined, sid).then(async (snap) => {
+          docApi.get(sid).then(async (snap) => {
             if (!snap || snap.status !== 200 || !snap.body || !snap.body.doc) return;
             const nextId = snap.body.docId || '';
             if (nextId && nextId !== hostRef.current.docId) {
@@ -494,15 +445,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     if (!autoSeededRef.current.has(id)) return undefined;
     if (docRef.current && docRef.current.name) return undefined;
     let cancelled = false;
-    apiFetch(
-      '/docs/rename',
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ docId: id, name: title }),
-      },
-      sessionIdRef.current,
-    ).then((res) => {
+    docApi.rename(sessionIdRef.current, id, title).then((res) => {
       if (cancelled || !res || res.status !== 200) return;
       const current = docRef.current;
       if (!current || current.name || hostRef.current.docId !== id) return;

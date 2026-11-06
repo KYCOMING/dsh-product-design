@@ -2,6 +2,7 @@
  * Agent tools: read the canvas, apply an ordered operation list.
  */
 
+import { OP_SIGNATURES } from '../shared/ops-manifest.js';
 import { summarizeDoc } from './model.js';
 import { productPreviewMeta } from './preview.js';
 
@@ -60,18 +61,7 @@ function applyTool(stores) {
     description: [
       'Apply an ordered list of operations to the product-design canvas (a simplified Figma). The Host owns the document and broadcasts the result to the open canvas.',
       'Operations (each an object with `kind`):',
-      'add_page {name?, preset?: mobile|tablet|desktop, width?, height?, background?} → pageId',
-      'duplicate_page {pageId, name?} → pageId (copies the whole page with fresh element ids)',
-      'delete_page {pageId}; rename_page {pageId, name}; set_active_page {pageId}',
-      'set_page_frame {pageId, preset?|width?, height?, background?, resizeMode?: constraints|scale|none} (default constraints)',
-      'add_page_state {pageId, key: loading|empty|error, name?} → pageId (creates a real variant page by copying the base page; edit it like any page); delete_page_state {pageId, key}',
-      'clear_page {pageId}',
-      'add_container {pageId?, containerId?, x?, y?, w?, h?, name?, background?, radius?, clipContent?, hidden?, locked?, opacity?, constraints?, layout?} → elementId (a frame-like container; pass containerId (or "@last") to nest it)',
-      'add_element {pageId?, containerId?, type, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?: {text,color,fontSize,fontWeight,radius,src,fit}, interactions?} → elementId (containerId also accepts "@last")',
-      'update_element {pageId?, elementId, x?, y?, w?, h?, name?, hidden?, locked?, opacity?, state?, props?, interactions?, constraints?, layout?}; delete_element {pageId?, elementId}',
-      'move_element {pageId?, elementId, containerId?: string|null, index?} (reparent without moving on screen); reorder_element {pageId?, elementId, position: front|back|forward|backward}',
-      'group_elements {pageId?, elementIds: string[]} → groupId; ungroup_elements {pageId?, elementId}',
-      'set_document_name {name}',
+      ...OP_SIGNATURES,
       'Element types: container, button, input, card, navbar, tabs, toggle, checkbox, avatar, text, image, badge, select.',
       'Container children use coordinates relative to the container; containers clip content by default. States: button[default,hover,active,disabled]; input[default,focus,filled,error,disabled]; card[default,hover]; toggle[on,off]; checkbox[unchecked,checked]; select[default,open,disabled]; others default.',
       'interactions: [{ action: "navigate"|"back"|"openOverlay", targetPageId }] — wire buttons between pages so the prototype can be walked through in preview.',

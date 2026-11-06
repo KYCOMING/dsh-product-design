@@ -6,7 +6,17 @@
  * rely on reference equality.
  */
 
-import { isContainerType } from '../../shared/elements.js';
+import {
+  cloneElementDeep,
+  isContainerType,
+  removeElementsFromTree,
+  extractFromTree as sharedExtractFromTree,
+} from '../../shared/elements.js';
+import { uid } from '../../shared/id.js';
+
+// These two tree operations were duplicated here; delegate to the shared impl.
+const extractFromTree = sharedExtractFromTree;
+const removeFromTree = removeElementsFromTree;
 
 function mapTree(elements, fn) {
   let changed = false;
@@ -20,53 +30,6 @@ function mapTree(elements, fn) {
     return next;
   });
   return changed ? out : elements;
-}
-
-function removeFromTree(elements, idSet) {
-  let changed = false;
-  const out = [];
-  for (const el of elements) {
-    if (idSet.has(el.id)) {
-      changed = true;
-      continue;
-    }
-    if (isContainerType(el.type) && Array.isArray(el.children)) {
-      const kids = removeFromTree(el.children, idSet);
-      if (kids !== el.children) {
-        changed = true;
-        out.push({ ...el, children: kids });
-        continue;
-      }
-    }
-    out.push(el);
-  }
-  return changed ? out : elements;
-}
-
-function extractFromTree(elements, id) {
-  let extracted = null;
-  let changed = false;
-  const walk = (list) => {
-    const out = [];
-    for (const el of list) {
-      if (el.id === id) {
-        extracted = el;
-        changed = true;
-        continue;
-      }
-      if (isContainerType(el.type) && Array.isArray(el.children)) {
-        const kids = walk(el.children);
-        if (kids !== el.children) {
-          out.push({ ...el, children: kids });
-          continue;
-        }
-      }
-      out.push(el);
-    }
-    return out;
-  };
-  const next = walk(elements);
-  return { elements: changed ? next : elements, extracted };
 }
 
 function appendToContainer(elements, containerId, el) {

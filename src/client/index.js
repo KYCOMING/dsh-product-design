@@ -1,10 +1,10 @@
 import { registerProductDesignCards, setCanvasOpener } from './cards.js';
 import { NS, PANEL_ID } from './constants.js';
+import { augmentDesignCommandFace } from './hostIntegration/commandFace.js';
 import { activeLocale, DICT, pickDict, setAppCtx } from './i18n.js';
 import { ProductDesignPanel } from './panel.js';
 import { h } from './react.js';
 import { setSessionSource, useSessionId } from './session.js';
-import { HeroDesignEntry } from './ui/heroEntry.js';
 
 export const inject = ['slots', 'layout'];
 
@@ -12,8 +12,6 @@ export const inject = ['slots', 'layout'];
 // renders (defining components inside apply would remount the whole editor).
 let openFullScreen = () => {};
 let backToConversation = () => {};
-// The hero button can open the canvas before the Session adapter is readable.
-let pendingSessionId = '';
 
 function ProductDesignView(props) {
   return h(ProductDesignPanel, {
@@ -25,9 +23,8 @@ function ProductDesignView(props) {
 
 function ProductDesignMain() {
   const adapterSessionId = useSessionId();
-  if (adapterSessionId) pendingSessionId = '';
   return h(ProductDesignPanel, {
-    sessionId: adapterSessionId || pendingSessionId,
+    sessionId: adapterSessionId,
     onCollapse: () => backToConversation(),
   });
 }
@@ -59,6 +56,8 @@ export function apply(ctx) {
   openFullScreen = () => selectPanel(PANEL_ID);
   backToConversation = () => selectPanel(null);
   setCanvasOpener(openFullScreen);
+  // Give the host `/design` command a localized label + glyph in the `/` menu.
+  augmentDesignCommandFace(ctx);
 
   let loc = null;
   try {
@@ -119,27 +118,6 @@ export function apply(ctx) {
           key: PANEL_ID,
         },
         ProductDesignMain,
-      ),
-    ),
-  );
-
-  disposers.push(
-    slots.inject('conversation.hero.options', () =>
-      slots.register(
-        {
-          name: 'conversation.hero.options',
-          id: 'dsh-product-design.hero',
-          order: 10,
-          locale: NS,
-          inject: (sessionId) => ({
-            sessionId,
-            open: () => {
-              pendingSessionId = sessionId || '';
-              openFullScreen();
-            },
-          }),
-        },
-        HeroDesignEntry,
       ),
     ),
   );

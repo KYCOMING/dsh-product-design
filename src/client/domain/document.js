@@ -8,16 +8,18 @@
 
 import {
   boundsOfEntries,
+  buildGroupFromEntries,
   cloneElementDeep,
   collectElementEntries,
   findElementEntry,
   moveElementInTree,
   reorderInTree,
   scaleElementsInTree,
+  ungroupChildren,
 } from '../../shared/elements.js';
+import { uid } from '../../shared/id.js';
 import { reflowPage } from '../../shared/layout.js';
 import { removePageDeep } from '../../shared/page-states.js';
-import { uid } from '../model.js';
 import { appendToContainer, duplicateInTree, mapTree, removeFromTree } from './tree.js';
 
 export function activePageOf(doc) {
@@ -165,33 +167,8 @@ export function groupEntries(doc, pageId, entries, name) {
   if (entries.length < 2) return { doc, groupId: null };
   const list = entries[0].list;
   if (!entries.every((entry) => entry.list === list)) return { doc, groupId: null };
-  const bounds = boundsOfEntries(entries);
-  if (!bounds) return { doc, groupId: null };
-  const parentAbsX = entries[0].absX - entries[0].el.x;
-  const parentAbsY = entries[0].absY - entries[0].el.y;
-  const group = {
-    id: uid(),
-    type: 'group',
-    name: '',
-    x: bounds.x - parentAbsX,
-    y: bounds.y - parentAbsY,
-    w: bounds.w,
-    h: bounds.h,
-    hidden: false,
-    locked: false,
-    opacity: 1,
-    state: 'default',
-    props: { name },
-    interactions: [],
-    constraints: { h: 'leftRight', v: 'top' },
-    layout: null,
-    children: entries.map((entry) => {
-      const copy = cloneElementDeep(entry.el);
-      copy.x = entry.absX - bounds.x;
-      copy.y = entry.absY - bounds.y;
-      return copy;
-    }),
-  };
+  const group = buildGroupFromEntries(entries, { id: uid(), name: name || '' });
+  if (!group) return { doc, groupId: null };
   const ids = new Set(entries.map((entry) => entry.el.id));
   const insertAt = Math.min(...entries.map((entry) => entry.index));
   const remaining = list.filter((el) => !ids.has(el.id));
@@ -210,12 +187,7 @@ export function ungroupEntry(doc, pageId, id) {
   const entry = page ? findElementEntry(page.elements, id) : null;
   if (!entry || entry.el.type !== 'group') return { doc, ids: [] };
   const group = entry.el;
-  const kids = (group.children || []).map((child) => {
-    const copy = cloneElementDeep(child);
-    copy.x += group.x;
-    copy.y += group.y;
-    return copy;
-  });
+  const kids = ungroupChildren(group);
   const next = entry.list.slice();
   next.splice(entry.index, 1, ...kids);
   const out = mapElements(doc, pageId, (elements) => {

@@ -6,8 +6,8 @@
  * semantic tags for buttons/inputs, and a small state-based page router.
  */
 
+import { accentOf, fontSizeOf, radiusOf } from '../../shared/element-visual.js';
 import { rgba, shade } from '../color.js';
-import { ACCENT } from '../constants.js';
 
 const cls = (...parts) => parts.filter(Boolean).join(' ');
 
@@ -98,7 +98,7 @@ function textOf(el, fallback) {
 function renderElement(el, ctx, parentLayout) {
   if (!el || el.hidden) return '';
   const p = el.props || {};
-  const acc = p.color || ACCENT;
+  const acc = accentOf(el);
   const state = el.state || 'default';
   const size = childClasses(el, parentLayout);
   const inter = interactionProps(el);
@@ -110,7 +110,7 @@ function renderElement(el, ctx, parentLayout) {
       el.type === 'container'
         ? [
             p.background ? `bg-[${p.background}]` : 'bg-white',
-            `rounded-[${p.radius != null ? p.radius : 12}px]`,
+            `rounded-[${radiusOf(el)}px]`,
             p.clipContent === false ? '' : 'overflow-hidden',
           ]
         : [];
@@ -122,15 +122,22 @@ function renderElement(el, ctx, parentLayout) {
   }
 
   if (el.type === 'button') {
-    const bg = state === 'disabled' ? 'bg-[#c9ccd4]' : `bg-[${acc}]`;
+    const bg =
+      state === 'disabled'
+        ? 'bg-[#c9ccd4]'
+        : state === 'hover'
+          ? `bg-[${shade(acc, -0.08)}]`
+          : state === 'active'
+            ? `bg-[${shade(acc, -0.16)}]`
+            : `bg-[${acc}]`;
     const fg = state === 'disabled' ? 'text-[#f7f8fa]' : 'text-white';
     return `${pad}<button type="button" className={${JSON.stringify(
       cls(
         size,
         bg,
         fg,
-        `rounded-[${p.radius != null ? p.radius : 8}px]`,
-        `text-[${p.fontSize || 14}px]`,
+        `rounded-[${radiusOf(el)}px]`,
+        `text-[${fontSizeOf(el, 14)}px]`,
         'font-semibold',
         'flex items-center justify-center px-3 overflow-hidden whitespace-nowrap',
       ),
@@ -139,6 +146,12 @@ function renderElement(el, ctx, parentLayout) {
 
   if (el.type === 'input') {
     const disabled = state === 'disabled' ? ' disabled' : '';
+    const stateCls =
+      state === 'disabled'
+        ? 'bg-[#f3f4f6] text-[#9aa0ac]'
+        : state === 'error'
+          ? 'border-[#ef4444]'
+          : '';
     return `${pad}<input${disabled} placeholder={${textOf(el, ctx.t('sample.placeholder'))}} className={${JSON.stringify(
       cls(
         size,
@@ -147,10 +160,11 @@ function renderElement(el, ctx, parentLayout) {
         'border-[#d6d9e2]',
         'bg-white',
         'px-3',
-        `text-[${p.fontSize || 14}px]`,
+        `text-[${fontSizeOf(el, 14)}px]`,
         'text-[#1a1d26]',
         'outline-none',
-        'focus:border-[#6366f1]',
+        `focus:border-[${acc}]`,
+        stateCls,
       ),
     )}} />`;
   }
@@ -210,7 +224,7 @@ ${pad}</header>`;
               'text-[13.5px]',
               index === 0 ? 'font-semibold' : 'font-medium',
               index === 0 ? 'border-b-2' : 'border-b-2 border-transparent',
-              index === 0 ? 'text-[#6366f1]' : 'text-[#6b7280]',
+              index === 0 ? `text-[${acc}]` : 'text-[#6b7280]',
             ),
           )}}>${JSON.stringify(label)}</button>`,
       )
@@ -268,12 +282,17 @@ ${pad}</label>`;
         size,
         'flex',
         'items-center',
-        `text-[${p.fontSize || 18}px]`,
+        `text-[${fontSizeOf(el, 18)}px]`,
         p.fontWeight ? `font-[${p.fontWeight}]` : 'font-semibold',
         `text-[${p.color || '#161a22'}]`,
         'leading-[1.3]',
         'whitespace-pre-wrap',
         'overflow-hidden',
+        p.textAlign === 'center'
+          ? 'text-center'
+          : p.textAlign === 'right'
+            ? 'text-right'
+            : 'text-left',
       ),
     )}}${inter}>{${textOf(el, ctx.t('sample.text'))}}</p>`;
   }
@@ -286,7 +305,7 @@ ${pad}</label>`;
       return `${pad}<img src={${JSON.stringify(p.src)}} alt={${JSON.stringify(
         p.alt || '',
       )}} className={${JSON.stringify(
-        cls(size, `rounded-[${p.radius != null ? p.radius : 10}px]`, fitCls),
+        cls(size, `rounded-[${radiusOf(el)}px]`, fitCls),
       )}}${inter} />`;
     }
     return `${pad}<div className={${JSON.stringify(

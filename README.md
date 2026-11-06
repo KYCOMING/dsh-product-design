@@ -85,7 +85,6 @@ dsh plugin --profile desktop remove dsh-product-design
 - **页面状态变体**：编辑器不再提供顶部「正常 / 加载中 / 空状态 / 错误」切换按钮与右侧「页面状态」创建区（此前点击会生成不出现在页面列表的变体页，已移除）；AI 仍可用 `add_page_state` 生成变体，预览里可对已存在的状态做只读切换。
 - **设计稿库**：左侧「设计稿」只列出**当前会话**的稿子（一个会话对多份稿子），可新建、重命名、复制、删除、导出 JSON；换会话不会丢稿，也不会看到别的会话的稿子。
 - **图片**：「图片」组件支持 URL 或本地文件（2MB 内转 data URL）、三种填充方式（cover / contain / fill），编辑器与三种导出都渲染真实图片。
-- **空会话入口**：还没有消息的会话看不到顶部标签，但输入框旁的「打开产品设计」可以直接进入画布。
 - **网格 + 缩放**：画布小方格网格随缩放变化；`Ctrl/⌘ + 滚轮` 缩放，普通滚轮滚动。
 - **编辑体验**：撤销 / 重做（含 AI 改动）、键盘快捷键、空格 / 中键拖拽平移画布；左右侧栏均可拖拽调节宽度，右侧属性栏还可一键收起为窄条，避免遮挡画布。
 - **对话内产品预览（Visualize 风格）**：AI 调用 `product_design_apply` 后，聊天回合末尾会出现当前页面的产品缩略卡片，可一键「打开画布」；无需先手动打开画布。
@@ -129,7 +128,7 @@ dsh plugin --profile desktop remove dsh-product-design
 | --- | --- |
 | `/design <需求>` | 提交一条产品设计需求，作为普通用户消息交给 AI，由 AI 调用画布工具生成/修改设计 |
 
-`/design` 实现：Host 半通过 `ctx.commands.register({ name: 'design', input: { hint: '<需求>' }, ... })` 注册；handler 将 `rawInput` 包装成普通用户消息并通过 `agent.followup()` 提交，因此 AI 会正常走产品设计工具链，而不是由命令直接改文档。
+`/design` 实现：Host 半通过 `ctx.commands.register({ name: 'design', input: { hint: '<需求>' }, ... })` 注册；handler 将 `rawInput` 包装成普通用户消息并通过 `agent.followup()` 提交，因此 AI 会正常走产品设计工具链，而不是由命令直接改文档。斜杠菜单中的 `/design` 行会显示中文本地化标题「设计」（保留 `design` 作为别名，显示为「设计 design」）与插件设计图标（客户端 `ui/commandFace.js` 为宿主命令行补充 presentation，随界面语言切换，不改变命令行为）。
 
 ## 架构
 
@@ -168,12 +167,12 @@ dsh-product-design/
 │  │  │  ├─ canvas.js         #   多画板画布 + 就地编辑器 + 弹层
 │  │  │  ├─ inspector.js      #   右侧属性面板
 │  │  │  ├─ contextmenu.js
-│  │  │  └─ exportmenu.js
+│  │  │  ├─ exportmenu.js
+│  │  │  └─ commandFace.js     # /design 斜杠菜单行的图标 + 中文本地化标题（presentation shim）
 │  │  ├─ react.js  constants.js  i18n.js  color.js  icons.js  styles.js
 │  │  ├─ model.js             # 文档归一化 / localStorage / Host API 调用
 │  │  ├─ docs.js              # 设计稿库客户端（列表 / 新建 / 重命名 / 复制 / 导出）
 │  │  ├─ widgets.js           # 组件渲染
-│  │  ├─ ui/heroEntry.js      # 空会话的「打开产品设计」入口
 │  │  ├─ cards.js             # 对话内产品预览卡片
 │  │  └─ session.js           # 跟随当前会话
 │  ├─ shared/                 # 浏览器 / Host 共用纯逻辑
