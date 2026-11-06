@@ -421,6 +421,7 @@ function ProductDesignPanel(props = {}) {
             addPage: actions.addPage,
             duplicatePage: actions.duplicatePage,
             deletePage: actions.deletePage,
+            renamePage: actions.renamePage,
             addElement: actions.addElement,
             section: prefs.section,
             setSection: prefs.setSection,

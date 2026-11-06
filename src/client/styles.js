@@ -83,6 +83,7 @@ const CSS = [
   '.dpd-pageRow:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}',
   '.dpd-pageRow.active{background:var(--dsw-alias-bg-layer-2,#f0f1f4);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary,#6366f1)}',
   '.dpd-pageRow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  '.dpd-pageRow .nmInput{flex:1;min-width:0;background:var(--dsw-alias-bg-base,#fff);border:1px solid var(--dsw-alias-brand-primary,#6366f1);border-radius:4px;padding:1px 4px;font:inherit;font-size:12px;color:inherit}',
   '.dpd-pageRow .sz{font-size:10px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap}',
   '.dpd-libScroll{overflow-y:auto;overflow-x:hidden;padding:0 8px 12px;min-height:0;flex:1}',
   '.dpd-libGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}',
