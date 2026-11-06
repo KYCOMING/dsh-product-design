@@ -23,22 +23,13 @@ function sameDoc(a, b) {
   }
 }
 
-export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitle, onAutoSeeded }) {
+export function useDocument({ sessionId, t, resetTransient, onAdopt, onAutoSeeded }) {
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
-  // Latest Session title, used to name drafts this hook auto-creates. A Session
-  // is bound to a document that starts out empty (0 pages); the panel seeds it
-  // on first open, and that seed carries the Session's title as its name.
-  const sessionTitleRef = useRef(sessionTitle);
-  sessionTitleRef.current = sessionTitle;
   // Notifies the composition root that a draft was auto-created / renamed so
   // the design-draft library can refresh its listing.
   const onAutoSeededRef = useRef(onAutoSeeded);
   onAutoSeededRef.current = onAutoSeeded;
-  // Documents this hook seeded from an empty (0-page) Host document. Only these
-  // are auto-named: docs the user created / duplicated / imported keep their
-  // own naming behaviour.
-  const autoSeededRef = useRef(new Set());
   // Documents whose seeding is in flight (or done). A delete can make both the
   // delete response and the SSE stream ask to seed the same fresh document; this
   // keeps that single-writer, avoiding a duplicate-seed 409 conflict.
@@ -202,19 +193,16 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
       }
       return body;
     }
-    // A brand-new document has no pages yet: seed the sample so the canvas is
-    // never empty on first open. An auto-created draft (first open of a Session
-    // or the replacement after deleting the active one) takes the Session's
-    // title as its name; manual create / duplicate / import never reach here.
+    // A brand-new document has no pages yet: seed a blank document so the
+    // canvas follows it. Auto-created drafts are left unnamed (the library
+    // shows「未命名设计稿」) and named only by the user; an existing host-side
+    // name is preserved. Manual create / duplicate never reach here.
     const seedId = hostRef.current.docId;
     if (seedId && seededDocIdsRef.current.has(seedId)) return body;
     if (seedId) seededDocIdsRef.current.add(seedId);
     const seeded = defaultDoc();
     const currentName = body.doc && typeof body.doc.name === 'string' ? body.doc.name.trim() : '';
-    const title = String(sessionTitleRef.current || '').trim();
     if (currentName) seeded.name = currentName;
-    else if (title) seeded.name = title;
-    autoSeededRef.current.add(seedId);
     hostRef.current.suppressSave = true;
     conflictRef.current = null;
     setSyncState('saving');
@@ -371,7 +359,6 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     setDocState(localDoc);
     resetTransient();
     histRef.current = { past: [], future: [] };
-    autoSeededRef.current = new Set();
     seededDocIdsRef.current = new Set();
     (async () => {
       const canStream = typeof window.EventSource === 'function';
@@ -433,31 +420,6 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
       }
     };
   }, [sessionId]);
-
-  // Keep an auto-seeded draft's name in step with the Session title when the
-  // title only becomes available after the draft was seeded (e.g. a brand-new
-  // conversation named after its first message). A user-renamed draft is left
-  // alone because it already has a non-empty name.
-  useEffect(() => {
-    const title = String(sessionTitle || '').trim();
-    const id = hostRef.current.docId;
-    if (!title || !id) return undefined;
-    if (!autoSeededRef.current.has(id)) return undefined;
-    if (docRef.current && docRef.current.name) return undefined;
-    let cancelled = false;
-    docApi.rename(sessionIdRef.current, id, title).then((res) => {
-      if (cancelled || !res || res.status !== 200) return;
-      const current = docRef.current;
-      if (!current || current.name || hostRef.current.docId !== id) return;
-      hostRef.current.suppressSave = true;
-      docRef.current = { ...current, name: title };
-      setDocState(docRef.current);
-      if (typeof onAutoSeededRef.current === 'function') onAutoSeededRef.current();
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionTitle]);
 
   return {
     doc,

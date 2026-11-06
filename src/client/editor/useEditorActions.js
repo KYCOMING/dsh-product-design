@@ -169,9 +169,14 @@ export function useEditorActions({
     );
   }
 
+  function renamePageById(pageId, name) {
+    if (!pageId) return;
+    setDoc((current) => renamePage(current, pageId, name), 'pagename:' + pageId);
+  }
+
   function renameActivePage(name) {
     if (!activePage) return;
-    setDoc((current) => renamePage(current, activePage.id, name), 'pagename:' + activePage.id);
+    renamePageById(activePage.id, name);
   }
 
   function groupSelection() {
@@ -232,6 +237,7 @@ export function useEditorActions({
     setPreset,
     fitContentToFrame,
     patchActiveFrame,
+    renamePage: renamePageById,
     renameActivePage,
     groupSelection,
     ungroupSelection,

@@ -58,6 +58,7 @@ export const zh = {
   'pages.title': '页面',
   'pages.add': '新增页',
   'pages.default': '页面',
+  'pages.rename': '重命名页面（双击名称）',
   'pages.copySuffix': '副本',
   'pages.duplicate': '复制页面',
   'pages.delete': '删除页面',

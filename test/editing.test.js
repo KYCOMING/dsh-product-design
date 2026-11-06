@@ -129,6 +129,39 @@ describe('编辑行为', () => {
     expect(q('.dpd-pageRow').length).toBe(1);
   });
 
+  it('页面列表可双击名称或点铅笔重命名页面', async () => {
+    const name = container.querySelector('.dpd-pageRow .nm');
+    expect(name.textContent).toBe('Page 1');
+
+    // 双击名称进入编辑
+    await mouse(name, 'dblclick');
+    const input = container.querySelector('.dpd-pageRow .nmInput');
+    expect(input).toBeTruthy();
+    expect(input.value).toBe('Page 1');
+
+    await act(async () => {
+      const desc = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+      if (desc?.set) desc.set.call(input, '首页');
+      else input.value = '首页';
+      input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    expect(doc().pages[0].name).toBe('首页');
+    expect(container.querySelector('.dpd-pageRow .nm').textContent).toBe('首页');
+
+    // 点铅笔按钮进入编辑，Esc 取消不修改
+    await click(btn('重命名页面（双击名称）'));
+    const input2 = container.querySelector('.dpd-pageRow .nmInput');
+    expect(input2).toBeTruthy();
+    await act(async () => {
+      input2.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(doc().pages[0].name).toBe('首页');
+  });
+
   it('方向键微移、Delete 删除、撤销恢复、Esc 取消选中', async () => {
     const el = container.querySelector('.dpd-el');
     expect(el).toBeTruthy();

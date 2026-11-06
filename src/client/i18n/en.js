@@ -60,6 +60,7 @@ export const en = {
   'pages.title': 'Pages',
   'pages.add': 'Add page',
   'pages.default': 'Page',
+  'pages.rename': 'Rename page (double-click)',
   'pages.copySuffix': 'copy',
   'pages.duplicate': 'Duplicate page',
   'pages.delete': 'Delete page',

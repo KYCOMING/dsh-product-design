@@ -1,9 +1,24 @@
 /** Pages list panel (extracted from LeftView). */
-import { IconCopy, IconPlus, IconTrash } from '../../icons.js';
-import { h } from '../../react.js';
+import { IconCopy, IconPencil, IconPlus, IconTrash } from '../../icons.js';
+import { h, useState } from '../../react.js';
 
 export function PagesPanel(props) {
-  const { t, doc, activePage, setActivePage, addPage, duplicatePage, deletePage } = props;
+  const { t, doc, activePage, setActivePage, addPage, duplicatePage, deletePage, renamePage } =
+    props;
+  const [renamingPage, setRenamingPage] = useState(null);
+  const [pageNameValue, setPageNameValue] = useState('');
+
+  const beginPageRename = (page) => {
+    setRenamingPage(page.id);
+    setPageNameValue(page.name || '');
+  };
+
+  const commitPageRename = (page) => {
+    const value = pageNameValue.trim();
+    setRenamingPage(null);
+    if (value && value !== (page.name || '') && renamePage) renamePage(page.id, value);
+  };
+
   const pageRows = doc.pages
     .filter((p) => !p.variantOf)
     .map((p) => {
@@ -15,8 +30,46 @@ export function PagesPanel(props) {
           className: 'dpd-pageRow' + (p.id === activePage.id || stateActive ? ' active' : ''),
           onClick: () => setActivePage(p.id),
         },
-        h('span', { className: 'nm' }, p.name),
-        h('span', { className: 'sz' }, p.frame.w + '×' + p.frame.h),
+        renamingPage === p.id
+          ? h('input', {
+              className: 'nmInput',
+              value: pageNameValue,
+              autoFocus: true,
+              onClick: (e) => e.stopPropagation(),
+              onChange: (e) => setPageNameValue(e.target.value),
+              onBlur: () => commitPageRename(p),
+              onKeyDown: (e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') commitPageRename(p);
+                else if (e.key === 'Escape') setRenamingPage(null);
+              },
+            })
+          : h(
+              'span',
+              {
+                className: 'nm',
+                title: t('pages.rename'),
+                onDoubleClick: (e) => {
+                  e.stopPropagation();
+                  beginPageRename(p);
+                },
+              },
+              p.name,
+            ),
+        h('span', { className: 'sz' }, `${p.frame.w}×${p.frame.h}`),
+        h(
+          'button',
+          {
+            className: 'dpd-mini',
+            type: 'button',
+            title: t('pages.rename'),
+            onClick: (e) => {
+              e.stopPropagation();
+              beginPageRename(p);
+            },
+          },
+          h(IconPencil),
+        ),
         h(
           'button',
           {

@@ -14,6 +14,7 @@ export function LeftView(props) {
     addPage,
     duplicatePage,
     deletePage,
+    renamePage,
     addElement,
     section,
     setSection,
@@ -76,6 +77,7 @@ export function LeftView(props) {
     addPage,
     duplicatePage,
     deletePage,
+    renamePage,
   });
 
   const componentsBody = h(LibraryPanel, { t, addElement });
