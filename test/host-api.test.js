@@ -134,6 +134,19 @@ describe('host API + tools', () => {
     expect(sections[0].text).toContain('product_design_apply');
   });
 
+  it('提示要求按需求参考 Web / 移动端 / 小程序优秀设计与开源社区', () => {
+    const text = sections[0].text;
+    // 平台维度：Web / 移动端 / 小程序，以及各自的设计规范
+    expect(text).toContain('Web');
+    expect(text).toContain('移动端');
+    expect(text).toContain('小程序');
+    expect(text).toContain('Material Design');
+    expect(text).toContain('Human Interface Guidelines');
+    // 开源设计社区：即时设计等
+    expect(text).toContain('即时设计');
+    expect(text).toContain('js.design');
+  });
+
   it('工具定义满足 dsh-tools 注册契约（output.render + 受支持的 JSON Schema 子集）', () => {
     // Mirrors the real registry's checks: output.render must be a function and
     // schemas may only use the supported keyword subset.

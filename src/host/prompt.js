@@ -19,6 +19,8 @@ const GUIDANCE = [
   'set_page_frame 默认 resizeMode:"constraints"（按约束重排）；也支持 "scale"（整体缩放）与 "none"（保持不变）。',
   '页面状态（加载/空/错误）是真实的变体页面：用 add_page_state {pageId, key} 复制基础页生成，返回的 pageId 就是变体页，像普通页一样增删元素；delete_page_state 删除。基础页的 states 记录各状态对应的变体页 id。',
   '状态见各类型（如 button: default/hover/active/disabled）。不传 pageId 时默认作用于当前活动页；add_page / duplicate_page 会把新页设为活动页，所以「先 add_page 再 add_element」会自然落在新页。也可用 pageId:"@last" / pageIndex（0基）显式指定。',
+  '做产品设计时，先根据用户的不同需求判断目标平台属于 Web、移动端 App 还是小程序，再参考对应平台的优秀设计与规范，而不是凭空臆造界面：Web 参考成熟 SaaS / 官网的信息架构、栅格与响应式布局；移动端参考 iOS Human Interface Guidelines 与 Material Design 的导航、控件与手势习惯；小程序参考微信小程序设计指南与轻量、即用即走的交互模式。',
+  '可优先参考即时设计（js.design）资源广场等优秀开源设计社区，以及 Dribbble、Behance、Mobbin 等设计资源库中的开源设计稿与案例，借鉴其布局、组件、留白与视觉语言，再结合本次需求落到画布。画板尺寸随平台对齐：Web 用桌面尺寸，移动端默认 390×844，小程序贴近手机尺寸。',
   '当用户提出产品设计/原型需求时：先 get_document，再用一次 apply 批量搭好页面与元素；结果会自动出现在对话内的产品预览卡片里，用户也可点会话顶部「产品设计」标签查看完整画布。',
 ].join('\n');
 
