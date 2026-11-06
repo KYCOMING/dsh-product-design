@@ -37,6 +37,40 @@ describe('插件注册', () => {
 
 describe('面板渲染冒烟测试', () => {
   it('整树渲染包含工具栏 / 画布 / 画板 / 组件 / 页面列表', () => {
+    // 产品默认 0 页，这里种一个只有单页的文档以覆盖整棵编辑树。
+    window.localStorage.setItem(
+      'dsh-product-design:doc:v3',
+      JSON.stringify({
+        name: '',
+        activePageId: 'p1',
+        pages: [
+          {
+            id: 'p1',
+            name: '页面 1',
+            frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
+            states: {},
+            elements: [
+              {
+                id: 'e1',
+                type: 'text',
+                name: '',
+                x: 24,
+                y: 40,
+                w: 200,
+                h: 28,
+                hidden: false,
+                locked: false,
+                opacity: 1,
+                state: 'default',
+                props: { text: 'Hi' },
+                interactions: [],
+                constraints: { h: 'left', v: 'top' },
+              },
+            ],
+          },
+        ],
+      }),
+    );
     const { panel } = loadPlugin();
     const html = renderToStaticMarkup(React.createElement(panel));
     for (const marker of [
@@ -53,5 +87,13 @@ describe('面板渲染冒烟测试', () => {
     // 撤销 / 重做按钮存在
     expect(html).toContain('撤销');
     expect(html).toContain('重做');
+  });
+
+  it('没有任何页面时面板也能正常渲染（空白画布）', () => {
+    const { panel } = loadPlugin();
+    const html = renderToStaticMarkup(React.createElement(panel));
+    expect(html).toContain('dpd-root');
+    expect(html).toContain('dpd-toolbar');
+    expect(html).toContain('dpd-canvas');
   });
 });

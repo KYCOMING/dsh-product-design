@@ -39,18 +39,11 @@ function makeEl(type, x, y, w, hh, props, state) {
   return el;
 }
 
-function defaultDoc(t) {
-  // A brand-new design starts as a single blank page: an empty artboard the
-  // user (or the agent) fills from the component library. We deliberately seed
-  // no sample content so opening product design never shows a welcome/demo page.
-  const page = {
-    id: uid(),
-    name: t ? t('pages.default') + ' 1' : 'Page 1',
-    frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
-    states: {},
-    elements: [],
-  };
-  return { name: '', pages: [page], activePageId: page.id };
+function defaultDoc() {
+  // A brand-new design starts empty — no pages. The user (or the agent) adds
+  // the first page from the page list, so opening product design on a new
+  // Session shows a blank canvas instead of an auto-created artboard.
+  return { name: '', pages: [], activePageId: null };
 }
 
 function normalizeInteractions(raw) {

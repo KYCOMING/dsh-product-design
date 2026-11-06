@@ -21,7 +21,7 @@ const CSS = [
   '.dpd-zoomer .dpd-iconbtn:hover{background:var(--dsw-alias-bg-layer-2,#f0f1f4)}',
   '.dpd-zoomer .dpd-zoom{height:24px;padding:0 2px;border-radius:0;min-width:40px}',
   '.dpd-iconbtn.active,.dpd-iconbtn.primary{background:var(--dsw-alias-brand-primary,#6366f1);color:#fff;border-color:transparent}',
-  '.dpd-iconbtn.active:hover,.dpd-iconbtn.primary:hover{filter:brightness(1.06)}',
+  '.dpd-iconbtn.active:hover,.dpd-iconbtn.primary:hover{background:var(--dsw-alias-brand-primary,#6366f1);color:#fff;border-color:transparent;filter:brightness(1.06)}',
   '.dpd-brand{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13.5px;margin-right:2px;color:var(--dsw-alias-label-primary,#111);white-space:nowrap}',
   '.dpd-nameInput{background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 7px;color:inherit;font:inherit;font-weight:600;width:132px;max-width:26vw}',
   '.dpd-nameInput:hover{border-color:var(--dsw-alias-border-l1,#e5e6eb)}',

@@ -10,13 +10,6 @@ import {
 import { h } from '../react.js';
 import { ExportMenu } from './exportmenu.js';
 
-const stateLabels = {
-  normal: 'state.normal',
-  loading: 'state.loading',
-  empty: 'state.empty',
-  error: 'state.error',
-};
-
 const syncLabels = {
   local: 'toolbar.localOnly',
   saving: 'toolbar.saving',
@@ -32,8 +25,6 @@ export function ToolbarView(props) {
     setDoc,
     activePage,
     setPreset,
-    pageState,
-    setPageState,
     zoom,
     setZoom,
     preview,
@@ -111,22 +102,6 @@ export function ToolbarView(props) {
           },
           ['mobile', 'tablet', 'desktop'].map((k) =>
             h('option', { key: k, value: k }, t('frame.' + k)),
-          ),
-        ),
-        h(
-          'div',
-          { className: 'dpd-seg', title: t('frame.title') },
-          ['normal', 'loading', 'empty', 'error'].map((s) =>
-            h(
-              'button',
-              {
-                key: s,
-                type: 'button',
-                className: pageState === s ? 'active' : '',
-                onClick: () => setPageState(s),
-              },
-              t(stateLabels[s]),
-            ),
           ),
         ),
       ),

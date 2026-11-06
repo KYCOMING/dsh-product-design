@@ -43,7 +43,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
   // delete response and the SSE stream ask to seed the same fresh document; this
   // keeps that single-writer, avoiding a duplicate-seed 409 conflict.
   const seededDocIdsRef = useRef(new Set());
-  const [doc, setDocState] = useState(() => loadDoc(sessionId) || defaultDoc(t));
+  const [doc, setDocState] = useState(() => loadDoc(sessionId) || defaultDoc());
   const [docId, setDocId] = useState('');
   // Latest doc mirrored in a ref so imperative handlers always read the
   // current value instead of a stale closure.
@@ -227,7 +227,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     const seedId = hostRef.current.docId;
     if (seedId && seededDocIdsRef.current.has(seedId)) return body;
     if (seedId) seededDocIdsRef.current.add(seedId);
-    const seeded = defaultDoc(t);
+    const seeded = defaultDoc();
     const currentName = body.doc && typeof body.doc.name === 'string' ? body.doc.name.trim() : '';
     const title = String(sessionTitleRef.current || '').trim();
     if (currentName) seeded.name = currentName;
@@ -411,7 +411,7 @@ export function useDocument({ sessionId, t, resetTransient, onAdopt, sessionTitl
     let cancelled = false;
     let source = null;
     const sid = sessionId;
-    const localDoc = loadDoc(sid) || defaultDoc(t);
+    const localDoc = loadDoc(sid) || defaultDoc();
     hostRef.current = { on: false, revision: 0, docId: '', suppressSave: true };
     conflictRef.current = null;
     setSyncState('local');

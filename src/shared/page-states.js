@@ -171,7 +171,6 @@ export function removePageDeep(doc, pageId) {
   const family = base ? [base.id, ...stateVariantsOf(doc, base.id).map((item) => item.id)] : [];
   const removing = new Set(page.variantOf ? [pageId] : family.length ? family : [pageId]);
   const remaining = doc.pages.filter((candidate) => !removing.has(candidate.id));
-  if (!remaining.some((candidate) => !isVariant(candidate))) return doc;
   let activePageId = doc.activePageId;
   if (removing.has(activePageId)) {
     activePageId = base && !removing.has(base.id) ? base.id : remaining[0]?.id || null;

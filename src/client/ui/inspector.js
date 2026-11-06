@@ -1,6 +1,5 @@
 import { isContainerType } from '../../shared/elements.js';
 import { H_MODES, V_MODES } from '../../shared/layout.js';
-import { PAGE_STATE_KEYS } from '../../shared/page-states.js';
 import { ACCENT, defaultState, TYPE_INFO } from '../constants.js';
 import { IconBack, IconCopy, IconFront, IconTrash } from '../icons.js';
 import { h } from '../react.js';
@@ -34,9 +33,6 @@ export function InspectorView(props) {
     sel,
     selCount,
     activePage,
-    statePageIds,
-    switchPageState,
-    deleteStateVariant,
     resizeMode,
     setResizeMode,
     fitContentToFrame,
@@ -850,77 +846,6 @@ export function InspectorView(props) {
             t('inspector.fitContent'),
           ),
         ),
-      ),
-      h(
-        'div',
-        { className: 'dpd-section' },
-        h(
-          'div',
-          { className: 'dpd-panelTitle' },
-          h('span', null, t('inspector.states')),
-          activePage && activePage.variantOf
-            ? h('span', null, t('state.' + activePage.stateKey))
-            : null,
-        ),
-        activePage && activePage.variantOf
-          ? h(
-              'div',
-              null,
-              h('div', { className: 'dpd-hint' }, t('inspector.variantEditing')),
-              h(
-                'div',
-                { className: 'dpd-actions' },
-                h(
-                  'button',
-                  {
-                    className: 'dpd-btn',
-                    type: 'button',
-                    onClick: () => switchPageState('normal'),
-                  },
-                  t('inspector.backToBase'),
-                ),
-                h(
-                  'button',
-                  {
-                    className: 'dpd-btn',
-                    type: 'button',
-                    onClick: () => deleteStateVariant(activePage.stateKey),
-                  },
-                  h(IconTrash),
-                  t('inspector.deleteVariant'),
-                ),
-              ),
-            )
-          : PAGE_STATE_KEYS.map((key) => {
-              const linked = !!(statePageIds && statePageIds[key]);
-              return h(
-                'div',
-                { className: 'dpd-row', key },
-                h('label', null, t('state.' + key)),
-                h(
-                  'button',
-                  {
-                    className: 'dpd-btn',
-                    type: 'button',
-                    onClick: () => switchPageState(key),
-                  },
-                  linked ? t('inspector.editState') : t('inspector.createState'),
-                ),
-                linked
-                  ? h(
-                      'button',
-                      {
-                        className: 'dpd-mini',
-                        type: 'button',
-                        title: t('inspector.deleteVariant'),
-                        'aria-label': t('inspector.deleteVariant'),
-                        onClick: () => deleteStateVariant(key),
-                      },
-                      h(IconTrash),
-                    )
-                  : null,
-              );
-            }),
       ),
     );
   }

@@ -1,10 +1,5 @@
 import { findElementEntry } from '../shared/elements.js';
-import {
-  addStateVariant,
-  PAGE_STATE_KEYS,
-  removeStateVariant,
-  statePageId,
-} from '../shared/page-states.js';
+import { PAGE_STATE_KEYS, statePageId } from '../shared/page-states.js';
 import { useDocs } from './docs.js';
 import { activePageOf } from './domain/document.js';
 import { buildMenuItems } from './editor/contextMenuItems.js';
@@ -19,7 +14,6 @@ import { useSelection } from './editor/useSelection.js';
 import { useTextEditing } from './editor/useTextEditing.js';
 import { useUiPrefs } from './editor/useUiPrefs.js';
 import { useT } from './i18n.js';
-import { uid } from './model.js';
 import { h, useCallback, useEffect, useRef, useState } from './react.js';
 import { useSessionId, useSessionTitle } from './session.js';
 import { StyleBlock } from './styles.js';
@@ -88,16 +82,6 @@ function ProductDesignPanel(props = {}) {
 
   const prefs = useUiPrefs();
   const activePage = activePageOf(doc);
-  const stateBase =
-    activePage && activePage.variantOf
-      ? doc.pages.find((page) => page.id === activePage.variantOf) || null
-      : activePage;
-  const pageState = activePage && activePage.variantOf ? activePage.stateKey : 'normal';
-  const statePageIds = {
-    loading: statePageId(doc, stateBase ? stateBase.id : '', 'loading'),
-    empty: statePageId(doc, stateBase ? stateBase.id : '', 'empty'),
-    error: statePageId(doc, stateBase ? stateBase.id : '', 'error'),
-  };
   const selection = useSelection({ setDoc, activePage });
   const { selIds, setSelIds, selEntries, sel, selBoxes, multiBounds, topSelectedEntries } =
     selection;
@@ -167,52 +151,6 @@ function ProductDesignPanel(props = {}) {
         (current) => (current.activePageId === id ? current : { ...current, activePageId: id }),
         false,
       );
-    },
-    [docRef, setDoc, setSelIds],
-  );
-
-  const switchPageState = useCallback(
-    (key) => {
-      const current = activePageOf(docRef.current);
-      if (!current) return;
-      const base = current.variantOf
-        ? docRef.current.pages.find((page) => page.id === current.variantOf)
-        : current;
-      if (!base) return;
-      if (key === 'normal') {
-        setActivePage(base.id);
-        return;
-      }
-      const existing = statePageId(docRef.current, base.id, key);
-      if (existing) {
-        setActivePage(existing);
-        return;
-      }
-      const out = addStateVariant(docRef.current, base.id, key, {
-        name: `${base.name} · ${t('state.' + key)}`,
-        id: uid,
-      });
-      if (out.created) {
-        setDoc(out.doc);
-        setSelIds([]);
-      }
-    },
-    [docRef, setActivePage, setDoc, setSelIds, t],
-  );
-
-  const deleteStateVariant = useCallback(
-    (key) => {
-      const current = activePageOf(docRef.current);
-      if (!current) return;
-      const base = current.variantOf
-        ? docRef.current.pages.find((page) => page.id === current.variantOf)
-        : current;
-      if (!base) return;
-      const out = removeStateVariant(docRef.current, base.id, key);
-      if (out.removedId) {
-        setDoc(out.doc);
-        setSelIds([]);
-      }
     },
     [docRef, setDoc, setSelIds],
   );
@@ -452,8 +390,6 @@ function ProductDesignPanel(props = {}) {
           setDoc,
           activePage,
           setPreset: actions.setPreset,
-          pageState,
-          setPageState: switchPageState,
           zoom: prefs.zoom,
           setZoom: prefs.setZoom,
           preview,
@@ -557,9 +493,6 @@ function ProductDesignPanel(props = {}) {
             sel,
             selCount: selEntries.length,
             activePage,
-            statePageIds,
-            switchPageState,
-            deleteStateVariant,
             resizeMode: prefs.resizeMode,
             setResizeMode: prefs.setResizeMode,
             fitContentToFrame: actions.fitContentToFrame,

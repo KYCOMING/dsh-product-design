@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
+  activateDesignTab,
   foldCard,
   ProductDesignCard,
   ProductPagePreview,
@@ -65,6 +66,23 @@ describe('产品设计 Visualize 卡片', () => {
     const b = { callId: 'b', seq: 2, meta: { ...meta, title: '登录页 2' } };
     expect(foldCard([a], b)).toHaveLength(1);
     expect(foldCard([a], b)[0].callId).toBe('b');
+  });
+
+  it('「打开画布」优先切换到会话内的产品设计选项卡', () => {
+    document.body.innerHTML =
+      '<div data-conversation-tabs>' +
+      '<button type="button" role="tab">对话</button>' +
+      '<button type="button" role="tab">产品设计</button>' +
+      '</div>';
+    let clicked = 0;
+    document.querySelectorAll('button')[1].addEventListener('click', () => {
+      clicked += 1;
+    });
+    expect(activateDesignTab()).toBe(true);
+    expect(clicked).toBe(1);
+    document.body.innerHTML = '';
+    // 没有选项卡时返回 false，让调用方回退到全屏。
+    expect(activateDesignTab()).toBe(false);
   });
 
   it('回合事件会收集 apply 结果里的产品预览', () => {

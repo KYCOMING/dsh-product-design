@@ -56,6 +56,12 @@ describe('domain/document 纯变换', () => {
     expect(removed.activePageId).toBe('p1');
   });
 
+  it('允许删除最后一个页面，删到 0 页', () => {
+    const removed = removePage(doc(), 'p1');
+    expect(removed.pages).toHaveLength(0);
+    expect(removed.activePageId).toBe(null);
+  });
+
   it('pasteElements 保留绝对位置，并可粘贴进容器', () => {
     const source = collectElementEntries(doc().pages[0].elements).find((e) => e.el.id === 'a');
     const items = [{ el: source.el, absX: source.absX, absY: source.absY }];

@@ -194,7 +194,8 @@ describe('自动创建的设计稿命名', () => {
     await mount(makeSessionSource('s1', '登录页设计'));
 
     expect(docs.get('d1').name).toBe('登录页设计');
-    expect(docs.get('d1').pages.length).toBeGreaterThan(0);
+    // 新稿默认没有页面，命名逻辑仍会把会话标题写进空文档。
+    expect(docs.get('d1').pages.length).toBe(0);
     const nameInput = container.querySelector('.dpd-nameInput');
     expect(nameInput.value).toBe('登录页设计');
 

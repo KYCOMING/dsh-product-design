@@ -25,6 +25,23 @@ async function mouse(target, type, init = {}) {
 beforeEach(async () => {
   window.localStorage.clear();
   window.confirm = () => true;
+  // 产品默认 0 页；预览等用例需要一个画板，种一个单页文档。
+  window.localStorage.setItem(
+    'dsh-product-design:doc:v3',
+    JSON.stringify({
+      name: '',
+      activePageId: 'p1',
+      pages: [
+        {
+          id: 'p1',
+          name: '页面 1',
+          frame: { w: 390, h: 844, preset: 'mobile', background: '#ffffff' },
+          states: {},
+          elements: [],
+        },
+      ],
+    }),
+  );
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   document.body.innerHTML = '';
   container = document.createElement('div');

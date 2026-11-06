@@ -282,8 +282,6 @@ function applyOne(doc, op, index, state) {
     const page = doc.pages.find((p) => p.id === op.pageId);
     if (!page) throw new Error(`op[${index}] delete_page: unknown page "${op.pageId}"`);
     const out = removePageDeep(doc, page.id);
-    if (out.pages.length === doc.pages.length)
-      throw new Error(`op[${index}] delete_page: cannot delete the last page`);
     doc.pages = out.pages;
     doc.activePageId = out.activePageId;
     return { op: index, kind, pageId: page.id };

@@ -10,7 +10,7 @@
 
 import { isContainerType } from '../shared/elements.js';
 import { defaultState } from './constants.js';
-import { useT } from './i18n.js';
+import { activeLocale, pickDict, useT } from './i18n.js';
 import { h } from './react.js';
 import { renderWidget } from './widgets.js';
 
@@ -24,7 +24,31 @@ export function setCanvasOpener(fn) {
   canvasOpener = typeof fn === 'function' ? fn : () => {};
 }
 
+/**
+ * Switch to the in-conversation "产品设计" view — the exact same result as the
+ * user clicking that tab. The panel is otherwise a full-screen main panel
+ * (`selectPanel`), which lays out differently (no app sidebar / no view tabs),
+ * so preferring the tab keeps "打开画布" consistent with the tab. Falls back to
+ * the opener when the tab row is unavailable (blank session / hidden tab).
+ */
+export function activateDesignTab() {
+  try {
+    if (typeof document === 'undefined') return false;
+    const labels = new Set([pickDict(activeLocale(), 'entry.label'), '产品设计', 'Product Design']);
+    const tabs = Array.from(
+      document.querySelectorAll('[data-conversation-tabs] button[role="tab"]'),
+    );
+    const target = tabs.find((btn) => labels.has((btn.textContent || '').trim()));
+    if (!target) return false;
+    target.click();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function openCanvas() {
+  if (activateDesignTab()) return;
   try {
     canvasOpener();
   } catch {

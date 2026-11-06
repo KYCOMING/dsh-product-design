@@ -182,30 +182,16 @@ describe('就地编辑与图层', () => {
 });
 
 describe('属性面板', () => {
-  it('空状态会创建真实变体页，可回到正常页并复用同一变体', async () => {
+  it('工具栏不再提供页面状态切换按钮', async () => {
     await mountWith({
       name: '',
       activePageId: 'p1',
       pages: [page('p1', 'P', [el({ props: { text: 'Hi' } })])],
     });
-    await click(btnText('空状态'));
-    let current = doc();
-    expect(current.pages).toHaveLength(2);
-    const base = current.pages.find((p) => !p.variantOf);
-    const variant = current.pages.find((p) => p.variantOf);
-    expect(base.states.empty).toBe(variant.id);
-    expect(variant.stateKey).toBe('empty');
-    expect(variant.elements).toHaveLength(1);
-    expect(current.activePageId).toBe(variant.id);
-    expect(container.textContent).toContain('正在编辑状态变体');
-
-    await click(btnText('回到正常页面'));
-    expect(doc().activePageId).toBe(base.id);
-
-    await click(btnText('空状态'));
-    current = doc();
-    expect(current.pages).toHaveLength(2);
-    expect(current.activePageId).toBe(variant.id);
+    // 「正常 / 加载中 / 空状态 / 错误」状态切换已移除。
+    expect(one('.dpd-seg')).toBeNull();
+    expect(btnText('空状态')).toBeUndefined();
+    expect(btnText('加载中')).toBeUndefined();
   });
 
   it('预览里可以在基础页与状态变体之间切换', async () => {

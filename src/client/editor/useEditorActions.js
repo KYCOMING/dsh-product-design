@@ -67,7 +67,6 @@ export function useEditorActions({
   function deletePage(id) {
     const source = doc.pages.find((candidate) => candidate.id === id);
     if (!source) return;
-    if (!source.variantOf && basePages(doc).length <= 1) return;
     if (!window.confirm(t('pages.deleteConfirm'))) return;
     setDoc((current) => removePageDeep(current, id));
     setSelIds([]);

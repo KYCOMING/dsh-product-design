@@ -48,9 +48,10 @@ describe('host 文档 reducer', () => {
       /add a page/,
     );
     const { doc } = applyOps(emptyDoc(), [{ kind: 'add_page' }]);
-    expect(() => applyOps(doc, [{ kind: 'delete_page', pageId: doc.pages[0].id }])).toThrow(
-      /last page/,
-    );
+    // 允许删除最后一个页面：删完就是 0 页的空白画布。
+    const afterDelete = applyOps(doc, [{ kind: 'delete_page', pageId: doc.pages[0].id }]).doc;
+    expect(afterDelete.pages).toHaveLength(0);
+    expect(afterDelete.activePageId).toBe(null);
   });
 
   it('ensureDoc 丢弃脏数据并补齐默认值', () => {

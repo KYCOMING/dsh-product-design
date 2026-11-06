@@ -206,7 +206,7 @@ export function CanvasView(props) {
     });
   }
 
-  const visiblePages = preview ? [activePage] : doc.pages;
+  const visiblePages = preview ? (activePage ? [activePage] : []) : doc.pages;
   const labelOffset = preview ? 0 : LABEL;
   const positions = {};
   let cursorX = 0;
