@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **页面列表支持重命名**：左侧「页面」列表的每一项现在可以**双击名称**或点击新的**铅笔按钮**就地重命名（Enter 提交、Esc 取消），无需先选中页面再到右侧属性栏改名；新增 `renamePage(pageId, name)` 动作，可重命名任意页面而不切换当前页。
 - **机器可读的 `install` 字段**：`package.json` 顶层新增 `install`，值为规范安装命令 `dsh plugin --profile web add github:KYCOMING/dsh-product-design`，供插件市场 L3「安装规范」检查直接从 manifest 解析安装路径（`engines.dsh` 已声明 DSH 版本要求）。
 
 ### Fixed
