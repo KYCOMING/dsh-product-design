@@ -186,25 +186,25 @@ afterEach(async () => {
 });
 
 describe('自动创建的设计稿命名', () => {
-  it('首次打开会话时，用会话标题命名自动生成的空白稿', async () => {
+  it('首次打开会话时，自动生成的空白稿保持未命名，不用会话标题命名', async () => {
     docs = new Map([['d1', emptyDoc()]]);
     activeDocId = 'd1';
     revisions = { d1: 0 };
 
     await mount(makeSessionSource('s1', '登录页设计'));
 
-    expect(docs.get('d1').name).toBe('登录页设计');
-    // 新稿默认没有页面，命名逻辑仍会把会话标题写进空文档。
+    expect(docs.get('d1').name).toBe('');
+    // 新稿默认没有页面，且不会被自动套用会话标题。
     expect(docs.get('d1').pages.length).toBe(0);
     const nameInput = container.querySelector('.dpd-nameInput');
-    expect(nameInput.value).toBe('登录页设计');
+    expect(nameInput.value).toBe('');
 
     await openDesigns();
-    expect(
-      docRows()
-        .map((row) => row.textContent)
-        .join(' '),
-    ).toContain('登录页设计');
+    const listed = docRows()
+      .map((row) => row.textContent)
+      .join(' ');
+    expect(listed).toContain('未命名设计稿');
+    expect(listed).not.toContain('登录页设计');
   });
 
   it('手动新建的设计稿不会被自动改名', async () => {

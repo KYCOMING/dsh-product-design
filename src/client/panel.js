@@ -15,7 +15,7 @@ import { useTextEditing } from './editor/useTextEditing.js';
 import { useUiPrefs } from './editor/useUiPrefs.js';
 import { useT } from './i18n.js';
 import { h, useCallback, useEffect, useRef, useState } from './react.js';
-import { useSessionId, useSessionTitle } from './session.js';
+import { useSessionId } from './session.js';
 import { StyleBlock } from './styles.js';
 import { CanvasView } from './ui/canvas.js';
 import { ContextMenu } from './ui/contextmenu.js';
@@ -34,7 +34,6 @@ function ProductDesignPanel(props = {}) {
   const t = useT();
   const adapterSessionId = useSessionId();
   const sessionId = props.sessionId || adapterSessionId;
-  const sessionTitle = useSessionTitle();
   const canvasRef = useRef(null);
   const spaceRef = useRef(false);
   const [layerQuery, setLayerQuery] = useState('');
@@ -63,7 +62,6 @@ function ProductDesignPanel(props = {}) {
     resolveConflict,
   } = useDocument({
     sessionId,
-    sessionTitle,
     t,
     resetTransient: () => resetTransientRef.current(),
     onAdopt: (next) => adoptRef.current(next),
