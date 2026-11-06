@@ -3,18 +3,25 @@ import { PAGE_STATE_KEYS, statePageId } from '../shared/page-states.js';
 import { useDocs } from './docs.js';
 import { activePageOf } from './domain/document.js';
 import { buildMenuItems } from './editor/contextMenuItems.js';
+import { useActivePage } from './editor/useActivePage.js';
+import { useCanvasZoom } from './editor/useCanvasZoom.js';
 import { useClipboard } from './editor/useClipboard.js';
+import { useContextMenu } from './editor/useContextMenu.js';
 import { useDocument } from './editor/useDocument.js';
 import { useEditorActions } from './editor/useEditorActions.js';
 import { useExport } from './editor/useExport.js';
 import { useGestures } from './editor/useGestures.js';
 import { useKeyboardShortcuts } from './editor/useKeyboard.js';
+import { usePanelResize } from './editor/usePanelResize.js';
 import { usePreview } from './editor/usePreview.js';
 import { useSelection } from './editor/useSelection.js';
 import { useTextEditing } from './editor/useTextEditing.js';
+import { useToast } from './editor/useToast.js';
 import { useUiPrefs } from './editor/useUiPrefs.js';
+import { useViewport } from './editor/useViewport.js';
 import { useT } from './i18n.js';
-import { h, useCallback, useEffect, useRef, useState } from './react.js';
+import { breadcrumbModel, previewViewModels } from './panel/viewModels.js';
+import { h, useRef, useState } from './react.js';
 import { useSessionId } from './session.js';
 import { StyleBlock } from './styles.js';
 import { CanvasView } from './ui/canvas.js';
@@ -37,14 +44,13 @@ function ProductDesignPanel(props = {}) {
   const canvasRef = useRef(null);
   const spaceRef = useRef(false);
   const [layerQuery, setLayerQuery] = useState('');
-  const [ctxMenu, setCtxMenu] = useState(null);
-  const [toast, setToast] = useState(null);
 
   // The document hook owns history + Host sync. Its session-reset / remote
   // callbacks need setters that live in later hooks, so route them via refs.
   const resetTransientRef = useRef(() => {});
   const adoptRef = useRef(() => {});
   const docsRefreshRef = useRef(() => {});
+  const { toast, setToast } = useToast();
   const {
     doc,
     docId,
@@ -79,10 +85,14 @@ function ProductDesignPanel(props = {}) {
   docsRefreshRef.current = docs.refresh;
 
   const prefs = useUiPrefs();
+  const { startResizeLeft, startResizeRight } = usePanelResize(prefs);
+  const viewport = useViewport();
+  useCanvasZoom(canvasRef, prefs.setZoom);
   const activePage = activePageOf(doc);
   const selection = useSelection({ setDoc, activePage });
   const { selIds, setSelIds, selEntries, sel, selBoxes, multiBounds, topSelectedEntries } =
     selection;
+  const { ctxMenu, setCtxMenu, openContextMenu } = useContextMenu(selIds, setSelIds);
 
   const actions = useEditorActions({
     doc,
@@ -135,23 +145,13 @@ function ProductDesignPanel(props = {}) {
   } = previewState;
   const { pruneSelection } = selection;
 
-  const setActivePage = useCallback(
-    (id) => {
-      setEditing(null);
-      selection.setHoverId(null);
-      setSelIds((ids) => {
-        const page = docRef.current.pages.find((candidate) => candidate.id === id);
-        if (!page) return [];
-        const kept = ids.filter((item) => !!findElementEntry(page.elements, item));
-        return kept.length === ids.length ? ids : kept;
-      });
-      setDoc(
-        (current) => (current.activePageId === id ? current : { ...current, activePageId: id }),
-        false,
-      );
-    },
-    [docRef, setDoc, setSelIds],
-  );
+  const setActivePage = useActivePage({
+    docRef,
+    setDoc,
+    setEditing,
+    setHoverId: selection.setHoverId,
+    setSelIds,
+  });
 
   const gestures = useGestures({
     docRef,
@@ -181,22 +181,6 @@ function ProductDesignPanel(props = {}) {
     pruneSelection(nextDoc);
   };
 
-  // Ctrl/⌘ + wheel zooms the canvas.
-  useEffect(() => {
-    const element = canvasRef.current;
-    if (!element) return undefined;
-    const onWheel = (event) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
-      event.preventDefault();
-      const direction = event.deltaY > 0 ? -1 : 1;
-      prefs.setZoom((value) =>
-        Math.max(0.2, Math.min(2, Math.round((value + direction * 0.1) * 10) / 10)),
-      );
-    };
-    element.addEventListener('wheel', onWheel, { passive: false });
-    return () => element.removeEventListener('wheel', onWheel);
-  }, [prefs.setZoom]);
-
   useKeyboardShortcuts({
     preview,
     editingRef,
@@ -223,111 +207,14 @@ function ProductDesignPanel(props = {}) {
     },
   });
 
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(null), 3200);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  // Close the context menu on any outside press.
-  useEffect(() => {
-    if (!ctxMenu) return undefined;
-    const close = () => setCtxMenu(null);
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, [ctxMenu]);
-
   function toggleSnap() {
     prefs.setSnapEnabled((value) => !value);
   }
 
-  function startResizeLeft(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    const startX = event.clientX;
-    const startWidth = prefs.leftWidth;
-    const move = (moveEvent) => {
-      prefs.setLeftWidth(
-        Math.max(168, Math.min(460, Math.round(startWidth + (moveEvent.clientX - startX)))),
-      );
-    };
-    const up = () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-  }
-
-  function startResizeRight(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (prefs.rightCollapsed) return;
-    const startX = event.clientX;
-    const startWidth = prefs.rightWidth;
-    const move = (moveEvent) => {
-      prefs.setRightWidth(
-        Math.max(200, Math.min(520, Math.round(startWidth - (moveEvent.clientX - startX)))),
-      );
-    };
-    const up = () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-  }
-
-  function openContextMenu(event, element) {
-    if (element) {
-      if (!selIds.includes(element.id)) setSelIds([element.id]);
-    } else {
-      setSelIds([]);
-    }
-    setCtxMenu({ x: event.clientX, y: event.clientY });
-  }
-
-  const viewPage = preview
-    ? doc.pages.find((page) => page.id === previewStack[previewStack.length - 1]) || activePage
-    : activePage;
-  const previewBase =
-    viewPage && viewPage.variantOf
-      ? doc.pages.find((page) => page.id === viewPage.variantOf) || null
-      : viewPage;
-  const previewStateKey = viewPage && viewPage.variantOf ? viewPage.stateKey : 'normal';
-  const previewStateIds = {
-    loading: statePageId(doc, previewBase ? previewBase.id : '', 'loading'),
-    empty: statePageId(doc, previewBase ? previewBase.id : '', 'empty'),
-    error: statePageId(doc, previewBase ? previewBase.id : '', 'error'),
-  };
-  const hasPreviewState =
-    previewStateKey !== 'normal' || Object.values(previewStateIds).some(Boolean);
+  const { viewPage, previewBase, previewStateKey, previewStateIds, hasPreviewState } =
+    previewViewModels(doc, activePage, preview, previewStack);
   const crumbEntry = selEntries[0];
-  const breadcrumb = activePage
-    ? [
-        { id: activePage.id, label: activePage.name },
-        ...(crumbEntry
-          ? crumbEntry.ancestors.map((id) => {
-              const entry = selection.entryById.get(id);
-              return {
-                id,
-                label: entry
-                  ? entry.el.name || entry.el.props.name || t('comp.' + entry.el.type)
-                  : id,
-              };
-            })
-          : []),
-        ...(crumbEntry
-          ? [
-              {
-                id: crumbEntry.el.id,
-                label:
-                  crumbEntry.el.name || crumbEntry.el.props.text || t('comp.' + crumbEntry.el.type),
-              },
-            ]
-          : []),
-      ]
-    : [];
+  const breadcrumb = breadcrumbModel(activePage, crumbEntry, selection.entryById, t);
 
   const ctxEl = selEntries[0] ? selEntries[0].el : null;
   const menuItems = ctxMenu
@@ -440,12 +327,15 @@ function ProductDesignPanel(props = {}) {
             onCreateDoc: docs.create,
             onDuplicateDoc: docs.duplicate,
             onRenameDoc: docs.rename,
-            onDeleteDoc: docs.remove,
+            onDeleteDoc: (id) => {
+              if (id === docId || window.confirm(t('docs.deleteConfirm'))) docs.remove(id);
+            },
             onExportDoc: docs.exportDoc,
             onRefreshDocs: docs.refresh,
           }),
       h(CanvasView, {
         t,
+        viewport,
         doc,
         activePage: viewPage,
         zoom: prefs.zoom,
@@ -488,6 +378,7 @@ function ProductDesignPanel(props = {}) {
         ? null
         : h(InspectorView, {
             t,
+            onImageError: () => setToast({ ok: false, message: t('inspector.imageTooLarge') }),
             doc,
             sel,
             selCount: selEntries.length,
@@ -559,6 +450,7 @@ function ProductDesignPanel(props = {}) {
       ? h(ContextMenu, {
           x: ctxMenu.x,
           y: ctxMenu.y,
+          viewport,
           items: menuItems,
           onClose: () => setCtxMenu(null),
         })

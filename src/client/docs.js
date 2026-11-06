@@ -4,8 +4,8 @@
  * panel stays usable but the library reports that it is unavailable.
  */
 
-import { downloadText, safeFileName } from './export/index.js';
-import { apiFetch, uid } from './model.js';
+import { docsApi, saveExportedDoc } from './docs-api.js';
+import { uid } from './model.js';
 import { useCallback, useEffect, useRef, useState } from './react.js';
 
 /** A fresh one-page document with no elements. */
@@ -32,7 +32,7 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
   tRef.current = t;
 
   const refresh = useCallback(async () => {
-    const res = await apiFetch('/docs', undefined, sessionId);
+    const res = await docsApi.list(sessionId);
     if (!res) {
       setReady(false);
       return null;
@@ -52,15 +52,7 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
   }, [refresh]);
 
   const create = useCallback(async () => {
-    const res = await apiFetch(
-      '/docs',
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionId, doc: blankDoc(tRef.current) }),
-      },
-      sessionId,
-    );
+    const res = await docsApi.create(sessionId, blankDoc(tRef.current));
     if (!res || res.status !== 200 || !res.body || !res.body.meta) {
       setError(tRef.current('docs.createFailed'));
       return null;
@@ -72,15 +64,7 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
 
   const duplicate = useCallback(
     async (docId) => {
-      const res = await apiFetch(
-        '/docs/duplicate',
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ docId, sessionId }),
-        },
-        sessionId,
-      );
+      const res = await docsApi.duplicate(sessionId, docId);
       if (!res || res.status !== 200) {
         setError(tRef.current('docs.duplicateFailed'));
         return null;
@@ -93,15 +77,7 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
 
   const rename = useCallback(
     async (docId, name) => {
-      const res = await apiFetch(
-        '/docs/rename',
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ docId, name }),
-        },
-        sessionId,
-      );
+      const res = await docsApi.rename(sessionId, docId, name);
       if (!res || res.status !== 200) {
         setError(tRef.current('docs.renameFailed'));
         return null;
@@ -120,15 +96,7 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
         if (statusRef.current) statusRef.current(false, 'docs.deleteActive');
         return false;
       }
-      const res = await apiFetch(
-        '/docs/delete',
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ docId }),
-        },
-        sessionId,
-      );
+      const res = await docsApi.remove(sessionId, docId);
       if (!res || res.status !== 200) {
         setError(tRef.current('docs.deleteFailed'));
         return false;
@@ -142,21 +110,12 @@ export function useDocs({ sessionId, activeDocId, t, onSwitch, onStatus }) {
 
   const exportDoc = useCallback(
     async (docId) => {
-      const res = await apiFetch(
-        '/docs/export?docId=' + encodeURIComponent(docId),
-        undefined,
-        sessionId,
-      );
+      const res = await docsApi.export(sessionId, docId);
       if (!res || res.status !== 200 || !res.body) {
         setError(tRef.current('docs.exportFailed'));
         return false;
       }
-      const name = res.body.doc && res.body.doc.name ? res.body.doc.name : 'design';
-      downloadText(
-        JSON.stringify(res.body, null, 2),
-        `${safeFileName(name, 'design')}.json`,
-        'application/json;charset=utf-8',
-      );
+      saveExportedDoc(res.body);
       if (statusRef.current) statusRef.current(true, 'export.done');
       return true;
     },

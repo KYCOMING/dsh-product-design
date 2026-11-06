@@ -2,6 +2,7 @@ import { isContainerType } from '../../shared/elements.js';
 import { TYPE_INFO } from '../constants.js';
 import { h } from '../react.js';
 import { renderWidget } from '../widgets.js';
+import { OverlayLayer } from './canvas/OverlayLayer.js';
 
 const GAP = 72;
 const LABEL = 30;
@@ -32,6 +33,7 @@ export function CanvasView(props) {
     t,
     doc,
     activePage,
+    viewport,
     zoom,
     selIds,
     selBoxes,
@@ -434,6 +436,7 @@ export function CanvasView(props) {
       ? h(OverlayLayer, {
           page: overlayPage,
           t,
+          viewport,
           renderElements,
           onClose: onCloseOverlay,
         })
@@ -467,44 +470,5 @@ export function CanvasView(props) {
         )
       : null,
     canvas,
-  );
-}
-
-/** Modal / dialog prototype: a target page rendered on top of the current one. */
-function OverlayLayer(props) {
-  const { page, renderElements, onClose } = props;
-  const frame = page.frame || { w: 390, h: 844 };
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-  const scale = Math.min(1, (vh * 0.8) / Math.max(1, frame.h), (vw * 0.6) / Math.max(1, frame.w));
-  return h(
-    'div',
-    { className: 'dpd-overlayBackdrop', onMouseDown: onClose },
-    h(
-      'div',
-      {
-        className: 'dpd-overlayFrame',
-        style: {
-          width: Math.round(frame.w * scale),
-          height: Math.round(frame.h * scale),
-          background: frame.background || '#ffffff',
-        },
-        onMouseDown: (ev) => ev.stopPropagation(),
-        onClick: (ev) => ev.stopPropagation(),
-      },
-      h(
-        'div',
-        {
-          style: {
-            width: frame.w,
-            height: frame.h,
-            position: 'relative',
-            transform: 'scale(' + scale + ')',
-            transformOrigin: 'top left',
-          },
-        },
-        renderElements(page.elements || [], page.id, true),
-      ),
-    ),
   );
 }

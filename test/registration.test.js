@@ -20,8 +20,7 @@ describe('插件注册', () => {
     expect(registered.some((r) => r.slot === 'sidebar.panellist')).toBe(false);
     const cards = registered.find((r) => r.slot === 'conversation.chat.turnTail');
     expect(cards?.config?.id).toBe('dsh-product-design-cards');
-    const hero = registered.find((r) => r.slot === 'conversation.hero.options');
-    expect(hero?.config?.id).toBe('dsh-product-design.hero');
+    expect(registered.some((r) => r.slot === 'conversation.hero.options')).toBe(false);
   });
 
   it('会话视图渲染画布，并提供全屏入口', () => {

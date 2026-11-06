@@ -6,7 +6,11 @@
 
 ## [Unreleased]
 
+### Removed
+- **移除新会话的「打开产品设计」入口**：新会话（还没有消息）不再在输入框旁显示「打开产品设计」按钮，同时删除 `conversation.hero.options` 的注册、`ui/heroEntry.js` 组件与相关 `hero.open` 文案；空会话可发送消息后从会话顶部的「产品设计」标签进入，或直接用 `/design <需求>` 绘制。
+
 ### Added
+- **`/design` 斜杠命令的图标与中文标题**：斜杠菜单里的 `/design` 行现在显示中文本地化标题「设计」（保留 `design` 作为别名，显示为「设计 design」）与插件设计图标。由于宿主命令描述符不携带标题/图标、客户端只为内置命令与 `commandUi` 贡献项提供这些展示字段，且 `/design` 需保留 `<需求>` 自由参数（不能用同名客户端贡献项），改由客户端 `ui/commandFace.js` 给命令菜单候选行补充 presentation（标题/描述/图标，随界面语言切换），仅影响外观、不改变命令行为。
 - **页面列表支持重命名**：左侧「页面」列表的每一项现在可以**双击名称**或点击新的**铅笔按钮**就地重命名（Enter 提交、Esc 取消），无需先选中页面再到右侧属性栏改名；新增 `renamePage(pageId, name)` 动作，可重命名任意页面而不切换当前页。
 - **机器可读的 `install` 字段**：`package.json` 顶层新增 `install`，值为规范安装命令 `dsh plugin --profile web add github:KYCOMING/dsh-product-design`，供插件市场 L3「安装规范」检查直接从 manifest 解析安装路径（`engines.dsh` 已声明 DSH 版本要求）。
 

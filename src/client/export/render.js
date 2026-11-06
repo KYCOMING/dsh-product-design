@@ -7,8 +7,8 @@
  * rasterised through an SVG foreignObject.
  */
 
+import { accentOf, fontSizeOf, radiusOf } from '../../shared/element-visual.js';
 import { rgba, shade } from '../color.js';
-import { ACCENT } from '../constants.js';
 
 const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
@@ -67,7 +67,7 @@ export function renderElement(el, ctx) {
   if (!el || el.hidden) return '';
   const t = ctx.t;
   const p = el.props || {};
-  const acc = p.color || ACCENT;
+  const acc = accentOf(el);
   const state = el.state || 'default';
   const attrs = interactionAttrs(el);
 
@@ -77,7 +77,7 @@ export function renderElement(el, ctx) {
       el.type === 'container'
         ? {
             background: p.background || '#ffffff',
-            borderRadius: px(p.radius != null ? p.radius : 12),
+            borderRadius: px(radiusOf(el)),
             overflow: p.clipContent === false ? 'visible' : 'hidden',
           }
         : {};
@@ -90,6 +90,10 @@ export function renderElement(el, ctx) {
     if (state === 'disabled') {
       bg = '#c9ccd4';
       fg = '#f7f8fa';
+    } else if (state === 'hover') {
+      bg = shade(acc, -0.08);
+    } else if (state === 'active') {
+      bg = shade(acc, -0.16);
     }
     const inner = `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;padding:0 12px;overflow:hidden;white-space:nowrap">${escapeHtml(p.text || t('sample.button'))}</span>`;
     return box(
@@ -97,9 +101,9 @@ export function renderElement(el, ctx) {
       {
         background: bg,
         color: fg,
-        borderRadius: px(p.radius != null ? p.radius : 8),
+        borderRadius: px(radiusOf(el)),
         fontWeight: 600,
-        fontSize: px(p.fontSize || 14),
+        fontSize: px(fontSizeOf(el, 14)),
         overflow: 'hidden',
       },
       inner,
@@ -119,10 +123,10 @@ export function renderElement(el, ctx) {
       boxSizing: 'border-box',
       padding: '0 12px',
       border: `1.5px solid ${error ? '#e5484d' : focused ? acc : '#d6d9e2'}`,
-      borderRadius: px(p.radius != null ? p.radius : 8),
+      borderRadius: px(radiusOf(el)),
       background: disabled ? '#f4f5f7' : '#ffffff',
       color: filled ? '#1a1d26' : '#9aa1ad',
-      fontSize: px(p.fontSize || 14),
+      fontSize: px(fontSizeOf(el, 14)),
       fontFamily: 'inherit',
       outline: 'none',
       boxShadow: focused ? `0 0 0 3px ${rgba(acc, 0.18)}` : 'none',
@@ -153,7 +157,7 @@ export function renderElement(el, ctx) {
       {
         background: '#ffffff',
         border: '1px solid #eceef3',
-        borderRadius: px(p.radius != null ? p.radius : 12),
+        borderRadius: px(radiusOf(el)),
         boxShadow: hover ? '0 10px 26px rgba(17,24,39,.14)' : '0 1px 3px rgba(17,24,39,.06)',
         overflow: 'hidden',
       },
@@ -233,7 +237,7 @@ export function renderElement(el, ctx) {
   }
 
   if (el.type === 'text') {
-    const inner = `<div style="width:100%;height:100%;display:flex;align-items:center;font-size:${px(p.fontSize || 18)};font-weight:${p.fontWeight || 600};color:${p.color || '#161a22'};line-height:1.3;white-space:pre-wrap;overflow:hidden;text-align:${p.textAlign || 'left'}">${escapeHtml(p.text || t('sample.text'))}</div>`;
+    const inner = `<div style="width:100%;height:100%;display:flex;align-items:center;font-size:${px(fontSizeOf(el, 18))};font-weight:${p.fontWeight || 600};color:${p.color || '#161a22'};line-height:1.3;white-space:pre-wrap;overflow:hidden;text-align:${p.textAlign || 'left'}">${escapeHtml(p.text || t('sample.text'))}</div>`;
     return box(el, {}, inner, attrs);
   }
 
@@ -242,7 +246,7 @@ export function renderElement(el, ctx) {
       const fit = ['cover', 'contain', 'fill'].includes(p.fit) ? p.fit : 'cover';
       return box(
         el,
-        { borderRadius: px(p.radius != null ? p.radius : 10), overflow: 'hidden' },
+        { borderRadius: px(radiusOf(el)), overflow: 'hidden' },
         `<img src="${escapeHtml(p.src)}" alt="${escapeHtml(p.alt || '')}" style="display:block;width:100%;height:100%;object-fit:${fit}" />`,
         attrs,
       );
@@ -250,7 +254,7 @@ export function renderElement(el, ctx) {
     return box(
       el,
       {
-        borderRadius: px(p.radius != null ? p.radius : 10),
+        borderRadius: px(radiusOf(el)),
         background:
           'repeating-linear-gradient(45deg,#eef0f5,#eef0f5 10px,#e6e9f0 10px,#e6e9f0 20px)',
         border: '1px solid #e6e9f0',

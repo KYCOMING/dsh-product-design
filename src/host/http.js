@@ -7,9 +7,11 @@
  *   GET  /events  → SSE, one `{ revision }` per change
  */
 
+import { applySecurityFence } from './http/security.js';
+import { streamEvents } from './http/sse.js';
+
 const API_PREFIX = '/dsh-product-design/api';
 const MAX_BODY = 16 * 1024 * 1024;
-const HEARTBEAT_MS = 15000;
 
 function writeJson(res, status, value) {
   const body = JSON.stringify(value);
@@ -57,21 +59,8 @@ function makeHandler(ctx, stores) {
         return;
       }
 
-      // Same-origin fence: reuse the Host's own browser-session authority when
-      // the deployment provides it; otherwise rely on the loopback bind.
-      try {
-        const connection = ctx.get('connection');
-        if (connection && typeof connection.requestRejection === 'function') {
-          const rejection = connection.requestRejection(req);
-          if (rejection) {
-            res.writeHead(rejection);
-            res.end();
-            return;
-          }
-        }
-      } catch {
-        /* no connection service */
-      }
+      // Same-origin fence (see ./http/security.js).
+      if (applySecurityFence(ctx, req, res)) return;
 
       const sub = pathname.slice(API_PREFIX.length) || '/';
       const querySessionId = url.searchParams.get('sessionId') || '';
@@ -119,19 +108,23 @@ function makeHandler(ctx, stores) {
 
       if (sub === '/docs/rename' && req.method === 'POST') {
         const body = await readJson(req);
-        writeJson(res, 200, stores.renameDoc(body?.docId, body?.name));
+        writeJson(
+          res,
+          200,
+          stores.renameDoc(body?.docId, body?.name, body?.sessionId || querySessionId),
+        );
         return;
       }
 
       if (sub === '/docs/delete' && req.method === 'POST') {
         const body = await readJson(req);
-        writeJson(res, 200, stores.deleteDoc(body?.docId));
+        writeJson(res, 200, stores.deleteDoc(body?.docId, body?.sessionId || querySessionId));
         return;
       }
 
       if (sub === '/docs/export' && req.method === 'GET') {
         const docId = url.searchParams.get('docId') || '';
-        const payload = stores.exportDoc(docId);
+        const payload = stores.exportDoc(docId, querySessionId);
         const body = JSON.stringify(payload);
         const safeName =
           String(payload.doc?.name || 'design')
@@ -151,36 +144,12 @@ function makeHandler(ctx, stores) {
       if (sub === '/apply' && req.method === 'POST') {
         const body = await readJson(req);
         const store = stores.forSession(body?.sessionId || querySessionId);
-        const result = store.apply(body?.operations);
-        writeJson(res, 200, result);
+        writeJson(res, 200, store.apply(body?.operations));
         return;
       }
 
       if (sub === '/events' && req.method === 'GET') {
-        const store = stores.forSession(querySessionId);
-        res.writeHead(200, {
-          'content-type': 'text/event-stream; charset=utf-8',
-          'cache-control': 'no-cache',
-          connection: 'keep-alive',
-        });
-        const push = (revision, docId) =>
-          res.write(`data: ${JSON.stringify({ revision, docId })}\n\n`);
-        const unsubscribe = store.subscribe(push);
-        const heartbeat = setInterval(() => {
-          try {
-            res.write(': ping\n\n');
-          } catch {
-            /* ignore */
-          }
-        }, HEARTBEAT_MS);
-        const close = () => {
-          clearInterval(heartbeat);
-          unsubscribe();
-        };
-        req.once('close', close);
-        res.once('close', close);
-        const snap = store.snapshot();
-        push(snap.revision, snap.docId);
+        streamEvents(stores.forSession(querySessionId), req, res);
         return;
       }
 

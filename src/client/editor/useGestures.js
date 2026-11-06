@@ -15,9 +15,12 @@ import {
   isUnderAny,
   pointInBox,
 } from '../../shared/elements.js';
+import { resizeElement } from '../../shared/layout.js';
 import { SNAP_THRESHOLD, snapMoveBox, snapResizeBox } from '../../shared/snapping.js';
 import { appendToContainer, extractFromTree, mapTree } from '../domain/tree.js';
 import { useEffect, useState } from '../react.js';
+import { snapTargets } from './gestureUtils.js';
+import { useSpacePan } from './useSpacePan.js';
 
 export function useGestures({
   docRef,
@@ -36,65 +39,9 @@ export function useGestures({
   const [guides, setGuides] = useState([]);
   const [marquee, setMarquee] = useState(null);
   const [panning, setPanning] = useState(false);
-  const [spaceDown, setSpaceDown] = useState(false);
-
-  // Hold Space to enter pan mode; released on keyup / window blur.
-  useEffect(() => {
-    const isEditable = (tgt) => {
-      const tag = (tgt && tgt.tagName) || '';
-      return (
-        tag === 'INPUT' ||
-        tag === 'TEXTAREA' ||
-        tag === 'SELECT' ||
-        tag === 'BUTTON' ||
-        tag === 'A' ||
-        (tgt && tgt.isContentEditable)
-      );
-    };
-    const down = (e) => {
-      if (e.code !== 'Space' || isEditable(e.target)) return;
-      e.preventDefault();
-      if (!spaceRef.current) {
-        spaceRef.current = true;
-        setSpaceDown(true);
-      }
-    };
-    const up = (e) => {
-      if (e.code === 'Space') {
-        spaceRef.current = false;
-        setSpaceDown(false);
-      }
-    };
-    const blur = () => {
-      spaceRef.current = false;
-      setSpaceDown(false);
-    };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    window.addEventListener('blur', blur);
-    return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
-      window.removeEventListener('blur', blur);
-    };
-  }, []);
+  const spaceDown = useSpacePan(spaceRef);
 
   // ----- drag / resize / snapping -----
-  function snapTargets(page, excludeIds) {
-    const targets = [{ x: 0, y: 0, w: page.frame.w, h: page.frame.h, id: '__frame__' }];
-    for (const entry of collectElementEntries(page.elements)) {
-      if (excludeIds.has(entry.el.id)) continue;
-      targets.push({
-        id: entry.el.id,
-        x: entry.absX,
-        y: entry.absY,
-        w: entry.w,
-        h: entry.h,
-      });
-    }
-    return targets;
-  }
-
   function startDrag(ev, pageId, el) {
     if (ev.button === 1 || spaceRef.current) return;
     ev.stopPropagation();

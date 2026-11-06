@@ -12,19 +12,13 @@
  */
 
 import { cloneElementDeep } from './elements.js';
+import { newId } from './id.js';
 import { resizePage } from './layout.js';
 
 export const PAGE_STATE_KEYS = ['loading', 'empty', 'error'];
 
-let seq = 0;
-function defaultId(prefix) {
-  seq += 1;
-  const rnd =
-    typeof globalThis.crypto?.randomUUID === 'function'
-      ? globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 8)
-      : Math.random().toString(36).slice(2, 10);
-  return prefix + Date.now().toString(36) + seq.toString(36) + rnd;
-}
+// Page/element/state ids come from the shared generator (single source).
+const defaultId = (prefix) => newId(prefix);
 
 export function isVariant(page) {
   return !!(page && page.variantOf && PAGE_STATE_KEYS.includes(page.stateKey));
